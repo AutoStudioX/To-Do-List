@@ -157,9 +157,9 @@ export default function PrehledPage() {
 
       {/* Rings */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
-        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={150} />
-        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#8b5cf6" size={150} sublabel={goalRingSublabel} />
-        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={150} />
+        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={180} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#8b5cf6" size={180} sublabel={goalRingSublabel} />
+        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={180} />
       </div>
 
       {/* Bottom grid — fills remaining height */}
