@@ -165,7 +165,15 @@ export default function FinancePage() {
 
   async function deleteIncome(id: string) {
     if (!confirm('Smazat příjem?')) return
-    await createClient().from('prijmy').delete().eq('id', id); load()
+    const supabase = createClient()
+    const income = incomes.find(i => i.id === id)
+    await supabase.from('prijmy').delete().eq('id', id)
+    if (income?.status === 'dluh') {
+      await supabase.from('dluhy').delete()
+        .eq('user_id', income.user_id).eq('smer', 'mne')
+        .eq('popis', `Příjem: ${income.klient}`)
+    }
+    load()
   }
   async function deleteExpense(id: string) {
     if (!confirm('Smazat výdaj?')) return
@@ -193,7 +201,15 @@ export default function FinancePage() {
 
   async function deleteDebt(id: string) {
     if (!confirm('Smazat dluh?')) return
-    await createClient().from('dluhy').delete().eq('id', id); load()
+    const supabase = createClient()
+    const debt = debts.find(d => d.id === id)
+    await supabase.from('dluhy').delete().eq('id', id)
+    if (debt?.popis?.startsWith('Příjem: ')) {
+      const klient = debt.popis.replace('Příjem: ', '')
+      await supabase.from('prijmy').delete()
+        .eq('user_id', debt.user_id).eq('klient', klient).eq('status', 'dluh')
+    }
+    load()
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
