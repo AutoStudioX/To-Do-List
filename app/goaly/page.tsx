@@ -182,8 +182,8 @@ export default function GoalyPage() {
                     border: `1px solid ${goal.status === 'completed' ? '#a7f3d0' : '#c4b5fd'}`,
                   }}>{goal.status === 'completed' ? 'Splněno' : 'Aktivní'}</span>
                   {typ !== 'manual' && (
-                    <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: typ === 'income' ? '#8b5cf622' : '#3b82f622', border: `1px solid ${typ === 'income' ? '#8b5cf6' : '#3b82f6'}`, color: typ === 'income' ? '#8b5cf6' : '#3b82f6', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
-                      {typ === 'income' ? <><Zap size={10} /> příjmy</> : <><Hash size={10} /> číslo</>}
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, background: typ === 'income' ? '#8b5cf622' : '#3b82f622', border: `1px solid ${typ === 'income' ? '#8b5cf6' : '#3b82f6'}`, color: typ === 'income' ? '#8b5cf6' : '#3b82f6', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                      {typ === 'income' ? <><Zap size={9} /> příjmy</> : <><Hash size={9} /> číslo</>}
                     </span>
                   )}
                 </div>
