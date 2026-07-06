@@ -77,8 +77,8 @@ export default function FinancePage() {
   const fixedYearly = fixni.filter(t => t.opakovani === 'rocni').reduce((s, t) => s + Number(t.castka), 0)
   const fixedTotal = fixedMonthly + fixedYearly / 12
 
-  const chartData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+  const chartData = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
     const mS = new Date(d.getFullYear(), d.getMonth(), 1)
     const mE = new Date(d.getFullYear(), d.getMonth() + 1, 0)
     return {
@@ -190,7 +190,7 @@ export default function FinancePage() {
       </div>
 
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px', marginBottom: 24, boxShadow: 'var(--shadow)' }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--text)' }}>Posledních 6 měsíců</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--text)' }}>Posledních 12 měsíců</h2>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
