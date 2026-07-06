@@ -107,14 +107,24 @@ export default function UkolyPage() {
       {/* Filter pills */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
-          {['All', 'Todo', 'In Progress', 'Done'].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{
-              ...pillBase,
-              background: filterStatus === s ? 'var(--text)' : 'var(--card)',
-              color: filterStatus === s ? 'var(--bg)' : 'var(--muted)',
-              border: `1px solid ${filterStatus === s ? 'var(--text)' : 'var(--border)'}`,
-            }}>{s === 'All' ? 'Vše' : s}</button>
-          ))}
+          {(['All', 'Todo', 'In Progress', 'Done'] as const).map(s => {
+            const activeColors: Record<string, { bg: string; color: string; border: string }> = {
+              All: { bg: 'var(--text)', color: 'var(--bg)', border: 'var(--text)' },
+              Todo: { bg: '#e5e7eb', color: '#374151', border: '#9ca3af' },
+              'In Progress': { bg: '#dbeafe', color: '#1d4ed8', border: '#3b82f6' },
+              Done: { bg: '#d1fae5', color: '#065f46', border: '#10b981' },
+            }
+            const active = filterStatus === s
+            return (
+              <button key={s} onClick={() => setFilterStatus(s)} style={{
+                ...pillBase,
+                background: active ? activeColors[s].bg : 'var(--card)',
+                color: active ? activeColors[s].color : 'var(--muted)',
+                border: `1px solid ${active ? activeColors[s].border : 'var(--border)'}`,
+                fontWeight: active ? 600 : 500,
+              }}>{s === 'All' ? 'Vše' : s}</button>
+            )
+          })}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'High', 'Medium', 'Low'] as const).map(p => (
