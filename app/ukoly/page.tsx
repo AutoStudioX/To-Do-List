@@ -11,15 +11,15 @@ const priorityBorder: Record<string, string> = {
   Medium: '#f59e0b',
   Low: '#9ca3af',
 }
-const priorityBadge: Record<string, { bg: string; color: string }> = {
-  High: { bg: '#fee2e2', color: '#e53e3e' },
-  Medium: { bg: '#fef3c7', color: '#d97706' },
-  Low: { bg: '#f3f4f6', color: '#6b7280' },
+const priorityBadge: Record<string, { bg: string; color: string; border: string }> = {
+  High: { bg: '#fee2e2', color: '#c53030', border: '#fca5a5' },
+  Medium: { bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
+  Low: { bg: '#e5e7eb', color: '#4b5563', border: '#d1d5db' },
 }
-const statusBadge: Record<string, { bg: string; color: string }> = {
-  'Todo': { bg: '#f3f4f6', color: '#6b7280' },
-  'In Progress': { bg: '#dbeafe', color: '#2563eb' },
-  'Done': { bg: '#d1fae5', color: '#059669' },
+const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
+  'Todo': { bg: '#e5e7eb', color: '#374151', border: '#d1d5db' },
+  'In Progress': { bg: '#dbeafe', color: '#1d4ed8', border: '#93c5fd' },
+  'Done': { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
 }
 
 const inputStyle: React.CSSProperties = {
@@ -173,8 +173,8 @@ export default function UkolyPage() {
 
               {/* Badges + actions */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', flexShrink: 0 }}>
-                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, ...priorityBadge[t.priorita] }}>{t.priorita}</span>
-                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, ...statusBadge[t.status] }}>{t.status}</span>
+                <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, fontWeight: 600, background: priorityBadge[t.priorita].bg, color: priorityBadge[t.priorita].color, border: `1px solid ${priorityBadge[t.priorita].border}` }}>{t.priorita}</span>
+                <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, fontWeight: 600, background: statusBadge[t.status].bg, color: statusBadge[t.status].color, border: `1px solid ${statusBadge[t.status].border}` }}>{t.status}</span>
                 <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
                   <Pencil size={13} />
                 </button>
