@@ -73,13 +73,9 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div style={{ padding: '12px 12px', margin: '0 8px 8px', borderRadius: 10, background: 'linear-gradient(135deg, #1a1a1a 0%, #1f1215 100%)', border: '1px solid #3a1a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(229,62,62,0.4)' }}>
-          <Zap size={17} color="white" fill="white" />
-        </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}><span style={{ color: '#ffffff' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span></div>
-        </div>
+      <div style={{ padding: '11px 14px', margin: '0 8px 8px', borderRadius: 10, background: '#e53e3e', boxShadow: '0 0 18px rgba(229,62,62,0.55), 0 2px 8px rgba(229,62,62,0.3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Zap size={18} color="white" fill="white" />
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', letterSpacing: '0.2px' }}>AutoStudio</span>
       </div>
 
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
