@@ -41,6 +41,22 @@ export interface Income {
   created_at: string
 }
 
+export interface Transaction {
+  id: string
+  user_id: string
+  nazev: string
+  castka: number
+  datum: string | null
+  typ: 'prijem' | 'vydaj' | 'fixni_naklad' | 'dluh'
+  kategorie: string | null
+  smer: string | null
+  opakovani: 'jednorazovy' | 'mesicni' | 'rocni' | null
+  status: string | null
+  klient: string | null
+  poznamka: string | null
+  created_at: string
+}
+
 export interface Expense {
   id: string
   user_id: string

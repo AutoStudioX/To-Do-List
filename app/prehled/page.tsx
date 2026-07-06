@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import CircleProgress from '@/components/CircleProgress'
 import GoalRoadmap from '@/components/GoalRoadmap'
-import { Task, Goal, Milestone, Income, Debt } from '@/lib/types'
+import { Task, Goal, Milestone, Transaction } from '@/lib/types'
 import { CheckSquare, Calendar, TrendingUp, CreditCard } from 'lucide-react'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -12,8 +12,7 @@ export default function PrehledPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [milestones, setMilestones] = useState<Milestone[]>([])
-  const [incomes, setIncomes] = useState<Income[]>([])
-  const [debts, setDebts] = useState<Debt[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -24,19 +23,17 @@ export default function PrehledPage() {
         const user = session?.user
         if (!user) return
 
-        const [tasksRes, goalsRes, milestonesRes, incomesRes, debtsRes] = await Promise.all([
+        const [tasksRes, goalsRes, milestonesRes, trRes] = await Promise.all([
           supabase.from('ukoly').select('*').eq('user_id', user.id),
           supabase.from('goaly').select('*').eq('user_id', user.id),
           supabase.from('milniky').select('*').eq('user_id', user.id),
-          supabase.from('prijmy').select('*').eq('user_id', user.id),
-          supabase.from('dluhy').select('*').eq('user_id', user.id),
+          supabase.from('transakce').select('*').eq('user_id', user.id),
         ])
 
         setTasks(tasksRes.data || [])
         setGoals(goalsRes.data || [])
         setMilestones(milestonesRes.data || [])
-        setIncomes(incomesRes.data || [])
-        setDebts(debtsRes.data || [])
+        setTransactions(trRes.data || [])
       } catch {
         // network or auth error — show empty state
       } finally {
@@ -51,20 +48,21 @@ export default function PrehledPage() {
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthIncomes = incomes.filter(i => i.status === 'zaplaceno' && new Date(i.datum) >= monthStart)
-  const monthTotal = monthIncomes.reduce((s, i) => s + Number(i.castka), 0)
 
-  const myDebts = debts.filter(d => d.smer === 'moje' && d.status === 'nesplaceno')
-  const myDebtTotal = myDebts.reduce((s, d) => s + Number(d.castka), 0)
-  const paidDebts = debts.filter(d => d.smer === 'moje' && d.status === 'splaceno')
-  const allMyDebtTotal = myDebtTotal + paidDebts.reduce((s, d) => s + Number(d.castka), 0)
+  const prijmy = transactions.filter(t => t.typ === 'prijem')
+  const dluhyTx = transactions.filter(t => t.typ === 'dluh')
+
+  const monthTotal = prijmy.filter(i => i.status === 'zaplaceno' && i.datum && new Date(i.datum) >= monthStart).reduce((s, i) => s + Number(i.castka), 0)
+  const lifetimeIncome = prijmy.filter(i => i.status === 'zaplaceno').reduce((s, i) => s + Number(i.castka), 0)
+
+  const myDebtTotal = dluhyTx.filter(d => d.smer === 'moje' && d.status === 'nesplaceno').reduce((s, d) => s + Number(d.castka), 0)
+  const allMyDebtTotal = dluhyTx.filter(d => d.smer === 'moje').reduce((s, d) => s + Number(d.castka), 0)
+  const paidDebtTotal = allMyDebtTotal - myDebtTotal
 
   const openTasks = tasks.filter(t => t.status !== 'Done')
   const nextDeadline = openTasks
     .filter(t => t.deadline)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0]
-
-  const lifetimeIncome = incomes.filter(i => i.status === 'zaplaceno').reduce((s, i) => s + Number(i.castka), 0)
 
   if (loading) {
     return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>
@@ -89,7 +87,7 @@ export default function PrehledPage() {
         <CircleProgress label="Úkoly splněny" value={doneTasks} max={Math.max(tasks.length, 1)} color="#e53e3e" />
         <CircleProgress label="Goaly splněny" value={completedGoals} max={Math.max(goals.length, 1)} color="#8b5cf6" />
         <CircleProgress label="Finance (1M cíl)" value={lifetimeIncome} max={1000000} color="#f59e0b" />
-        <CircleProgress label="Dluhy splaceny" value={allMyDebtTotal - myDebtTotal} max={Math.max(allMyDebtTotal, 1)} color="#10b981" />
+        <CircleProgress label="Dluhy splaceny" value={paidDebtTotal} max={Math.max(allMyDebtTotal, 1)} color="#10b981" />
       </div>
 
       {/* Quick stats */}
