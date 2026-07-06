@@ -226,7 +226,7 @@ export default function GoalyPage() {
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button onClick={() => openEditGoal(goal)} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '8px', color: 'var(--muted)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <button onClick={() => openEditGoal(goal)} style={{ flex: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                   <Pencil size={13} /> Upravit
                 </button>
                 <button onClick={() => deleteGoal(goal.id)} style={{ flex: 1, background: 'transparent', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px', color: '#e53e3e', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
