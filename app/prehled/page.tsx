@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Task, Goal, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import CircleProgress from '@/components/CircleProgress'
 import Link from 'next/link'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -93,30 +94,11 @@ export default function PrehledPage() {
         </button>
       </div>
 
-      {/* Top stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 16, marginBottom: 28 }}>
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Celkem vyděláno</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#10b981' }}>{czk(lifetimeIncome)}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>tento měsíc {czk(monthIncome)}</div>
-        </div>
-
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Cíl 1 000 000 Kč</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>{pct1M}%</div>
-          </div>
-          <div style={{ background: 'var(--progress-track)', borderRadius: 8, height: 14, overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(90deg, #e53e3e, #f59e0b)', height: '100%', width: `${pct1M}%`, borderRadius: 8, transition: 'width 0.6s' }} />
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>{czk(lifetimeIncome)} z {czk(1000000)} — zbývá {czk(1000000 - lifetimeIncome)}</div>
-        </div>
-
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Otevřené úkoly</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: openTasks.length > 0 ? '#e53e3e' : '#10b981' }}>{openTasks.length}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>z {tasks.length} celkem</div>
-        </div>
+      {/* Top rings */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '24px', marginBottom: 28, boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" />
+        <CircleProgress label="Goaly splněny" value={goals.filter(g => g.status === 'completed').length} max={Math.max(goals.length, 1)} color="#8b5cf6" />
+        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" />
       </div>
 
       {/* Goals */}
