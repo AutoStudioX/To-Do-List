@@ -173,8 +173,8 @@ export default function UkolyPage() {
 
               {/* Badges + actions */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', flexShrink: 0 }}>
-                <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, fontWeight: 600, background: priorityBadge[t.priorita].bg, color: priorityBadge[t.priorita].color, border: `1px solid ${priorityBadge[t.priorita].border}` }}>{t.priorita}</span>
-                <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, fontWeight: 600, background: statusBadge[t.status].bg, color: statusBadge[t.status].color, border: `1px solid ${statusBadge[t.status].border}` }}>{t.status}</span>
+                <span style={{ fontSize: 11, padding: '4px 0', borderRadius: 20, fontWeight: 600, width: 70, textAlign: 'center', display: 'inline-block', background: priorityBadge[t.priorita].bg, color: priorityBadge[t.priorita].color, border: `1px solid ${priorityBadge[t.priorita].border}` }}>{t.priorita}</span>
+                <span style={{ fontSize: 11, padding: '4px 0', borderRadius: 20, fontWeight: 600, width: 90, textAlign: 'center', display: 'inline-block', background: statusBadge[t.status].bg, color: statusBadge[t.status].color, border: `1px solid ${statusBadge[t.status].border}` }}>{t.status}</span>
                 <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
                   <Pencil size={13} />
                 </button>
