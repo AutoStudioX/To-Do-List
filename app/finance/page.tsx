@@ -244,20 +244,20 @@ export default function FinancePage() {
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px' }}><TypBadge typ={t.typ} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 {activeTab === 'prijmy' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.klient || t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#10b981' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#dbeafe', color: '#2563eb' }}>{t.opakovani || '—'}</span></td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 {activeTab === 'vydaje' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.kategorie || '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'mesicni' ? '#dbeafe' : '#f3f4f6', color: t.opakovani === 'mesicni' ? '#2563eb' : '#6b7280' }}>{t.opakovani === 'mesicni' ? 'Opakující se' : 'Jednorázový'}</span></td>
                 </>}
@@ -274,7 +274,7 @@ export default function FinancePage() {
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.smer === 'moje' ? '#e53e3e' : '#10b981' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 <td style={{ padding: '12px 16px' }}>
