@@ -160,7 +160,7 @@ export default function GoalyPage() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 20 }}>
         {goals.length === 0 ? (
           <div style={{ color: 'var(--muted)', padding: 24 }}>Žádné goaly. Přidejte první!</div>
         ) : goals.map(goal => {
