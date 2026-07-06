@@ -257,8 +257,8 @@ export default function PrehledPage() {
                 <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
                   style={{ width: 15, height: 15, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
-                  {t.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
+                  <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
+                  {t.deadline && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
                 </div>
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0 }}>{t.priorita}</span>
               </div>
@@ -297,10 +297,10 @@ export default function PrehledPage() {
             ) : last5tx.map(t => (
               <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</div>
+                  <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>
                   {t.typ === 'prijem' ? '+' : '-'}{czk(Number(t.castka))}
                 </div>
               </div>
