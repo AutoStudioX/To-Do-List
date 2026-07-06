@@ -95,7 +95,8 @@ a:hover {
 
   /* Přehled grids */
   .bottom-grid { grid-template-columns: 1fr !important; }
-  .rings-grid { gap: 6px !important; padding: 10px 8px !important; }
+  .rings-grid { gap: 8px !important; padding: 12px 8px !important; }
+  .rings-grid > div > div:last-child { display: none; } /* hide progress bar under ring on mobile */
 
   /* Modal → bottom sheet */
   .modal-overlay { align-items: flex-end !important; padding: 0 !important; }

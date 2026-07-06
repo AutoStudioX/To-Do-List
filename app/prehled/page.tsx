@@ -23,6 +23,13 @@ export default function PrehledPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [menu, setMenu] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   const [addModal, setAddModal] = useState<'finance' | 'ukol' | 'goal' | null>(null)
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -150,6 +157,7 @@ export default function PrehledPage() {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     })
 
+  const ringSize = isMobile ? 76 : 120
   const singleGoal = goals.length === 1 ? goals[0] : null
   const last5tx = transactions.slice(0, 5)
 
@@ -187,7 +195,7 @@ export default function PrehledPage() {
   const goalRingSublabel = singleGoal ? singleGoal.nazev : undefined
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+    <div style={{ height: isMobile ? 'auto' : '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
@@ -220,9 +228,9 @@ export default function PrehledPage() {
 
       {/* Rings */}
       <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
-        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={120} />
-        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={120} />
-        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={120} />
+        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} />
+        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
       </div>
 
       {/* Goals */}
@@ -293,9 +301,9 @@ export default function PrehledPage() {
       )}
 
       {/* Bottom grid — fills remaining height */}
-      <div className="bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
+      <div className="bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: isMobile ? undefined : 1, minHeight: 0 }}>
         {/* Tasks */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 200 : 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Úkoly</h2>
             <Link href="/ukoly" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
@@ -323,7 +331,7 @@ export default function PrehledPage() {
         </div>
 
         {/* Finance */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 200 : 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Finance</h2>
             <Link href="/finance" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
