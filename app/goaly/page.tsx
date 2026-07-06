@@ -98,20 +98,27 @@ export default function GoalyPage() {
       progress = Math.min(100, Math.round((monthIncome / (Number(goalForm.target_value) || 1)) * 100))
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       nazev: goalForm.nazev,
       deadline: goalForm.deadline || null,
       popis: goalForm.popis || null,
       progress,
       status: goalForm.status,
+    }
+    // Try with new columns; fall back to base payload if columns don't exist yet
+    const extendedPayload = {
+      ...payload,
       typ: goalForm.typ,
       current_value: goalForm.typ === 'number' ? (Number(goalForm.current_value) || null) : null,
       target_value: goalForm.typ !== 'manual' ? (Number(goalForm.target_value) || null) : null,
     }
+    let error
     if (editGoal) {
-      await supabase.from('goaly').update(payload).eq('id', editGoal.id)
+      ;({ error } = await supabase.from('goaly').update(extendedPayload).eq('id', editGoal.id))
+      if (error?.code === '42703') await supabase.from('goaly').update(payload).eq('id', editGoal.id)
     } else {
-      await supabase.from('goaly').insert({ ...payload, user_id: user.id })
+      ;({ error } = await supabase.from('goaly').insert({ ...extendedPayload, user_id: user.id }))
+      if (error?.code === '42703') await supabase.from('goaly').insert({ ...payload, user_id: user.id })
     }
     setSaving(false); setGoalModal(false); load()
   }
@@ -148,7 +155,7 @@ export default function GoalyPage() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Goaly</h1>
-        <button onClick={openAddGoal} style={{ background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={openAddGoal} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={16} /> Přidat goal
         </button>
       </div>
