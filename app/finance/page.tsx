@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
+import DatePicker from '@/components/DatePicker'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
@@ -312,7 +313,7 @@ export default function FinancePage() {
           <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={form.castka} onChange={e => setForm({ ...form, castka: e.target.value })} /></div>
 
           {form.typ !== 'fixni_naklad' && (
-            <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={e => setForm({ ...form, datum: e.target.value })} /></div>
+            <div><label style={labelStyle}>Datum</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
           )}
 
           {form.typ === 'vydaj' && (

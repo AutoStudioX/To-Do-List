@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Goal, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X } from 'lucide-react'
 import CircleProgress from '@/components/CircleProgress'
+import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -17,9 +18,12 @@ export default function PrehledPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [addModal, setAddModal] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const [addModal, setAddModal] = useState<'finance' | 'ukol' | 'goal' | null>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka' })
+  const [txForm, setTxForm] = useState({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka' })
+  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'Medium', deadline: '' })
+  const [goalForm, setGoalForm] = useState({ nazev: '', deadline: '', popis: '' })
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,12 +58,42 @@ export default function PrehledPage() {
     const user = session?.user
     if (!user) { setSaving(false); return }
     const { data } = await supabase.from('transakce').insert({
-      nazev: form.nazev, castka: Number(form.castka), datum: form.datum,
-      typ: form.typ, status: form.status, user_id: user.id,
+      nazev: txForm.nazev, castka: Number(txForm.castka), datum: txForm.datum,
+      typ: txForm.typ, status: txForm.status, user_id: user.id,
     }).select().single()
     if (data) setTransactions(prev => [data, ...prev])
-    setSaving(false); setAddModal(false)
-    setForm({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem', status: 'ceka' })
+    setSaving(false); setAddModal(null)
+    setTxForm({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem', status: 'ceka' })
+  }
+
+  async function saveTask() {
+    const supabase = createClient()
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setSaving(false); return }
+    const { data } = await supabase.from('ukoly').insert({
+      nazev: taskForm.nazev, priorita: taskForm.priorita,
+      deadline: taskForm.deadline || null, status: 'Todo', user_id: user.id,
+    }).select().single()
+    if (data) setTasks(prev => [data, ...prev])
+    setSaving(false); setAddModal(null)
+    setTaskForm({ nazev: '', priorita: 'Medium', deadline: '' })
+  }
+
+  async function saveGoal() {
+    const supabase = createClient()
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setSaving(false); return }
+    const { data } = await supabase.from('goaly').insert({
+      nazev: goalForm.nazev, deadline: goalForm.deadline || null,
+      popis: goalForm.popis || null, progress: 0, status: 'active', user_id: user.id,
+    }).select().single()
+    if (data) setGoals(prev => [...prev, data])
+    setSaving(false); setAddModal(null)
+    setGoalForm({ nazev: '', deadline: '', popis: '' })
   }
 
   const now = new Date()
@@ -81,137 +115,182 @@ export default function PrehledPage() {
     })
     .slice(0, 5)
 
-  const activeGoals = goals.filter(g => g.status === 'active')
+  const singleGoal = goals.length === 1 ? goals[0] : null
   const last5tx = transactions.slice(0, 5)
-  const pct1M = Math.min(100, Math.round((lifetimeIncome / 1000000) * 100))
+
+  // Goal ring: single goal → show its progress; multiple → show % completed
+  const goalRingValue = singleGoal ? singleGoal.progress : goals.filter(g => g.status === 'completed').length
+  const goalRingMax = singleGoal ? 100 : Math.max(goals.length, 1)
+  const goalRingLabel = singleGoal ? singleGoal.nazev : 'Goaly splněny'
+  const goalRingSublabel = singleGoal ? singleGoal.nazev : undefined
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Přehled</h1>
-        <button onClick={() => setAddModal(true)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plus size={16} /> Přidat transakci
-        </button>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Přehled</h1>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setMenu(m => !m)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Plus size={14} /> Přidat
+          </button>
+          {menu && (
+            <>
+              <div onClick={() => setMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 20, minWidth: 160, overflow: 'hidden' }}>
+                {([
+                  { key: 'finance', label: 'Finance', icon: TrendingUp },
+                  { key: 'ukol', label: 'Úkol', icon: CheckSquare },
+                  { key: 'goal', label: 'Goal', icon: Target },
+                ] as const).map(({ key, label, icon: Icon }) => (
+                  <button key={key} onClick={() => { setAddModal(key); setMenu(false) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 14, cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--nav-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Icon size={15} color="var(--muted)" /> {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Top rings */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '24px', marginBottom: 28, boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" />
-        <CircleProgress label="Goaly splněny" value={goals.filter(g => g.status === 'completed').length} max={Math.max(goals.length, 1)} color="#8b5cf6" />
-        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" />
+      {/* Rings */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
+        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={90} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#8b5cf6" size={90} sublabel={goalRingSublabel} />
+        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={90} />
       </div>
 
-      {/* Goals */}
-      {activeGoals.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Goaly</h2>
-            <Link href="/goaly" style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
+      {/* Bottom grid — fills remaining height */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
+        {/* Tasks */}
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Úkoly</h2>
+            <Link href="/ukoly" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-            {activeGoals.map(g => (
-              <div key={g.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px', boxShadow: 'var(--shadow)' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.nazev}</div>
-                {g.deadline && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
-                <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 6 }}>
-                  <div style={{ background: '#8b5cf6', height: '100%', width: `${g.progress}%`, borderRadius: 4, transition: 'width 0.4s' }} />
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            {urgentTasks.length === 0 ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', paddingTop: 16 }}>Žádné otevřené úkoly 🎉</div>
+            ) : urgentTasks.map(t => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
+                  style={{ width: 15, height: 15, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
+                  {t.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
                 </div>
-                <div style={{ fontSize: 12, color: '#8b5cf6', fontWeight: 600 }}>{g.progress}%</div>
+                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0 }}>{t.priorita}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
-
-      {/* Bottom grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Tasks */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Úkoly</h2>
-            <Link href="/ukoly" style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
-          </div>
-          {urgentTasks.length === 0 ? (
-            <div style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '20px 0' }}>Žádné otevřené úkoly 🎉</div>
-          ) : urgentTasks.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
-                style={{ width: 16, height: 16, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
-                {t.deadline && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
-              </div>
-              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0 }}>{t.priorita}</span>
-            </div>
-          ))}
-        </div>
 
         {/* Finance */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Finance</h2>
-            <Link href="/finance" style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Finance</h2>
+            <Link href="/finance" style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>Zobrazit vše →</Link>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-            <div style={{ background: '#d1fae522', border: '1px solid #d1fae5', borderRadius: 8, padding: '10px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <TrendingUp size={14} color="#10b981" />
-                <span style={{ fontSize: 12, color: '#10b981', fontWeight: 500 }}>Příjmy / měsíc</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+            <div style={{ background: '#d1fae522', border: '1px solid #d1fae5', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                <TrendingUp size={12} color="#10b981" />
+                <span style={{ fontSize: 11, color: '#10b981', fontWeight: 500 }}>Příjmy / měsíc</span>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#10b981' }}>{czk(monthIncome)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981' }}>{czk(monthIncome)}</div>
             </div>
-            <div style={{ background: '#fee2e222', border: '1px solid #fee2e2', borderRadius: 8, padding: '10px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <TrendingDown size={14} color="#e53e3e" />
-                <span style={{ fontSize: 12, color: '#e53e3e', fontWeight: 500 }}>Výdaje / měsíc</span>
+            <div style={{ background: '#fee2e222', border: '1px solid #fee2e2', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                <TrendingDown size={12} color="#e53e3e" />
+                <span style={{ fontSize: 11, color: '#e53e3e', fontWeight: 500 }}>Výdaje / měsíc</span>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#e53e3e' }}>{czk(monthExpense)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e53e3e' }}>{czk(monthExpense)}</div>
             </div>
           </div>
 
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, fontWeight: 500 }}>Poslední transakce</div>
-          {last5tx.length === 0 ? (
-            <div style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>Žádné transakce</div>
-          ) : last5tx.map(t => (
-            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 500, flexShrink: 0 }}>Poslední transakce</div>
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            {last5tx.length === 0 ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', paddingTop: 12 }}>Žádné transakce</div>
+            ) : last5tx.map(t => (
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>
+                  {t.typ === 'prijem' ? '+' : '-'}{czk(Number(t.castka))}
+                </div>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>
-                {t.typ === 'prijem' ? '+' : '-'}{czk(Number(t.castka))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Quick add transaction modal */}
-      <Modal isOpen={addModal} onClose={() => setAddModal(false)} title="Přidat transakci">
+      {/* Finance modal */}
+      <Modal isOpen={addModal === 'finance'} onClose={() => setAddModal(null)} title="Přidat transakci">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={form.nazev} onChange={e => setForm({ ...form, nazev: e.target.value })} placeholder="např. Faktura klient" autoFocus /></div>
-          <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={form.castka} onChange={e => setForm({ ...form, castka: e.target.value })} /></div>
-          <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={e => setForm({ ...form, datum: e.target.value })} /></div>
+          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={txForm.nazev} onChange={e => setTxForm({ ...txForm, nazev: e.target.value })} placeholder="např. Faktura klient" autoFocus /></div>
+          <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={txForm.castka} onChange={e => setTxForm({ ...txForm, castka: e.target.value })} /></div>
+          <div><label style={labelStyle}>Datum</label><DatePicker value={txForm.datum} onChange={v => setTxForm({ ...txForm, datum: v })} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div><label style={labelStyle}>Typ</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.typ} onChange={e => setForm({ ...form, typ: e.target.value as Transaction['typ'], status: e.target.value === 'prijem' ? 'ceka' : e.target.value === 'dluh' ? 'nesplaceno' : '' })}>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={txForm.typ} onChange={e => setTxForm({ ...txForm, typ: e.target.value as Transaction['typ'], status: e.target.value === 'prijem' ? 'ceka' : e.target.value === 'dluh' ? 'nesplaceno' : '' })}>
                 <option value="prijem">Příjem</option>
                 <option value="vydaj">Výdaj</option>
                 <option value="dluh">Dluh</option>
               </select>
             </div>
             <div><label style={labelStyle}>Status</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                {form.typ === 'prijem' && <><option value="zaplaceno">Zaplaceno</option><option value="ceka">Čeká</option><option value="dluh">Dluh</option></>}
-                {form.typ === 'vydaj' && <><option value="">—</option></>}
-                {form.typ === 'dluh' && <><option value="nesplaceno">Nesplaceno</option><option value="splaceno">Splaceno</option></>}
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={txForm.status} onChange={e => setTxForm({ ...txForm, status: e.target.value })}>
+                {txForm.typ === 'prijem' && <><option value="zaplaceno">Zaplaceno</option><option value="ceka">Čeká</option><option value="dluh">Dluh</option></>}
+                {txForm.typ === 'vydaj' && <option value="">—</option>}
+                {txForm.typ === 'dluh' && <><option value="nesplaceno">Nesplaceno</option><option value="splaceno">Splaceno</option></>}
               </select>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <button onClick={() => setAddModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveTransaction} disabled={saving || !form.nazev || !form.castka} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={saveTransaction} disabled={saving || !txForm.nazev || !txForm.castka} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Ukládám...' : 'Uložit'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Task modal */}
+      <Modal isOpen={addModal === 'ukol'} onClose={() => setAddModal(null)} title="Přidat úkol">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={taskForm.nazev} onChange={e => setTaskForm({ ...taskForm, nazev: e.target.value })} placeholder="Co je potřeba udělat?" autoFocus /></div>
+          <div><label style={labelStyle}>Priorita</label>
+            <select style={{ ...inputStyle, cursor: 'pointer' }} value={taskForm.priorita} onChange={e => setTaskForm({ ...taskForm, priorita: e.target.value })}>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div><label style={labelStyle}>Deadline</label><DatePicker value={taskForm.deadline} onChange={v => setTaskForm({ ...taskForm, deadline: v })} /></div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={saveTask} disabled={saving || !taskForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Ukládám...' : 'Uložit'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Goal modal */}
+      <Modal isOpen={addModal === 'goal'} onClose={() => setAddModal(null)} title="Přidat goal">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={goalForm.nazev} onChange={e => setGoalForm({ ...goalForm, nazev: e.target.value })} placeholder="Čeho chceš dosáhnout?" autoFocus /></div>
+          <div><label style={labelStyle}>Deadline</label><DatePicker value={goalForm.deadline} onChange={v => setGoalForm({ ...goalForm, deadline: v })} /></div>
+          <div><label style={labelStyle}>Popis</label><textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} value={goalForm.popis} onChange={e => setGoalForm({ ...goalForm, popis: e.target.value })} placeholder="Volitelný popis..." /></div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#8b5cf6', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
+import DatePicker from '@/components/DatePicker'
 import { Plus, Trash2, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -162,7 +163,7 @@ export default function DluhyPage() {
           </div>
           <div><label style={labelStyle}>{form.smer === 'moje' ? 'Komu dluhu' : 'Kdo mi dluží'}</label><input style={inputStyle} value={form.nazev} onChange={e => setForm({ ...form, nazev: e.target.value })} /></div>
           <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={form.castka} onChange={e => setForm({ ...form, castka: e.target.value })} /></div>
-          <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={e => setForm({ ...form, datum: e.target.value })} /></div>
+          <div><label style={labelStyle}>Datum</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
           <div><label style={labelStyle}>Poznámka</label><textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} value={form.poznamka} onChange={e => setForm({ ...form, poznamka: e.target.value })} /></div>
           <div><label style={labelStyle}>Status</label>
             <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>

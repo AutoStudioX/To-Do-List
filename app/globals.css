@@ -44,3 +44,37 @@ body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+/* Global transitions */
+button, a, input, select, textarea {
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+              opacity 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+button:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+/* Don't dim buttons that already handle their own hover */
+button[style*="background: transparent"]:hover,
+button[style*="background:transparent"]:hover {
+  opacity: 1;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+}
+
+a {
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+a:hover {
+  opacity: 0.75;
+}

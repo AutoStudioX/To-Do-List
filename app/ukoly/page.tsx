@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/lib/types'
 import Modal from '@/components/Modal'
+import DatePicker from '@/components/DatePicker'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const priorityColors: Record<string, { bg: string; color: string }> = {
@@ -175,7 +176,7 @@ export default function UkolyPage() {
           </div>
           <div>
             <label style={labelStyle}>Deadline</label>
-            <input type="date" style={inputStyle} value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} />
+            <DatePicker value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} />
           </div>
           <div>
             <label style={labelStyle}>Status</label>

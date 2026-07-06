@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Goal, Milestone } from '@/lib/types'
 import Modal from '@/components/Modal'
+import DatePicker from '@/components/DatePicker'
 import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 
 const inputStyle: React.CSSProperties = {
@@ -181,7 +182,7 @@ export default function GoalyPage() {
       <Modal isOpen={goalModal} onClose={() => setGoalModal(false)} title={editGoal ? 'Upravit goal' : 'Nový goal'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Název</label><input style={inputStyle} value={goalForm.nazev} onChange={e => setGoalForm({ ...goalForm, nazev: e.target.value })} /></div>
-          <div><label style={labelStyle}>Deadline</label><input type="date" style={inputStyle} value={goalForm.deadline} onChange={e => setGoalForm({ ...goalForm, deadline: e.target.value })} /></div>
+          <div><label style={labelStyle}>Deadline</label><DatePicker value={goalForm.deadline} onChange={v => setGoalForm({ ...goalForm, deadline: v })} /></div>
           <div><label style={labelStyle}>Popis</label><textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} value={goalForm.popis} onChange={e => setGoalForm({ ...goalForm, popis: e.target.value })} /></div>
           <div>
             <label style={labelStyle}>Pokrok: {goalForm.progress}%</label>
@@ -206,7 +207,7 @@ export default function GoalyPage() {
       <Modal isOpen={milestoneModal} onClose={() => setMilestoneModal(false)} title="Přidat milník">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Název</label><input style={inputStyle} value={msForm.nazev} onChange={e => setMsForm({ ...msForm, nazev: e.target.value })} /></div>
-          <div><label style={labelStyle}>Deadline</label><input type="date" style={inputStyle} value={msForm.deadline} onChange={e => setMsForm({ ...msForm, deadline: e.target.value })} /></div>
+          <div><label style={labelStyle}>Deadline</label><DatePicker value={msForm.deadline} onChange={v => setMsForm({ ...msForm, deadline: v })} /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setMilestoneModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveMilestone} disabled={saving || !msForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !msForm.nazev ? 0.6 : 1 }}>
