@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Goal, Milestone, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
 import DatePicker from '@/components/DatePicker'
-import { Plus, Trash2, Pencil, Check } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, Sliders, Hash, Zap } from 'lucide-react'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
@@ -182,8 +182,8 @@ export default function GoalyPage() {
                     border: `1px solid ${goal.status === 'completed' ? '#a7f3d0' : '#c4b5fd'}`,
                   }}>{goal.status === 'completed' ? 'Splněno' : 'Aktivní'}</span>
                   {typ !== 'manual' && (
-                    <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: 'var(--progress-track)', color: 'var(--muted)' }}>
-                      {typ === 'income' ? '⚡ příjmy' : '🔢 číslo'}
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, background: 'var(--progress-track)', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      {typ === 'income' ? <><Zap size={9} /> příjmy</> : <><Hash size={9} /> číslo</>}
                     </span>
                   )}
                 </div>
@@ -254,7 +254,10 @@ export default function GoalyPage() {
                   background: goalForm.typ === t ? '#8b5cf622' : 'transparent',
                   color: goalForm.typ === t ? '#8b5cf6' : 'var(--muted)',
                 }}>
-                  {t === 'manual' ? '✏️ Manuální %' : t === 'number' ? '🔢 Číselný cíl' : '⚡ Příjmy'}
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                    {t === 'manual' ? <Sliders size={12} /> : t === 'number' ? <Hash size={12} /> : <Zap size={12} />}
+                    {t === 'manual' ? 'Manuální %' : t === 'number' ? 'Číselný cíl' : 'Příjmy'}
+                  </span>
                 </button>
               ))}
             </div>
@@ -284,7 +287,7 @@ export default function GoalyPage() {
           {goalForm.typ === 'income' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ background: '#8b5cf611', border: '1px solid #8b5cf633', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8b5cf6' }}>
-                ⚡ Progress se počítá automaticky z příjmů tohoto měsíce — aktuálně <strong>{czk(monthIncome)} Kč</strong>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Zap size={13} /> Progress se počítá automaticky z příjmů tohoto měsíce — aktuálně <strong>{czk(monthIncome)} Kč</strong></span>
               </div>
               <div><label style={labelStyle}>Cílová částka (Kč)</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
               {goalForm.target_value && (

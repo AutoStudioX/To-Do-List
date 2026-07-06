@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Goal, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check } from 'lucide-react'
 import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
@@ -213,7 +213,7 @@ export default function PrehledPage() {
                       <button
                         onClick={() => { setQuickGoalId(isOpen ? null : g.id); setQuickValue('') }}
                         style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#8b5cf6' : 'var(--border)'}`, background: isOpen ? '#8b5cf6' : 'transparent', color: isOpen ? 'white' : '#8b5cf6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
-                      >{isOpen ? '×' : '+'}</button>
+                      >{isOpen ? <X size={13} /> : <Plus size={13} />}</button>
                     )}
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export default function PrehledPage() {
                       onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
                       style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #8b5cf6', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
                     />
-                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#8b5cf6', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓</button>
+                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#8b5cf6', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
                   </div>
                 )}
               </div>
