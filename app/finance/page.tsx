@@ -112,10 +112,13 @@ export default function FinancePage() {
       } else if (incomeForm.status === 'zaplaceno' && editIncome.status === 'dluh') {
         await supabase.from('dluhy')
           .update({ status: 'splaceno' })
-          .eq('user_id', user.id)
-          .eq('smer', 'mne')
-          .eq('popis', `Příjem: ${editIncome.klient}`)
-          .eq('status', 'nesplaceno')
+          .eq('user_id', user.id).eq('smer', 'mne')
+          .eq('popis', `Příjem: ${editIncome.klient}`).eq('status', 'nesplaceno')
+      } else if (incomeForm.status === 'dluh' && editIncome.status === 'zaplaceno') {
+        await supabase.from('dluhy')
+          .update({ status: 'nesplaceno' })
+          .eq('user_id', user.id).eq('smer', 'mne')
+          .eq('popis', `Příjem: ${editIncome.klient}`).eq('status', 'splaceno')
       }
     } else {
       await supabase.from('prijmy').insert({ ...payload, user_id: user.id })
