@@ -5,6 +5,7 @@ import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
 import DatePicker from '@/components/DatePicker'
 import { Plus, Trash2, Pencil } from 'lucide-react'
+import { seedRecurring } from '@/lib/seedRecurring'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -54,6 +55,7 @@ export default function FinancePage() {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) return
+      await seedRecurring(supabase, user.id)
       const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       setTransactions(data || [])
     } catch { } finally { setLoading(false) }

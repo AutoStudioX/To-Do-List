@@ -7,6 +7,7 @@ import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check } from 'l
 import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
+import { seedRecurring } from '@/lib/seedRecurring'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
 const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none' }
@@ -32,6 +33,7 @@ export default function PrehledPage() {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user
         if (!user) return
+        await seedRecurring(supabase, user.id)
         const [tr, gr, txr] = await Promise.all([
           supabase.from('ukoly').select('*').eq('user_id', user.id),
           supabase.from('goaly').select('*').eq('user_id', user.id),
