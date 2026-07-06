@@ -178,11 +178,11 @@ export default function GoalyPage() {
                   <span style={{
                     fontSize: 11, padding: '2px 8px', borderRadius: 20,
                     background: goal.status === 'completed' ? '#d1fae5' : '#ede9fe',
-                    color: goal.status === 'completed' ? '#059669' : '#8b5cf6',
+                    color: goal.status === 'completed' ? '#059669' : '#e53e3e',
                     border: `1px solid ${goal.status === 'completed' ? '#a7f3d0' : '#c4b5fd'}`,
                   }}>{goal.status === 'completed' ? 'Splněno' : 'Aktivní'}</span>
                   {typ !== 'manual' && (
-                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, background: typ === 'income' ? '#8b5cf622' : '#3b82f622', border: `1px solid ${typ === 'income' ? '#8b5cf6' : '#3b82f6'}`, color: typ === 'income' ? '#8b5cf6' : '#3b82f6', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, background: typ === 'income' ? '#e53e3e22' : '#e53e3e22', border: `1px solid ${typ === 'income' ? '#e53e3e' : '#e53e3e'}`, color: typ === 'income' ? '#e53e3e' : '#e53e3e', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                       {typ === 'income' ? <><Zap size={9} /> příjmy</> : <><Hash size={9} /> číslo</>}
                     </span>
                   )}
@@ -197,7 +197,7 @@ export default function GoalyPage() {
                   <span style={{ fontWeight: 600, color: 'var(--text)' }}>{label}</span>
                 </div>
                 <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                  <div style={{ background: '#8b5cf6', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.3s' }} />
+                  <div style={{ background: '#e53e3e', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.3s' }} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, textAlign: 'right' }}>{pct}%</div>
               </div>
@@ -250,9 +250,9 @@ export default function GoalyPage() {
               {(['manual', 'number', 'income'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setGoalForm({ ...goalForm, typ: t })} style={{
                   padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: `2px solid ${goalForm.typ === t ? '#8b5cf6' : 'var(--border)'}`,
-                  background: goalForm.typ === t ? '#8b5cf622' : 'transparent',
-                  color: goalForm.typ === t ? '#8b5cf6' : 'var(--muted)',
+                  border: `2px solid ${goalForm.typ === t ? '#e53e3e' : 'var(--border)'}`,
+                  background: goalForm.typ === t ? '#e53e3e22' : 'transparent',
+                  color: goalForm.typ === t ? '#e53e3e' : 'var(--muted)',
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     {t === 'manual' ? <Sliders size={12} /> : t === 'number' ? <Hash size={12} /> : <Zap size={12} />}
@@ -266,7 +266,7 @@ export default function GoalyPage() {
           {goalForm.typ === 'manual' && (
             <div>
               <label style={labelStyle}>Pokrok: {goalForm.progress}%</label>
-              <input type="range" min={0} max={100} value={goalForm.progress} onChange={e => setGoalForm({ ...goalForm, progress: Number(e.target.value) })} style={{ width: '100%', accentColor: '#8b5cf6' }} />
+              <input type="range" min={0} max={100} value={goalForm.progress} onChange={e => setGoalForm({ ...goalForm, progress: Number(e.target.value) })} style={{ width: '100%', accentColor: '#e53e3e' }} />
             </div>
           )}
 
@@ -277,7 +277,7 @@ export default function GoalyPage() {
                 <div><label style={labelStyle}>Cílová hodnota</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
               </div>
               {goalForm.current_value && goalForm.target_value && (
-                <div style={{ fontSize: 12, color: '#8b5cf6', fontWeight: 600 }}>
+                <div style={{ fontSize: 12, color: '#e53e3e', fontWeight: 600 }}>
                   Pokrok: {czk(Number(goalForm.current_value))} z {czk(Number(goalForm.target_value))} ({Math.min(100, Math.round(Number(goalForm.current_value) / Number(goalForm.target_value) * 100))}%)
                 </div>
               )}
@@ -286,12 +286,12 @@ export default function GoalyPage() {
 
           {goalForm.typ === 'income' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ background: '#8b5cf611', border: '1px solid #8b5cf633', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8b5cf6' }}>
+              <div style={{ background: '#e53e3e11', border: '1px solid #e53e3e33', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#e53e3e' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Zap size={13} /> Progress se počítá automaticky z příjmů tohoto měsíce — aktuálně <strong>{czk(monthIncome)} Kč</strong></span>
               </div>
               <div><label style={labelStyle}>Cílová částka (Kč)</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
               {goalForm.target_value && (
-                <div style={{ fontSize: 12, color: '#8b5cf6', fontWeight: 600 }}>
+                <div style={{ fontSize: 12, color: '#e53e3e', fontWeight: 600 }}>
                   Aktuálně: {czk(monthIncome)} z {czk(Number(goalForm.target_value))} Kč ({Math.min(100, Math.round(monthIncome / Number(goalForm.target_value) * 100))}%)
                 </div>
               )}
@@ -308,7 +308,7 @@ export default function GoalyPage() {
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setGoalModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#8b5cf6', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !goalForm.nazev ? 0.6 : 1 }}>
+            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !goalForm.nazev ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
@@ -321,7 +321,7 @@ export default function GoalyPage() {
           <div><label style={labelStyle}>Deadline</label><DatePicker value={msForm.deadline} onChange={v => setMsForm({ ...msForm, deadline: v })} /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setMilestoneModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveMilestone} disabled={saving || !msForm.nazev} style={{ background: '#8b5cf6', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !msForm.nazev ? 0.6 : 1 }}>
+            <button onClick={saveMilestone} disabled={saving || !msForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !msForm.nazev ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Přidat'}
             </button>
           </div>
