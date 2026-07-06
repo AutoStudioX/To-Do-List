@@ -16,7 +16,7 @@ const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', d
 type Tab = 'vse' | 'prijmy' | 'vydaje' | 'fixni' | 'dluhy'
 
 function getMonthLabel(d: Date) {
-  return d.toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' })
+  return d.toLocaleDateString('cs-CZ', { month: 'short' })
 }
 
 function TypBadge({ typ }: { typ: Transaction['typ'] }) {
