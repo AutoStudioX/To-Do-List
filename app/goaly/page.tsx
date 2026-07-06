@@ -144,7 +144,7 @@ export default function GoalyPage() {
 
               {/* Milestones */}
               <div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }}>Milníky ({goalMs.filter(m => m.done).length}/{goalMs.length})</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }}>Kroky ({goalMs.filter(m => m.done).length}/{goalMs.length})</div>
                 {goalMs.map(m => (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                     <button onClick={() => toggleMilestone(m)} style={{
@@ -162,7 +162,7 @@ export default function GoalyPage() {
                   </div>
                 ))}
                 <button onClick={() => openMilestone(goal.id)} style={{ background: 'transparent', border: '1px dashed var(--border)', borderRadius: 6, padding: '6px 10px', color: 'var(--muted)', cursor: 'pointer', fontSize: 12, marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Plus size={12} /> Přidat milník
+                  <Plus size={12} /> Přidat krok
                 </button>
               </div>
 
@@ -204,7 +204,7 @@ export default function GoalyPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={milestoneModal} onClose={() => setMilestoneModal(false)} title="Přidat milník">
+      <Modal isOpen={milestoneModal} onClose={() => setMilestoneModal(false)} title="Přidat krok">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Název</label><input style={inputStyle} value={msForm.nazev} onChange={e => setMsForm({ ...msForm, nazev: e.target.value })} /></div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={msForm.deadline} onChange={v => setMsForm({ ...msForm, deadline: v })} /></div>

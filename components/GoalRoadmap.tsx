@@ -48,7 +48,7 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
             </div>
 
             {goalMilestones.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Žádné milníky</div>
+              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Žádné kroky</div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto', paddingBottom: 8 }}>
                 {goalMilestones.map((milestone, idx) => {
