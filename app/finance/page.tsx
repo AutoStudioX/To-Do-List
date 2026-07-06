@@ -413,7 +413,7 @@ export default function FinancePage() {
               <option value="dluh">Dluh (dluží mi)</option>
             </select>
           </div>
-          {incomeForm.status === 'dluh' && !editIncome && (
+          {incomeForm.status === 'dluh' && (
             <div><label style={labelStyle}>Kdo dluží (pokud jiné než klient)</label><input style={inputStyle} placeholder={incomeForm.klient} value={incomeForm.komu_kdo} onChange={e => setIncomeForm({ ...incomeForm, komu_kdo: e.target.value })} /></div>
           )}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
