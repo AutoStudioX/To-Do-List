@@ -11,15 +11,15 @@ const priorityBorder: Record<string, string> = {
   Medium: '#f59e0b',
   Low: '#9ca3af',
 }
-const priorityBadge: Record<string, { bg: string; color: string; border: string }> = {
-  High: { bg: '#fee2e2', color: '#c53030', border: '#fca5a5' },
-  Medium: { bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
-  Low: { bg: '#e5e7eb', color: '#4b5563', border: '#d1d5db' },
+const priorityDot: Record<string, string> = {
+  High: '#e53e3e',
+  Medium: '#f59e0b',
+  Low: '#9ca3af',
 }
-const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
-  'Todo': { bg: '#e5e7eb', color: '#374151', border: '#d1d5db' },
-  'In Progress': { bg: '#dbeafe', color: '#1d4ed8', border: '#93c5fd' },
-  'Done': { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
+const statusConfig: Record<string, { dot: string; label: string }> = {
+  'Todo': { dot: '#9ca3af', label: 'Todo' },
+  'In Progress': { dot: '#3b82f6', label: 'In Progress' },
+  'Done': { dot: '#10b981', label: 'Done' },
 }
 
 const inputStyle: React.CSSProperties = {
@@ -171,10 +171,16 @@ export default function UkolyPage() {
                 </div>
               </div>
 
-              {/* Badges + actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', flexShrink: 0 }}>
-                <span style={{ fontSize: 11, padding: '4px 0', borderRadius: 20, fontWeight: 600, width: 70, textAlign: 'center', display: 'inline-block', background: priorityBadge[t.priorita].bg, color: priorityBadge[t.priorita].color, border: `1px solid ${priorityBadge[t.priorita].border}` }}>{t.priorita}</span>
-                <span style={{ fontSize: 11, padding: '4px 0', borderRadius: 20, fontWeight: 600, width: 90, textAlign: 'center', display: 'inline-block', background: statusBadge[t.status].bg, color: statusBadge[t.status].color, border: `1px solid ${statusBadge[t.status].border}` }}>{t.status}</span>
+              {/* Status + actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 90 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 100 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
+                </div>
                 <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
                   <Pencil size={13} />
                 </button>
