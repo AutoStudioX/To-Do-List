@@ -17,6 +17,9 @@ export interface Goal {
   popis: string | null
   progress: number
   status: 'active' | 'completed'
+  typ: 'manual' | 'number' | 'income' | null
+  current_value: number | null
+  target_value: number | null
   created_at: string
 }
 
