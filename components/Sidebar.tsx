@@ -1,7 +1,7 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
@@ -73,9 +73,14 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ color: '#e53e3e', fontSize: 13, lineHeight: 1 }}>⚡</span>
-        <span style={{ fontSize: 11, color: 'var(--muted)' }}>by AutoStudio</span>
+      <div style={{ padding: '12px 12px', margin: '0 8px 8px', borderRadius: 10, background: 'linear-gradient(135deg, #1a1a1a 0%, #1f1215 100%)', border: '1px solid #3a1a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(229,62,62,0.4)' }}>
+          <Zap size={17} color="white" fill="white" />
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>AutoStudio</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.3, marginTop: 1 }}>powered by</div>
+        </div>
       </div>
 
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
