@@ -79,7 +79,6 @@ export default function Sidebar() {
         </div>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}><span style={{ color: '#ffffff' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span></div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3, marginTop: 1 }}>powered by</div>
         </div>
       </div>
 
