@@ -103,6 +103,13 @@ export default function FinancePage() {
     if (!user) { setSaving(false); return }
     if (editIncome) {
       await supabase.from('prijmy').update(payload).eq('id', editIncome.id)
+      if (incomeForm.status === 'dluh' && editIncome.status !== 'dluh') {
+        await supabase.from('dluhy').insert({
+          smer: 'mne', komu_kdo: incomeForm.klient,
+          castka: Number(incomeForm.castka), datum: incomeForm.datum,
+          popis: `Příjem: ${incomeForm.klient}`, status: 'nesplaceno', user_id: user.id,
+        })
+      }
     } else {
       await supabase.from('prijmy').insert({ ...payload, user_id: user.id })
       if (incomeForm.status === 'dluh') {
