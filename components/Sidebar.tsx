@@ -33,9 +33,8 @@ export default function Sidebar() {
       flexShrink: 0,
     }}>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.2 }}>
-  <div style={{ color: 'var(--text)' }}>To-Do</div>
-  <div style={{ color: '#e53e3e' }}>List</div>
+        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
+  <span style={{ color: 'var(--text)' }}>To-Do </span><span style={{ color: '#e53e3e' }}>List</span>
 </div>
       </div>
 
