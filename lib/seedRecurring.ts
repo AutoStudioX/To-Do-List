@@ -11,6 +11,7 @@ export async function seedRecurring(supabase: SupabaseClient, userId: string) {
     .select('*')
     .eq('user_id', userId)
     .in('opakovani', ['mesicni', 'rocni'])
+    .in('typ', ['prijem', 'vydaj'])
 
   if (!recurring?.length) return
 
