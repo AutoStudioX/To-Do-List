@@ -24,8 +24,9 @@ export default function DluhyPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) return
-      const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).eq('typ', 'dluh').order('datum', { ascending: false })
-      setDebts(data || [])
+      const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).order('datum', { ascending: false })
+      const filtered = (data || []).filter((t: Transaction) => t.typ === 'dluh' || (t.typ === 'prijem' && t.status === 'dluh'))
+      setDebts(filtered)
     } catch { } finally { setLoading(false) }
   }, [])
 

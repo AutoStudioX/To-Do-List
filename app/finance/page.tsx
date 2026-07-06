@@ -67,7 +67,7 @@ export default function FinancePage() {
   const prijmy = transactions.filter(t => t.typ === 'prijem')
   const vydaje = transactions.filter(t => t.typ === 'vydaj')
   const fixni = transactions.filter(t => t.typ === 'fixni_naklad')
-  const dluhy = transactions.filter(t => t.typ === 'dluh')
+  const dluhy = transactions.filter(t => t.typ === 'dluh' || (t.typ === 'prijem' && t.status === 'dluh'))
 
   const monthIncomeTotal = prijmy.filter(t => t.status === 'zaplaceno' && t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
   const monthExpenseTotal = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
