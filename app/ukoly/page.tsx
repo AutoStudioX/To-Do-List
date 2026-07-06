@@ -88,7 +88,7 @@ export default function UkolyPage() {
 
   const pillBase: React.CSSProperties = {
     padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500,
-    cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.15s',
+    cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.15s', outline: 'none',
   }
 
   return (
@@ -127,14 +127,24 @@ export default function UkolyPage() {
           })}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {(['All', 'High', 'Medium', 'Low'] as const).map(p => (
-            <button key={p} onClick={() => setFilterPriority(p)} style={{
-              ...pillBase,
-              background: filterPriority === p ? (p === 'All' ? 'var(--text)' : priorityBorder[p]) : 'var(--card)',
-              color: filterPriority === p ? (p === 'All' ? 'var(--bg)' : 'white') : 'var(--muted)',
-              border: `1px solid ${filterPriority === p ? (p === 'All' ? 'var(--text)' : priorityBorder[p]) : 'var(--border)'}`,
-            }}>{p === 'All' ? 'Vše' : p}</button>
-          ))}
+          {(['All', 'High', 'Medium', 'Low'] as const).map(p => {
+            const priorityActive: Record<string, { bg: string; color: string; border: string }> = {
+              All: { bg: 'var(--text)', color: 'var(--bg)', border: 'var(--text)' },
+              High: { bg: '#fee2e2', color: '#c53030', border: '#e53e3e' },
+              Medium: { bg: '#fef3c7', color: '#b45309', border: '#f59e0b' },
+              Low: { bg: '#e5e7eb', color: '#4b5563', border: '#9ca3af' },
+            }
+            const active = filterPriority === p
+            return (
+              <button key={p} onClick={() => setFilterPriority(p)} style={{
+                ...pillBase,
+                background: active ? priorityActive[p].bg : 'var(--card)',
+                color: active ? priorityActive[p].color : 'var(--muted)',
+                border: `1px solid ${active ? priorityActive[p].border : 'var(--border)'}`,
+                fontWeight: active ? 600 : 500,
+              }}>{p === 'All' ? 'Vše' : p}</button>
+            )
+          })}
         </div>
       </div>
 
