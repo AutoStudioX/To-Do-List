@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Income, Expense, FixedCost } from '@/lib/types'
 import Modal from '@/components/Modal'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -29,6 +29,9 @@ export default function FinancePage() {
   const [expenseModal, setExpenseModal] = useState(false)
   const [fixedModal, setFixedModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editIncome, setEditIncome] = useState<Income | null>(null)
+  const [editExpense, setEditExpense] = useState<Expense | null>(null)
+  const [editFixed, setEditFixed] = useState<FixedCost | null>(null)
   const [incomeForm, setIncomeForm] = useState({ klient: '', castka: '', datum: '', typ: 'jednorazovy' as Income['typ'], status: 'ceka' as Income['status'] })
   const [expenseForm, setExpenseForm] = useState({ nazev: '', castka: '', datum: '', kategorie: '', opakovani: false })
   const [fixedForm, setFixedForm] = useState({ nazev: '', castka: '' })
@@ -88,31 +91,46 @@ export default function FinancePage() {
   async function saveIncome() {
     const supabase = createClient()
     setSaving(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-    if (!user) return
-    await supabase.from('prijmy').insert({ klient: incomeForm.klient, castka: Number(incomeForm.castka), datum: incomeForm.datum, typ: incomeForm.typ, status: incomeForm.status, user_id: user.id })
-    setSaving(false); setIncomeModal(false); load()
+    const payload = { klient: incomeForm.klient, castka: Number(incomeForm.castka), datum: incomeForm.datum, typ: incomeForm.typ, status: incomeForm.status }
+    if (editIncome) {
+      await supabase.from('prijmy').update(payload).eq('id', editIncome.id)
+    } else {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) { setSaving(false); return }
+      await supabase.from('prijmy').insert({ ...payload, user_id: user.id })
+    }
+    setSaving(false); setIncomeModal(false); setEditIncome(null); load()
   }
 
   async function saveExpense() {
     const supabase = createClient()
     setSaving(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-    if (!user) return
-    await supabase.from('vydaje').insert({ nazev: expenseForm.nazev, castka: Number(expenseForm.castka), datum: expenseForm.datum, kategorie: expenseForm.kategorie, opakovani: expenseForm.opakovani, user_id: user.id })
-    setSaving(false); setExpenseModal(false); load()
+    const payload = { nazev: expenseForm.nazev, castka: Number(expenseForm.castka), datum: expenseForm.datum, kategorie: expenseForm.kategorie, opakovani: expenseForm.opakovani }
+    if (editExpense) {
+      await supabase.from('vydaje').update(payload).eq('id', editExpense.id)
+    } else {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) { setSaving(false); return }
+      await supabase.from('vydaje').insert({ ...payload, user_id: user.id })
+    }
+    setSaving(false); setExpenseModal(false); setEditExpense(null); load()
   }
 
   async function saveFixed() {
     const supabase = createClient()
     setSaving(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-    if (!user) return
-    await supabase.from('fixni_naklady').insert({ nazev: fixedForm.nazev, castka: Number(fixedForm.castka), user_id: user.id })
-    setSaving(false); setFixedModal(false); load()
+    const payload = { nazev: fixedForm.nazev, castka: Number(fixedForm.castka) }
+    if (editFixed) {
+      await supabase.from('fixni_naklady').update(payload).eq('id', editFixed.id)
+    } else {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) { setSaving(false); return }
+      await supabase.from('fixni_naklady').insert({ ...payload, user_id: user.id })
+    }
+    setSaving(false); setFixedModal(false); setEditFixed(null); load()
   }
 
   async function deleteIncome(id: string) {
@@ -193,7 +211,7 @@ export default function FinancePage() {
       {activeTab === 'prijmy' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <button onClick={() => { setIncomeForm({ klient: '', castka: '', datum: '', typ: 'jednorazovy', status: 'ceka' }); setIncomeModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => { setEditIncome(null); setIncomeForm({ klient: '', castka: '', datum: '', typ: 'jednorazovy', status: 'ceka' }); setIncomeModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Přidat příjem
             </button>
           </div>
@@ -211,7 +229,12 @@ export default function FinancePage() {
                       <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{new Date(i.datum).toLocaleDateString('cs-CZ')}</td>
                       <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#dbeafe', color: '#2563eb' }}>{i.typ}</span></td>
                       <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: i.status === 'zaplaceno' ? '#d1fae5' : '#fef3c7', color: i.status === 'zaplaceno' ? '#059669' : '#d97706' }}>{i.status}</span></td>
-                      <td style={{ padding: '12px 16px' }}><button onClick={() => deleteIncome(i.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer' }}><Trash2 size={14} /></button></td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => { setEditIncome(i); setIncomeForm({ klient: i.klient, castka: String(i.castka), datum: i.datum, typ: i.typ, status: i.status }); setIncomeModal(true) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
+                          <button onClick={() => deleteIncome(i.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -223,7 +246,7 @@ export default function FinancePage() {
       {activeTab === 'vydaje' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <button onClick={() => { setExpenseForm({ nazev: '', castka: '', datum: '', kategorie: '', opakovani: false }); setExpenseModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => { setEditExpense(null); setExpenseForm({ nazev: '', castka: '', datum: '', kategorie: '', opakovani: false }); setExpenseModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Přidat výdaj
             </button>
           </div>
@@ -241,7 +264,12 @@ export default function FinancePage() {
                       <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{new Date(e.datum).toLocaleDateString('cs-CZ')}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{e.kategorie}</td>
                       <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: e.opakovani ? '#dbeafe' : '#f3f4f6', color: e.opakovani ? '#2563eb' : '#6b7280' }}>{e.opakovani ? 'Ano' : 'Ne'}</span></td>
-                      <td style={{ padding: '12px 16px' }}><button onClick={() => deleteExpense(e.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer' }}><Trash2 size={14} /></button></td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => { setEditExpense(e); setExpenseForm({ nazev: e.nazev, castka: String(e.castka), datum: e.datum, kategorie: e.kategorie, opakovani: e.opakovani }); setExpenseModal(true) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
+                          <button onClick={() => deleteExpense(e.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -254,7 +282,7 @@ export default function FinancePage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 14, color: 'var(--muted)' }}>Celkem měsíčně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedTotal)}</span></div>
-            <button onClick={() => { setFixedForm({ nazev: '', castka: '' }); setFixedModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => { setEditFixed(null); setFixedForm({ nazev: '', castka: '' }); setFixedModal(true) }} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Přidat fixní náklad
             </button>
           </div>
@@ -269,7 +297,12 @@ export default function FinancePage() {
                     <tr key={f.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{f.nazev}</td>
                       <td style={{ padding: '12px 16px', fontSize: 14, color: '#e53e3e', fontWeight: 600 }}>{czk(Number(f.castka))}</td>
-                      <td style={{ padding: '12px 16px' }}><button onClick={() => deleteFixed(f.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer' }}><Trash2 size={14} /></button></td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => { setEditFixed(f); setFixedForm({ nazev: f.nazev, castka: String(f.castka) }); setFixedModal(true) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
+                          <button onClick={() => deleteFixed(f.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -278,7 +311,7 @@ export default function FinancePage() {
         </div>
       )}
 
-      <Modal isOpen={incomeModal} onClose={() => setIncomeModal(false)} title="Nový příjem">
+      <Modal isOpen={incomeModal} onClose={() => { setIncomeModal(false); setEditIncome(null) }} title={editIncome ? 'Upravit příjem' : 'Nový příjem'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Klient</label><input style={inputStyle} value={incomeForm.klient} onChange={e => setIncomeForm({ ...incomeForm, klient: e.target.value })} /></div>
           <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={incomeForm.castka} onChange={e => setIncomeForm({ ...incomeForm, castka: e.target.value })} /></div>
@@ -296,7 +329,7 @@ export default function FinancePage() {
             </select>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <button onClick={() => setIncomeModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={() => { setIncomeModal(false); setEditIncome(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveIncome} disabled={saving || !incomeForm.klient || !incomeForm.castka || !incomeForm.datum} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
@@ -304,7 +337,7 @@ export default function FinancePage() {
         </div>
       </Modal>
 
-      <Modal isOpen={expenseModal} onClose={() => setExpenseModal(false)} title="Nový výdaj">
+      <Modal isOpen={expenseModal} onClose={() => { setExpenseModal(false); setEditExpense(null) }} title={editExpense ? 'Upravit výdaj' : 'Nový výdaj'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Název</label><input style={inputStyle} value={expenseForm.nazev} onChange={e => setExpenseForm({ ...expenseForm, nazev: e.target.value })} /></div>
           <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={expenseForm.castka} onChange={e => setExpenseForm({ ...expenseForm, castka: e.target.value })} /></div>
@@ -315,7 +348,7 @@ export default function FinancePage() {
             <label htmlFor="opakovani" style={{ fontSize: 14, color: 'var(--text)', cursor: 'pointer' }}>Opakující se výdaj</label>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <button onClick={() => setExpenseModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={() => { setExpenseModal(false); setEditExpense(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveExpense} disabled={saving || !expenseForm.nazev || !expenseForm.castka || !expenseForm.datum} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
@@ -323,12 +356,12 @@ export default function FinancePage() {
         </div>
       </Modal>
 
-      <Modal isOpen={fixedModal} onClose={() => setFixedModal(false)} title="Nový fixní náklad">
+      <Modal isOpen={fixedModal} onClose={() => { setFixedModal(false); setEditFixed(null) }} title={editFixed ? 'Upravit fixní náklad' : 'Nový fixní náklad'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Název</label><input style={inputStyle} value={fixedForm.nazev} onChange={e => setFixedForm({ ...fixedForm, nazev: e.target.value })} /></div>
           <div><label style={labelStyle}>Měsíční částka (Kč)</label><input type="number" style={inputStyle} value={fixedForm.castka} onChange={e => setFixedForm({ ...fixedForm, castka: e.target.value })} /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <button onClick={() => setFixedModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={() => { setFixedModal(false); setEditFixed(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveFixed} disabled={saving || !fixedForm.nazev || !fixedForm.castka} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>

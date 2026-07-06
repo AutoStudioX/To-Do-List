@@ -46,6 +46,7 @@ async function LayoutInner({ children }: { children: React.ReactNode }) {
     return <AuthGuard>{children}</AuthGuard>
   }
 
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar />
