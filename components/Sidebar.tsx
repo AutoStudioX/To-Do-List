@@ -1,16 +1,13 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, Target, TrendingUp, Calendar, CreditCard, LogOut } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/prehled', label: 'Přehled', icon: LayoutDashboard },
-  { href: '/ukoly', label: 'Úkoly', icon: CheckSquare },
-  { href: '/goaly', label: 'Goaly', icon: Target },
   { href: '/finance', label: 'Finance', icon: TrendingUp },
-  { href: '/casovy-plan', label: 'Časový plán', icon: Calendar },
-  { href: '/dluhy', label: 'Dluhy', icon: CreditCard },
+  { href: '/ukoly', label: 'Úkoly', icon: CheckSquare },
 ]
 
 export default function Sidebar() {
@@ -34,7 +31,6 @@ export default function Sidebar() {
       flexDirection: 'column',
       flexShrink: 0,
     }}>
-      {/* AutoStudio brand */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
