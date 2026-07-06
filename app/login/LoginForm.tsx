@@ -15,13 +15,18 @@ export default function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push('/prehled')
+        router.refresh()
+      }
+    } catch {
+      setError('Nepodařilo se připojit k serveru. Zkontrolujte připojení k internetu.')
+    } finally {
       setLoading(false)
-    } else {
-      router.push('/prehled')
-      router.refresh()
     }
   }
 
