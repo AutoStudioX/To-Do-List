@@ -126,7 +126,7 @@ export default function UkolyPage() {
             )
           })}
         </div>
-        <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+        <div style={{ width: 1, background: '#000000', alignSelf: 'stretch' }} />
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'High', 'Medium', 'Low'] as const).map(p => {
             const priorityActive: Record<string, { bg: string; color: string; border: string }> = {
