@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -33,9 +33,9 @@ export default function UkolyPage() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
+    const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -47,9 +47,9 @@ export default function UkolyPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   function openAdd() { setForm(emptyForm); setEditTask(null); setModalOpen(true) }
   function openEdit(t: Task) {
@@ -58,6 +58,7 @@ export default function UkolyPage() {
   }
 
   async function save() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -75,7 +76,7 @@ export default function UkolyPage() {
 
   async function deleteTask(id: string) {
     if (!confirm('Smazat úkol?')) return
-    await supabase.from('ukoly').delete().eq('id', id)
+    await createClient().from('ukoly').delete().eq('id', id)
     load()
   }
 

@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
@@ -18,17 +18,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (saved) setTheme(saved)
   }, [])
 
-  function toggle() {
+  const toggle = useCallback(() => {
     setTheme(prev => {
       const next: Theme = prev === 'light' ? 'dark' : 'light'
       localStorage.setItem('theme', next)
       document.documentElement.classList.toggle('dark', next === 'dark')
       return next
     })
-  }
+  }, [])
+
+  const value = useMemo(() => ({ theme, toggle }), [theme, toggle])
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   )

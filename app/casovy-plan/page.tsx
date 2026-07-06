@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TimeBlock } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -27,9 +27,9 @@ export default function CasovyPlanPage() {
   const [editBlock, setEditBlock] = useState<TimeBlock | null>(null)
   const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#e53e3e', kategorie: '' })
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
+    const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -41,9 +41,9 @@ export default function CasovyPlanPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   function openAdd(den?: number, hour?: number) {
     setForm({
@@ -61,6 +61,7 @@ export default function CasovyPlanPage() {
   }
 
   async function save() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -76,7 +77,7 @@ export default function CasovyPlanPage() {
 
   async function deleteBlock(id: string) {
     if (!confirm('Smazat blok?')) return
-    await supabase.from('casovy_plan').delete().eq('id', id); load()
+    await createClient().from('casovy_plan').delete().eq('id', id); load()
   }
 
   const CELL_HEIGHT = 48

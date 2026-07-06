@@ -15,9 +15,9 @@ export default function PrehledPage() {
   const [incomes, setIncomes] = useState<Income[]>([])
   const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
     async function load() {
       try {
         const { data: { session } } = await supabase.auth.getSession()

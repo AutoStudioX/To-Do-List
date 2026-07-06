@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Debt } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -20,9 +20,9 @@ export default function DluhyPage() {
   const [modal, setModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ smer: 'moje' as Debt['smer'], komu_kdo: '', castka: '', datum: '', popis: '', status: 'nesplaceno' as Debt['status'] })
-  const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
+    const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -34,9 +34,9 @@ export default function DluhyPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   function openAdd() {
     setForm({ smer: activeTab, komu_kdo: '', castka: '', datum: '', popis: '', status: 'nesplaceno' })
@@ -44,6 +44,7 @@ export default function DluhyPage() {
   }
 
   async function save() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -54,13 +55,13 @@ export default function DluhyPage() {
 
   async function toggleStatus(d: Debt) {
     const newStatus = d.status === 'splaceno' ? 'nesplaceno' : 'splaceno'
-    await supabase.from('dluhy').update({ status: newStatus }).eq('id', d.id)
+    await createClient().from('dluhy').update({ status: newStatus }).eq('id', d.id)
     load()
   }
 
   async function deleteDebt(id: string) {
     if (!confirm('Smazat dluh?')) return
-    await supabase.from('dluhy').delete().eq('id', id); load()
+    await createClient().from('dluhy').delete().eq('id', id); load()
   }
 
   const myDebts = debts.filter(d => d.smer === 'moje')

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Income, Expense, FixedCost } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -33,9 +33,9 @@ export default function FinancePage() {
   const [expenseForm, setExpenseForm] = useState({ nazev: '', castka: '', datum: '', kategorie: '', opakovani: false })
   const [fixedForm, setFixedForm] = useState({ nazev: '', castka: '' })
   const { theme } = useTheme()
-  const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
+    const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -53,9 +53,9 @@ export default function FinancePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -86,6 +86,7 @@ export default function FinancePage() {
   const tooltipLabel = isDark ? '#ffffff' : '#111827'
 
   async function saveIncome() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -95,6 +96,7 @@ export default function FinancePage() {
   }
 
   async function saveExpense() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -104,6 +106,7 @@ export default function FinancePage() {
   }
 
   async function saveFixed() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -114,15 +117,15 @@ export default function FinancePage() {
 
   async function deleteIncome(id: string) {
     if (!confirm('Smazat příjem?')) return
-    await supabase.from('prijmy').delete().eq('id', id); load()
+    await createClient().from('prijmy').delete().eq('id', id); load()
   }
   async function deleteExpense(id: string) {
     if (!confirm('Smazat výdaj?')) return
-    await supabase.from('vydaje').delete().eq('id', id); load()
+    await createClient().from('vydaje').delete().eq('id', id); load()
   }
   async function deleteFixed(id: string) {
     if (!confirm('Smazat fixní náklad?')) return
-    await supabase.from('fixni_naklady').delete().eq('id', id); load()
+    await createClient().from('fixni_naklady').delete().eq('id', id); load()
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({

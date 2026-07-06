@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Goal, Milestone } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -22,9 +22,9 @@ export default function GoalyPage() {
   const [goalForm, setGoalForm] = useState({ nazev: '', deadline: '', popis: '', progress: 0, status: 'active' as Goal['status'] })
   const [msForm, setMsForm] = useState({ nazev: '', deadline: '' })
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
 
-  async function load() {
+  const load = useCallback(async () => {
+    const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -40,9 +40,9 @@ export default function GoalyPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   function openAddGoal() {
     setGoalForm({ nazev: '', deadline: '', popis: '', progress: 0, status: 'active' })
@@ -57,6 +57,7 @@ export default function GoalyPage() {
   }
 
   async function saveGoal() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -71,6 +72,7 @@ export default function GoalyPage() {
   }
 
   async function saveMilestone() {
+    const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -80,18 +82,18 @@ export default function GoalyPage() {
   }
 
   async function toggleMilestone(m: Milestone) {
-    await supabase.from('milniky').update({ done: !m.done }).eq('id', m.id)
+    await createClient().from('milniky').update({ done: !m.done }).eq('id', m.id)
     load()
   }
 
   async function deleteGoal(id: string) {
     if (!confirm('Smazat goal?')) return
-    await supabase.from('goaly').delete().eq('id', id)
+    await createClient().from('goaly').delete().eq('id', id)
     load()
   }
 
   async function deleteMilestone(id: string) {
-    await supabase.from('milniky').delete().eq('id', id)
+    await createClient().from('milniky').delete().eq('id', id)
     load()
   }
 
