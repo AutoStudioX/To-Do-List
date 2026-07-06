@@ -47,7 +47,8 @@ export default function DluhyPage() {
   async function save() {
     const supabase = createClient()
     setSaving(true)
-    const payload = { nazev: form.nazev, castka: Number(form.castka), datum: form.datum || null, typ: 'dluh' as const, smer: form.smer, status: form.status, poznamka: form.poznamka || null }
+    const typ = editDebt ? editDebt.typ : 'dluh' as const
+    const payload = { nazev: form.nazev, castka: Number(form.castka), datum: form.datum || null, typ, smer: form.smer || null, status: form.status, poznamka: form.poznamka || null }
     if (editDebt) {
       await supabase.from('transakce').update(payload).eq('id', editDebt.id)
     } else {
@@ -67,7 +68,13 @@ export default function DluhyPage() {
 
   async function deleteDebt(id: string) {
     if (!confirm('Smazat dluh?')) return
-    await createClient().from('transakce').delete().eq('id', id)
+    const supabase = createClient()
+    const record = debts.find(d => d.id === id)
+    if (record?.typ === 'prijem') {
+      await supabase.from('transakce').update({ status: 'ceka' }).eq('id', id)
+    } else {
+      await supabase.from('transakce').delete().eq('id', id)
+    }
     load()
   }
 
