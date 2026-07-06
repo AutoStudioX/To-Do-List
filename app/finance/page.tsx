@@ -73,7 +73,9 @@ export default function FinancePage() {
   const monthExpenseTotal = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
   const profit = monthIncomeTotal - monthExpenseTotal
   const lifetimeIncome = prijmy.filter(t => t.status === 'zaplaceno').reduce((s, t) => s + Number(t.castka), 0)
-  const fixedTotal = fixni.reduce((s, t) => s + Number(t.castka), 0)
+  const fixedMonthly = fixni.filter(t => t.opakovani !== 'rocni').reduce((s, t) => s + Number(t.castka), 0)
+  const fixedYearly = fixni.filter(t => t.opakovani === 'rocni').reduce((s, t) => s + Number(t.castka), 0)
+  const fixedTotal = fixedMonthly + fixedYearly / 12
 
   const chartData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
@@ -95,7 +97,7 @@ export default function FinancePage() {
 
   function openAdd(typ: Transaction['typ']) {
     setEditTx(null)
-    setForm({ ...emptyForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' })
+    setForm({ ...emptyForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '', opakovani: typ === 'fixni_naklad' ? 'mesicni' : 'jednorazovy' })
     setModal(true)
   }
 
@@ -150,7 +152,7 @@ export default function FinancePage() {
     vse: ['Název', 'Typ', 'Částka', 'Datum', 'Status', ''],
     prijmy: ['Klient', 'Částka', 'Datum', 'Opakování', 'Status', ''],
     vydaje: ['Název', 'Částka', 'Datum', 'Kategorie', 'Opakování', ''],
-    fixni: ['Název', 'Částka/měsíc', ''],
+    fixni: ['Název', 'Částka', 'Opakování', ''],
     dluhy: ['Směr', 'Komu / Kdo', 'Částka', 'Datum', 'Status', ''],
   }
 
@@ -218,8 +220,10 @@ export default function FinancePage() {
       </div>
 
       {activeTab === 'fixni' && (
-        <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
-          Celkem měsíčně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedTotal)}</span>
+        <div style={{ display: 'flex', gap: 24, marginBottom: 12, fontSize: 14, color: 'var(--muted)' }}>
+          <span>Měsíčně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedMonthly)}</span></span>
+          <span>Ročně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedYearly)}</span></span>
+          <span>Průměr/měsíc: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedTotal)}</span></span>
         </div>
       )}
 
@@ -257,6 +261,7 @@ export default function FinancePage() {
                 {activeTab === 'fixni' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'rocni' ? '#fef3c7' : '#dbeafe', color: t.opakovani === 'rocni' ? '#d97706' : '#2563eb' }}>{t.opakovani === 'rocni' ? 'Roční' : 'Měsíční'}</span></td>
                 </>}
                 {activeTab === 'dluhy' && <>
                   <td style={{ padding: '12px 16px' }}>
@@ -318,6 +323,14 @@ export default function FinancePage() {
             <div><label style={labelStyle}>Opakování</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.opakovani} onChange={e => setForm({ ...form, opakovani: e.target.value })}>
                 <option value="jednorazovy">Jednorázový</option>
+                <option value="mesicni">Měsíční</option>
+                <option value="rocni">Roční</option>
+              </select>
+            </div>
+          )}
+          {form.typ === 'fixni_naklad' && (
+            <div><label style={labelStyle}>Opakování</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.opakovani} onChange={e => setForm({ ...form, opakovani: e.target.value })}>
                 <option value="mesicni">Měsíční</option>
                 <option value="rocni">Roční</option>
               </select>
