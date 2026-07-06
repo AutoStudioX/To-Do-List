@@ -6,27 +6,27 @@ import Modal from '@/components/Modal'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const priorityColors: Record<string, { bg: string; color: string }> = {
-  High: { bg: '#ef444422', color: '#f87171' },
-  Medium: { bg: '#f59e0b22', color: '#fbbf24' },
-  Low: { bg: '#10b98122', color: '#34d399' },
+  High: { bg: '#fee2e2', color: '#e53e3e' },
+  Medium: { bg: '#fef3c7', color: '#d97706' },
+  Low: { bg: '#d1fae5', color: '#059669' },
 }
 const statusColors: Record<string, { bg: string; color: string }> = {
-  'Todo': { bg: '#6b728022', color: '#9ca3af' },
-  'In Progress': { bg: '#3b82f622', color: '#60a5fa' },
-  'Done': { bg: '#10b98122', color: '#34d399' },
+  'Todo': { bg: '#f3f4f6', color: '#6b7280' },
+  'In Progress': { bg: '#dbeafe', color: '#2563eb' },
+  'Done': { bg: '#d1fae5', color: '#059669' },
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#0f0f0f', border: '1px solid #2a2a2a',
-  borderRadius: 8, padding: '10px 14px', color: 'white', fontSize: 14, outline: 'none',
+  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
+  borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none',
 }
-const labelStyle: React.CSSProperties = { fontSize: 13, color: '#9ca3af', display: 'block', marginBottom: 6 }
+const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
 
 const emptyForm = { nazev: '', priorita: 'Medium' as Task['priorita'], deadline: '', status: 'Todo' as Task['status'], projekt: '' }
 
 export default function UkolyPage() {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editTask, setEditTask] = useState<Task | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -36,11 +36,17 @@ export default function UkolyPage() {
   const supabase = createClient()
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('ukoly').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    setTasks(data || [])
-    setLoading(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return
+      const { data } = await supabase.from('ukoly').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+      setTasks(data || [])
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -53,7 +59,8 @@ export default function UkolyPage() {
 
   async function save() {
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
     const payload = { nazev: form.nazev, priorita: form.priorita, deadline: form.deadline || null, status: form.status, projekt: form.projekt || null }
     if (editTask) {
@@ -82,8 +89,8 @@ export default function UkolyPage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700 }}>Úkoly</h1>
-        <button onClick={openAdd} style={{ background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Úkoly</h1>
+        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={16} /> Přidat úkol
         </button>
       </div>
@@ -105,42 +112,42 @@ export default function UkolyPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ background: '#2a2a2a' }}>
+            <tr style={{ background: 'var(--table-header)' }}>
               {['Název', 'Priorita', 'Deadline', 'Status', 'Projekt', ''].map(h => (
-                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 500, color: '#9ca3af' }}>{h}</th>
+                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>Načítání...</td></tr>
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Načítání...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>Žádné úkoly</td></tr>
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Žádné úkoly</td></tr>
             ) : filtered.map(t => (
-              <tr key={t.id} style={{ borderBottom: '1px solid #2a2a2a', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(42,42,42,0.3)'}
+              <tr key={t.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
               >
-                <td style={{ padding: '12px 16px', fontSize: 14 }}>{t.nazev}</td>
+                <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                 <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, ...priorityColors[t.priorita] }}>{t.priorita}</span>
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, ...priorityColors[t.priorita] }}>{t.priorita}</span>
                 </td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#9ca3af' }}>
+                <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>
                   {t.deadline ? new Date(t.deadline).toLocaleDateString('cs-CZ') : '—'}
                 </td>
                 <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, ...statusColors[t.status] }}>{t.status}</span>
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, ...statusColors[t.status] }}>{t.status}</span>
                 </td>
-                <td style={{ padding: '12px 16px', fontSize: 13, color: '#9ca3af' }}>{t.projekt || '—'}</td>
+                <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.projekt || '—'}</td>
                 <td style={{ padding: '12px 16px' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => openEdit(t)} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', padding: 4 }}>
+                    <button onClick={() => openEdit(t)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4 }}>
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => deleteTask(t.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}>
+                    <button onClick={() => deleteTask(t.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 4 }}>
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -182,8 +189,8 @@ export default function UkolyPage() {
             <input style={inputStyle} value={form.projekt} onChange={e => setForm({ ...form, projekt: e.target.value })} />
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#3b82f6', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
+            <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

@@ -14,28 +14,34 @@ export default function PrehledPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [incomes, setIncomes] = useState<Income[]>([])
   const [debts, setDebts] = useState<Debt[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
+        if (!user) return
 
-      const [tasksRes, goalsRes, milestonesRes, incomesRes, debtsRes] = await Promise.all([
-        supabase.from('ukoly').select('*').eq('user_id', user.id),
-        supabase.from('goaly').select('*').eq('user_id', user.id),
-        supabase.from('milniky').select('*').eq('user_id', user.id),
-        supabase.from('prijmy').select('*').eq('user_id', user.id),
-        supabase.from('dluhy').select('*').eq('user_id', user.id),
-      ])
+        const [tasksRes, goalsRes, milestonesRes, incomesRes, debtsRes] = await Promise.all([
+          supabase.from('ukoly').select('*').eq('user_id', user.id),
+          supabase.from('goaly').select('*').eq('user_id', user.id),
+          supabase.from('milniky').select('*').eq('user_id', user.id),
+          supabase.from('prijmy').select('*').eq('user_id', user.id),
+          supabase.from('dluhy').select('*').eq('user_id', user.id),
+        ])
 
-      setTasks(tasksRes.data || [])
-      setGoals(goalsRes.data || [])
-      setMilestones(milestonesRes.data || [])
-      setIncomes(incomesRes.data || [])
-      setDebts(debtsRes.data || [])
-      setLoading(false)
+        setTasks(tasksRes.data || [])
+        setGoals(goalsRes.data || [])
+        setMilestones(milestonesRes.data || [])
+        setIncomes(incomesRes.data || [])
+        setDebts(debtsRes.data || [])
+      } catch {
+        // network or auth error — show empty state
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -61,25 +67,26 @@ export default function PrehledPage() {
   const lifetimeIncome = incomes.filter(i => i.status === 'zaplaceno').reduce((s, i) => s + Number(i.castka), 0)
 
   if (loading) {
-    return <div style={{ color: '#6b7280', padding: 24 }}>Načítání...</div>
+    return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>
   }
 
   return (
     <div>
-      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 24 }}>Přehled</h1>
+      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 24, color: 'var(--text)' }}>Přehled</h1>
 
       {/* Circle rings */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
         gap: 24,
-        background: '#1a1a1a',
-        border: '1px solid #2a2a2a',
+        background: 'var(--card)',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         padding: 24,
         marginBottom: 24,
+        boxShadow: 'var(--shadow)',
       }}>
-        <CircleProgress label="Úkoly splněny" value={doneTasks} max={Math.max(tasks.length, 1)} color="#3b82f6" />
+        <CircleProgress label="Úkoly splněny" value={doneTasks} max={Math.max(tasks.length, 1)} color="#e53e3e" />
         <CircleProgress label="Goaly splněny" value={completedGoals} max={Math.max(goals.length, 1)} color="#8b5cf6" />
         <CircleProgress label="Finance (1M cíl)" value={lifetimeIncome} max={1000000} color="#f59e0b" />
         <CircleProgress label="Dluhy splaceny" value={allMyDebtTotal - myDebtTotal} max={Math.max(allMyDebtTotal, 1)} color="#10b981" />
@@ -88,42 +95,26 @@ export default function PrehledPage() {
       {/* Quick stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
         {[
-          {
-            icon: <CheckSquare size={20} color="#3b82f6" />,
-            label: 'Otevřené úkoly',
-            value: openTasks.length.toString(),
-          },
-          {
-            icon: <Calendar size={20} color="#f59e0b" />,
-            label: 'Nejbližší deadline',
-            value: nextDeadline ? new Date(nextDeadline.deadline!).toLocaleDateString('cs-CZ') : 'Žádný',
-          },
-          {
-            icon: <TrendingUp size={20} color="#10b981" />,
-            label: 'Příjmy tento měsíc',
-            value: czk(monthTotal),
-          },
-          {
-            icon: <CreditCard size={20} color="#ef4444" />,
-            label: 'Moje dluhy celkem',
-            value: czk(myDebtTotal),
-          },
+          { icon: <CheckSquare size={20} color="#e53e3e" />, label: 'Otevřené úkoly', value: openTasks.length.toString() },
+          { icon: <Calendar size={20} color="#f59e0b" />, label: 'Nejbližší deadline', value: nextDeadline ? new Date(nextDeadline.deadline!).toLocaleDateString('cs-CZ') : 'Žádný' },
+          { icon: <TrendingUp size={20} color="#10b981" />, label: 'Příjmy tento měsíc', value: czk(monthTotal) },
+          { icon: <CreditCard size={20} color="#e53e3e" />, label: 'Moje dluhy celkem', value: czk(myDebtTotal) },
         ].map((stat, i) => (
           <div key={i} style={{
-            background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 10, padding: '16px 20px',
-            display: 'flex', flexDirection: 'column', gap: 8,
+            background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px',
+            display: 'flex', flexDirection: 'column', gap: 8, boxShadow: 'var(--shadow)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {stat.icon}
-              <span style={{ fontSize: 13, color: '#6b7280' }}>{stat.label}</span>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>{stat.label}</span>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{stat.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{stat.value}</div>
           </div>
         ))}
       </div>
 
       {/* Goal Roadmap */}
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Roadmap goalů</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: 'var(--text)' }}>Roadmap goalů</h2>
       <GoalRoadmap goals={goals} milestones={milestones} />
     </div>
   )

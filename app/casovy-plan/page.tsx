@@ -6,14 +6,14 @@ import Modal from '@/components/Modal'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const DAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 6) // 6-22
-const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
+const HOURS = Array.from({ length: 17 }, (_, i) => i + 6)
+const COLORS = ['#e53e3e', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#ec4899']
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#0f0f0f', border: '1px solid #2a2a2a',
-  borderRadius: 8, padding: '10px 14px', color: 'white', fontSize: 14, outline: 'none',
+  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
+  borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none',
 }
-const labelStyle: React.CSSProperties = { fontSize: 13, color: '#9ca3af', display: 'block', marginBottom: 6 }
+const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number)
@@ -22,19 +22,25 @@ function timeToMinutes(t: string): number {
 
 export default function CasovyPlanPage() {
   const [blocks, setBlocks] = useState<TimeBlock[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [modal, setModal] = useState(false)
   const [editBlock, setEditBlock] = useState<TimeBlock | null>(null)
-  const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#3b82f6', kategorie: '' })
+  const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#e53e3e', kategorie: '' })
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('casovy_plan').select('*').eq('user_id', user.id)
-    setBlocks(data || [])
-    setLoading(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return
+      const { data } = await supabase.from('casovy_plan').select('*').eq('user_id', user.id)
+      setBlocks(data || [])
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -44,7 +50,7 @@ export default function CasovyPlanPage() {
       nazev: '', den: den ?? 0,
       od: hour !== undefined ? `${hour.toString().padStart(2, '0')}:00` : '09:00',
       do: hour !== undefined ? `${(hour + 1).toString().padStart(2, '0')}:00` : '10:00',
-      barva: '#3b82f6', kategorie: ''
+      barva: '#e53e3e', kategorie: ''
     })
     setEditBlock(null); setModal(true)
   }
@@ -56,7 +62,8 @@ export default function CasovyPlanPage() {
 
   async function save() {
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
     const payload = { nazev: form.nazev, den: form.den, od: form.od, do: form.do, barva: form.barva, kategorie: form.kategorie }
     if (editBlock) {
@@ -72,27 +79,27 @@ export default function CasovyPlanPage() {
     await supabase.from('casovy_plan').delete().eq('id', id); load()
   }
 
-  const CELL_HEIGHT = 48 // px per hour
+  const CELL_HEIGHT = 48
   const START_HOUR = 6
   const END_HOUR = 22
 
-  if (loading) return <div style={{ color: '#6b7280', padding: 24 }}>Načítání...</div>
+  if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700 }}>Časový plán</h1>
-        <button onClick={() => openAdd()} style={{ background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Časový plán</h1>
+        <button onClick={() => openAdd()} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={16} /> Přidat blok
         </button>
       </div>
 
-      <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'auto' }}>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'auto', boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', minWidth: 700 }}>
           {/* Header */}
-          <div style={{ background: '#2a2a2a', padding: '12px 8px', borderBottom: '1px solid #2a2a2a', borderRight: '1px solid #2a2a2a' }} />
+          <div style={{ background: 'var(--table-header)', padding: '12px 8px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }} />
           {DAYS.map((d, i) => (
-            <div key={i} style={{ background: '#2a2a2a', padding: '12px 8px', textAlign: 'center', fontSize: 13, fontWeight: 500, color: '#9ca3af', borderBottom: '1px solid #2a2a2a', borderRight: i < 6 ? '1px solid #2a2a2a' : 'none' }}>
+            <div key={i} style={{ background: 'var(--table-header)', padding: '12px 8px', textAlign: 'center', fontSize: 13, fontWeight: 500, color: 'var(--muted)', borderBottom: '1px solid var(--border)', borderRight: i < 6 ? '1px solid var(--border)' : 'none' }}>
               {d}
             </div>
           ))}
@@ -100,7 +107,7 @@ export default function CasovyPlanPage() {
           {/* Time rows */}
           {HOURS.map(hour => (
             <>
-              <div key={`hour-${hour}`} style={{ padding: '0 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', fontSize: 11, color: '#6b7280', borderBottom: '1px solid #2a2a2a', borderRight: '1px solid #2a2a2a', height: CELL_HEIGHT, paddingTop: 4 }}>
+              <div key={`hour-${hour}`} style={{ padding: '0 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', fontSize: 11, color: 'var(--muted)', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', height: CELL_HEIGHT, paddingTop: 4 }}>
                 {hour.toString().padStart(2, '0')}:00
               </div>
               {DAYS.map((_, dayIdx) => {
@@ -110,7 +117,7 @@ export default function CasovyPlanPage() {
                   return startMin >= hourMin && startMin < hourMin + 60
                 })
                 return (
-                  <div key={`cell-${hour}-${dayIdx}`} style={{ position: 'relative', borderBottom: '1px solid #2a2a2a', borderRight: dayIdx < 6 ? '1px solid #2a2a2a' : 'none', height: CELL_HEIGHT, cursor: 'pointer' }}
+                  <div key={`cell-${hour}-${dayIdx}`} style={{ position: 'relative', borderBottom: '1px solid var(--border)', borderRight: dayIdx < 6 ? '1px solid var(--border)' : 'none', height: CELL_HEIGHT, cursor: 'pointer' }}
                     onClick={() => openAdd(dayIdx, hour)}
                   >
                     {dayBlocks.map(b => {
@@ -123,11 +130,11 @@ export default function CasovyPlanPage() {
                           onClick={e => { e.stopPropagation(); openEdit(b) }}
                           style={{
                             position: 'absolute', top: topOffset, left: 2, right: 2,
-                            height, background: b.barva + '33', border: `1px solid ${b.barva}`,
+                            height, background: b.barva + '22', border: `1px solid ${b.barva}`,
                             borderRadius: 4, padding: '2px 4px', overflow: 'hidden', cursor: 'pointer', zIndex: 1,
                           }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: b.barva, lineHeight: 1.2 }}>{b.nazev}</div>
-                          <div style={{ fontSize: 10, color: '#9ca3af' }}>{b.od}–{b.do}</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.od}–{b.do}</div>
                         </div>
                       )
                     })}
@@ -158,17 +165,18 @@ export default function CasovyPlanPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {COLORS.map(c => (
                 <button key={c} onClick={() => setForm({ ...form, barva: c })} style={{
-                  width: 32, height: 32, borderRadius: 6, background: c, border: form.barva === c ? '3px solid white' : '2px solid transparent', cursor: 'pointer',
+                  width: 32, height: 32, borderRadius: 6, background: c,
+                  border: form.barva === c ? '3px solid var(--text)' : '2px solid transparent', cursor: 'pointer',
                 }} />
               ))}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             {editBlock && (
-              <button onClick={() => { deleteBlock(editBlock.id); setModal(false) }} style={{ background: 'transparent', border: '1px solid #ef444444', borderRadius: 8, padding: '10px 16px', color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>Smazat</button>
+              <button onClick={() => { deleteBlock(editBlock.id); setModal(false) }} style={{ background: 'transparent', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', color: '#e53e3e', cursor: 'pointer', fontSize: 14 }}>Smazat</button>
             )}
-            <button onClick={() => setModal(false)} style={{ background: 'transparent', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#3b82f6', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
+            <button onClick={() => setModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
+            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

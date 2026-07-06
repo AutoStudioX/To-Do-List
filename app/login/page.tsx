@@ -26,24 +26,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f0f' }}>
-      <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: 40, width: 380 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Dashboard</h1>
-        <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>Přihlaste se ke svému účtu</p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 40, width: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: '#e53e3e',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, fontWeight: 800, color: 'white',
+          }}>A</div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>AutoStudio</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Dashboard</div>
+          </div>
+        </div>
+
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>Přihlásit se</h1>
+        <p style={{ color: 'var(--muted)', marginBottom: 24, fontSize: 14 }}>Přihlaste se ke svému účtu</p>
+
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ fontSize: 13, color: '#9ca3af', display: 'block', marginBottom: 6 }}>Email</label>
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }}>Email</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              style={{ width: '100%', background: '#0f0f0f', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 14px', color: 'white', fontSize: 14, outline: 'none' }} />
+              style={{ width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none' }} />
           </div>
           <div>
-            <label style={{ fontSize: 13, color: '#9ca3af', display: 'block', marginBottom: 6 }}>Heslo</label>
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }}>Heslo</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              style={{ width: '100%', background: '#0f0f0f', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 14px', color: 'white', fontSize: 14, outline: 'none' }} />
+              style={{ width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none' }} />
           </div>
-          {error && <p style={{ color: '#ef4444', fontSize: 13 }}>{error}</p>}
+          {error && <p style={{ color: '#e53e3e', fontSize: 13 }}>{error}</p>}
           <button type="submit" disabled={loading}
-            style={{ background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, padding: '12px', fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 8 }}>
+            style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '12px', fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 8 }}>
             {loading ? 'Přihlašování...' : 'Přihlásit se'}
           </button>
         </form>
