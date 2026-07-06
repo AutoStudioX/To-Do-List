@@ -162,6 +162,24 @@ export default function PrehledPage() {
         <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={120} />
       </div>
 
+      {/* Goals */}
+      {goals.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          {goals.filter(g => g.status === 'active').map(g => (
+            <div key={g.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.nazev}</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6', flexShrink: 0 }}>{g.progress}%</span>
+              </div>
+              {g.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
+              <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 5, overflow: 'hidden' }}>
+                <div style={{ background: '#8b5cf6', height: '100%', width: `${g.progress}%`, borderRadius: 4, transition: 'width 0.4s' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Bottom grid — fills remaining height */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
         {/* Tasks */}
