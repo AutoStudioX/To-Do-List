@@ -33,19 +33,7 @@ export default function Sidebar() {
       flexShrink: 0,
     }}>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 8,
-            background: '#e53e3e',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, fontWeight: 800, color: 'white', flexShrink: 0,
-            letterSpacing: '-0.5px',
-          }}>A</div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>AutoStudio</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>Dashboard</div>
-          </div>
-        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.5px', lineHeight: 1 }}>To Do List</div>
       </div>
 
       <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
