@@ -118,6 +118,33 @@ export default function PrehledPage() {
   const singleGoal = goals.length === 1 ? goals[0] : null
   const last5tx = transactions.slice(0, 5)
 
+  const [quickGoalId, setQuickGoalId] = useState<string | null>(null)
+  const [quickValue, setQuickValue] = useState('')
+
+  async function saveQuickProgress(goal: Goal) {
+    if (!quickValue) return
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    const typ = goal.typ || 'manual'
+    let newProgress = goal.progress
+    let updates: Record<string, unknown> = {}
+    if (typ === 'manual') {
+      newProgress = Math.min(100, Math.max(0, Number(quickValue)))
+      updates = { progress: newProgress }
+    } else if (typ === 'number') {
+      const newCurrent = (goal.current_value ?? 0) + Number(quickValue)
+      newProgress = Math.min(100, Math.round(newCurrent / (goal.target_value ?? 1) * 100))
+      updates = { current_value: newCurrent, progress: newProgress }
+    } else if (typ === 'income') {
+      return // income is auto, nothing to do
+    }
+    await supabase.from('goaly').update(updates).eq('id', goal.id)
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, ...updates } as Goal : g))
+    setQuickGoalId(null)
+    setQuickValue('')
+  }
+
   // Goal ring: single goal → show its progress; multiple → show % completed
   const goalRingValue = singleGoal ? singleGoal.progress : goals.filter(g => g.status === 'completed').length
   const goalRingMax = singleGoal ? 100 : Math.max(goals.length, 1)
@@ -163,20 +190,54 @@ export default function PrehledPage() {
       </div>
 
       {/* Goals */}
-      {goals.length > 0 && (
+      {goals.filter(g => g.status === 'active').length > 0 && (
         <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
-          {goals.filter(g => g.status === 'active').map(g => (
-            <div key={g.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.nazev}</div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6', flexShrink: 0 }}>{g.progress}%</span>
+          {goals.filter(g => g.status === 'active').map(g => {
+            const typ = g.typ || 'manual'
+            const isOpen = quickGoalId === g.id
+            const pct = typ === 'manual' ? g.progress
+              : typ === 'number' ? Math.min(100, Math.round((g.current_value ?? 0) / (g.target_value ?? 1) * 100))
+              : Math.min(100, Math.round(monthIncome / (g.target_value ?? 1) * 100))
+            const valueLabel = typ === 'number'
+              ? `${new Intl.NumberFormat('cs-CZ').format(g.current_value ?? 0)} z ${new Intl.NumberFormat('cs-CZ').format(g.target_value ?? 0)}`
+              : typ === 'income'
+              ? `${new Intl.NumberFormat('cs-CZ').format(monthIncome)} z ${new Intl.NumberFormat('cs-CZ').format(g.target_value ?? 0)}`
+              : `${pct}%`
+            return (
+              <div key={g.id} style={{ background: 'var(--card)', border: `1px solid ${isOpen ? '#8b5cf6' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0, transition: 'border-color 0.15s' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.nazev}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6' }}>{valueLabel}</span>
+                    {typ !== 'income' && (
+                      <button
+                        onClick={() => { setQuickGoalId(isOpen ? null : g.id); setQuickValue('') }}
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#8b5cf6' : 'var(--border)'}`, background: isOpen ? '#8b5cf6' : 'transparent', color: isOpen ? 'white' : '#8b5cf6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
+                      >{isOpen ? '×' : '+'}</button>
+                    )}
+                  </div>
+                </div>
+                {g.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
+                <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: isOpen ? 8 : 0 }}>
+                  <div style={{ background: '#8b5cf6', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
+                </div>
+                {isOpen && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      autoFocus
+                      placeholder={typ === 'number' ? `+ hodnota (aktuálně ${g.current_value ?? 0})` : 'Nové % (0–100)'}
+                      value={quickValue}
+                      onChange={e => setQuickValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
+                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #8b5cf6', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                    />
+                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#8b5cf6', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓</button>
+                  </div>
+                )}
               </div>
-              {g.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
-              <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 5, overflow: 'hidden' }}>
-                <div style={{ background: '#8b5cf6', height: '100%', width: `${g.progress}%`, borderRadius: 4, transition: 'width 0.4s' }} />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
