@@ -80,7 +80,7 @@ export default function Sidebar() {
         <div>
           <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>powered by</div>
           <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
-            <span style={{ color: '#ffffff' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
+            <span style={{ color: 'var(--text)' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
           </div>
         </div>
       </div>
