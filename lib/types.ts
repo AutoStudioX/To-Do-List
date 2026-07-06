@@ -37,7 +37,7 @@ export interface Income {
   castka: number
   datum: string
   typ: 'jednorazovy' | 'mesicni'
-  status: 'zaplaceno' | 'ceka'
+  status: 'zaplaceno' | 'ceka' | 'dluh'
   created_at: string
 }
 

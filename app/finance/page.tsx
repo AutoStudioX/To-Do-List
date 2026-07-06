@@ -35,7 +35,7 @@ export default function FinancePage() {
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
   const [editFixed, setEditFixed] = useState<FixedCost | null>(null)
   const [editDebt, setEditDebt] = useState<Debt | null>(null)
-  const [incomeForm, setIncomeForm] = useState({ klient: '', castka: '', datum: '', typ: 'jednorazovy' as Income['typ'], status: 'ceka' as Income['status'] })
+  const [incomeForm, setIncomeForm] = useState({ klient: '', castka: '', datum: '', typ: 'jednorazovy' as Income['typ'], status: 'ceka' as Income['status'], komu_kdo: '' })
   const [expenseForm, setExpenseForm] = useState({ nazev: '', castka: '', datum: '', kategorie: '', opakovani: false })
   const [fixedForm, setFixedForm] = useState({ nazev: '', castka: '' })
   const [debtForm, setDebtForm] = useState({ smer: 'moje' as Debt['smer'], komu_kdo: '', castka: '', datum: '', popis: '', status: 'nesplaceno' as Debt['status'] })
@@ -98,13 +98,20 @@ export default function FinancePage() {
     const supabase = createClient()
     setSaving(true)
     const payload = { klient: incomeForm.klient, castka: Number(incomeForm.castka), datum: incomeForm.datum, typ: incomeForm.typ, status: incomeForm.status }
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setSaving(false); return }
     if (editIncome) {
       await supabase.from('prijmy').update(payload).eq('id', editIncome.id)
     } else {
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) { setSaving(false); return }
       await supabase.from('prijmy').insert({ ...payload, user_id: user.id })
+      if (incomeForm.status === 'dluh') {
+        await supabase.from('dluhy').insert({
+          smer: 'mne', komu_kdo: incomeForm.komu_kdo || incomeForm.klient,
+          castka: Number(incomeForm.castka), datum: incomeForm.datum,
+          popis: `Příjem: ${incomeForm.klient}`, status: 'nesplaceno', user_id: user.id,
+        })
+      }
     }
     setSaving(false); setIncomeModal(false); setEditIncome(null); load()
   }
@@ -255,10 +262,10 @@ export default function FinancePage() {
                       <td style={{ padding: '12px 16px', fontSize: 14, color: '#10b981', fontWeight: 600 }}>{czk(Number(i.castka))}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{new Date(i.datum).toLocaleDateString('cs-CZ')}</td>
                       <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#dbeafe', color: '#2563eb' }}>{i.typ}</span></td>
-                      <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: i.status === 'zaplaceno' ? '#d1fae5' : '#fef3c7', color: i.status === 'zaplaceno' ? '#059669' : '#d97706' }}>{i.status}</span></td>
+                      <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: i.status === 'zaplaceno' ? '#d1fae5' : i.status === 'dluh' ? '#ede9fe' : '#fef3c7', color: i.status === 'zaplaceno' ? '#059669' : i.status === 'dluh' ? '#7c3aed' : '#d97706' }}>{i.status === 'zaplaceno' ? 'Zaplaceno' : i.status === 'dluh' ? 'Dluh' : 'Čeká'}</span></td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => { setEditIncome(i); setIncomeForm({ klient: i.klient, castka: String(i.castka), datum: i.datum, typ: i.typ, status: i.status }); setIncomeModal(true) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
+                          <button onClick={() => { setEditIncome(i); setIncomeForm({ klient: i.klient, castka: String(i.castka), datum: i.datum, typ: i.typ, status: i.status, komu_kdo: '' }); setIncomeModal(true) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
                           <button onClick={() => deleteIncome(i.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
                         </div>
                       </td>
@@ -396,8 +403,12 @@ export default function FinancePage() {
             <select style={{ ...inputStyle, cursor: 'pointer' }} value={incomeForm.status} onChange={e => setIncomeForm({ ...incomeForm, status: e.target.value as Income['status'] })}>
               <option value="zaplaceno">Zaplaceno</option>
               <option value="ceka">Čeká</option>
+              <option value="dluh">Dluh (dluží mi)</option>
             </select>
           </div>
+          {incomeForm.status === 'dluh' && !editIncome && (
+            <div><label style={labelStyle}>Kdo dluží (pokud jiné než klient)</label><input style={inputStyle} placeholder={incomeForm.klient} value={incomeForm.komu_kdo} onChange={e => setIncomeForm({ ...incomeForm, komu_kdo: e.target.value })} /></div>
+          )}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => { setIncomeModal(false); setEditIncome(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveIncome} disabled={saving || !incomeForm.klient || !incomeForm.castka || !incomeForm.datum} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
