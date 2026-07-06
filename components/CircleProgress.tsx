@@ -31,7 +31,7 @@ export default function CircleProgress({ label, value, max, color = '#e53e3e', s
         </div>
       </div>
       <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 12, maxWidth: size + 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-      <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 4, marginTop: 5, overflow: 'hidden', width: size }}>
+      <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 6, marginTop: 6, overflow: 'hidden', width: size }}>
         <div style={{ background: color, height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.5s ease' }} />
       </div>
     </div>
