@@ -187,7 +187,7 @@ export default function PrehledPage() {
       {/* Rings */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
         <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={120} />
-        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#8b5cf6" size={120} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={120} />
         <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={120} />
       </div>
 
@@ -206,22 +206,22 @@ export default function PrehledPage() {
               ? `${new Intl.NumberFormat('cs-CZ').format(monthIncome)} z ${new Intl.NumberFormat('cs-CZ').format(g.target_value ?? 0)}`
               : `${pct}%`
             return (
-              <div key={g.id} style={{ background: 'var(--card)', border: `1px solid ${isOpen ? '#8b5cf6' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0, transition: 'border-color 0.15s' }}>
+              <div key={g.id} style={{ background: 'var(--card)', border: `1px solid ${isOpen ? '#e53e3e' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0, transition: 'border-color 0.15s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.nazev}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6' }}>{valueLabel}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#e53e3e' }}>{valueLabel}</span>
                     {typ !== 'income' && (
                       <button
                         onClick={() => { setQuickGoalId(isOpen ? null : g.id); setQuickValue('') }}
-                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#8b5cf6' : 'var(--border)'}`, background: isOpen ? '#8b5cf6' : 'transparent', color: isOpen ? 'white' : '#8b5cf6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#e53e3e' : 'var(--border)'}`, background: isOpen ? '#e53e3e' : 'transparent', color: isOpen ? 'white' : '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
                       >{isOpen ? <X size={13} /> : <Plus size={13} />}</button>
                     )}
                   </div>
                 </div>
                 {g.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
                 <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: isOpen ? 8 : 0 }}>
-                  <div style={{ background: '#8b5cf6', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
+                  <div style={{ background: '#e53e3e', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
                 </div>
                 {isOpen && (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -232,9 +232,9 @@ export default function PrehledPage() {
                       value={quickValue}
                       onChange={e => setQuickValue(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
-                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #8b5cf6', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #e53e3e', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
                     />
-                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#8b5cf6', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
                   </div>
                 )}
               </div>
@@ -371,7 +371,7 @@ export default function PrehledPage() {
           <div><label style={labelStyle}>Popis</label><textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} value={goalForm.popis} onChange={e => setGoalForm({ ...goalForm, popis: e.target.value })} placeholder="Volitelný popis..." /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#8b5cf6', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

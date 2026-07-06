@@ -177,9 +177,9 @@ export default function GoalyPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                   <span style={{
                     fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                    background: goal.status === 'completed' ? '#d1fae5' : '#ede9fe',
+                    background: goal.status === 'completed' ? '#d1fae5' : '#fee2e2',
                     color: goal.status === 'completed' ? '#059669' : '#e53e3e',
-                    border: `1px solid ${goal.status === 'completed' ? '#a7f3d0' : '#c4b5fd'}`,
+                    border: `1px solid ${goal.status === 'completed' ? '#a7f3d0' : '#fca5a5'}`,
                   }}>{goal.status === 'completed' ? 'Splněno' : 'Aktivní'}</span>
                   {typ !== 'manual' && (
                     <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, background: typ === 'income' ? '#e53e3e22' : '#e53e3e22', border: `1px solid ${typ === 'income' ? '#e53e3e' : '#e53e3e'}`, color: typ === 'income' ? '#e53e3e' : '#e53e3e', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
