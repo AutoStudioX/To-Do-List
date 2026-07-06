@@ -11,6 +11,7 @@ export default function Modal({ isOpen, onClose, title, children }: {
 
   return (
     <div
+      className="modal-overlay"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
@@ -20,6 +21,7 @@ export default function Modal({ isOpen, onClose, title, children }: {
       }}
     >
       <div
+        className="modal-content"
         onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--card)',
@@ -41,11 +43,11 @@ export default function Modal({ isOpen, onClose, title, children }: {
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: 'var(--muted)',
-              cursor: 'pointer', padding: 4, borderRadius: 6,
-              display: 'flex', alignItems: 'center',
+              cursor: 'pointer', padding: 8, borderRadius: 6,
+              display: 'flex', alignItems: 'center', minHeight: 44, minWidth: 44, justifyContent: 'center',
             }}
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
         {children}

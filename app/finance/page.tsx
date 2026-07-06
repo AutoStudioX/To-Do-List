@@ -3,10 +3,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
+import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
+import { Toast, useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { seedRecurring } from '@/lib/seedRecurring'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -37,7 +40,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color }}>{c.label}</span>
 }
 
-const emptyForm = { nazev: '', klient: '', castka: '', datum: '', typ: 'prijem' as Transaction['typ'], kategorie: '', smer: 'mne', opakovani: 'jednorazovy', status: 'ceka', poznamka: '' }
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+const emptyForm = { nazev: '', klient: '', castka: '', datum: todayISO(), typ: 'prijem' as Transaction['typ'], kategorie: '', smer: 'mne', opakovani: 'jednorazovy', status: 'ceka', poznamka: '' }
 
 export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -47,7 +51,11 @@ export default function FinancePage() {
   const [saving, setSaving] = useState(false)
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const [form, setForm] = useState({ ...emptyForm })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { theme } = useTheme()
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const [chartYear, setChartYear] = useState(new Date().getFullYear())
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -73,22 +81,24 @@ export default function FinancePage() {
   const dluhy = transactions.filter(t => t.typ === 'dluh' || (t.typ === 'prijem' && t.status === 'dluh'))
 
   const monthIncomeTotal = prijmy.filter(t => t.status === 'zaplaceno' && t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
-  const monthExpenseTotal = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
-  const profit = monthIncomeTotal - monthExpenseTotal
-  const lifetimeIncome = prijmy.filter(t => t.status === 'zaplaceno').reduce((s, t) => s + Number(t.castka), 0)
+  const monthExpenseVydaje = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
   const fixedMonthly = fixni.filter(t => t.opakovani !== 'rocni').reduce((s, t) => s + Number(t.castka), 0)
   const fixedYearly = fixni.filter(t => t.opakovani === 'rocni').reduce((s, t) => s + Number(t.castka), 0)
   const fixedTotal = fixedMonthly + fixedYearly / 12
+  const monthExpenseTotal = monthExpenseVydaje + fixedTotal
+  const profit = monthIncomeTotal - monthExpenseTotal
+  const lifetimeIncome = prijmy.filter(t => t.status === 'zaplaceno').reduce((s, t) => s + Number(t.castka), 0)
 
   const chartData = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
+    const d = new Date(chartYear, i, 1)
     const mS = new Date(d.getFullYear(), d.getMonth(), 1)
     const mE = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-    return {
-      month: getMonthLabel(d),
-      Příjmy: prijmy.filter(t => t.status === 'zaplaceno' && t.datum && new Date(t.datum) >= mS && new Date(t.datum) <= mE).reduce((s, t) => s + Number(t.castka), 0),
-      Výdaje: vydaje.filter(t => t.datum && new Date(t.datum) >= mS && new Date(t.datum) <= mE).reduce((s, t) => s + Number(t.castka), 0),
-    }
+    const inc = prijmy.filter(t => t.status === 'zaplaceno' && t.datum && new Date(t.datum) >= mS && new Date(t.datum) <= mE).reduce((s, t) => s + Number(t.castka), 0)
+    const monthFixedMonthly = fixni.filter(t => t.opakovani !== 'rocni' && (!t.datum || new Date(t.datum) <= mE)).reduce((s, t) => s + Number(t.castka), 0)
+    const monthFixedYearly = fixni.filter(t => t.opakovani === 'rocni' && (!t.datum || new Date(t.datum) <= mE)).reduce((s, t) => s + Number(t.castka), 0)
+    const monthFixed = monthFixedMonthly + monthFixedYearly / 12
+    const exp = vydaje.filter(t => t.datum && new Date(t.datum) >= mS && new Date(t.datum) <= mE).reduce((s, t) => s + Number(t.castka), 0) + monthFixed
+    return { month: getMonthLabel(d), 'Čistý zisk': inc - exp }
   })
 
   const isDark = theme === 'dark'
@@ -101,7 +111,7 @@ export default function FinancePage() {
   function openAdd(typ: Transaction['typ']) {
     setEditTx(null)
     setForm({ ...emptyForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '', opakovani: typ === 'fixni_naklad' ? 'mesicni' : 'jednorazovy' })
-    setModal(true)
+    setFormErrors({}); setModal(true)
   }
 
   function openEdit(t: Transaction) {
@@ -111,6 +121,11 @@ export default function FinancePage() {
   }
 
   async function save() {
+    const errors: Record<string, string> = {}
+    if (!form.castka) errors.castka = 'Částka je povinná'
+    if (form.typ === 'prijem' && !form.klient.trim()) errors.klient = 'Klient je povinný'
+    if (form.typ !== 'prijem' && !form.nazev.trim()) errors.nazev = 'Název je povinný'
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
     const supabase = createClient()
     setSaving(true)
     const payload: Partial<Transaction> = {
@@ -133,13 +148,14 @@ export default function FinancePage() {
       if (!user) { setSaving(false); return }
       await supabase.from('transakce').insert({ ...payload, user_id: user.id })
     }
-    setSaving(false); setModal(false); setEditTx(null); load()
+    setSaving(false); setModal(false); setEditTx(null); setFormErrors({}); load()
+    showToast(editTx ? 'Záznam upraven' : 'Záznam přidán')
   }
 
   async function deleteTx(id: string) {
-    if (!confirm('Smazat záznam?')) return
+    if (!await confirm('Smazat záznam?')) return
     await createClient().from('transakce').delete().eq('id', id)
-    load()
+    load(); showToast('Záznam smazán')
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -149,13 +165,19 @@ export default function FinancePage() {
   })
 
   const tabMap: Record<Tab, Transaction[]> = { vse: transactions, prijmy, vydaje, fixni, dluhy }
-  const shown = tabMap[activeTab]
+  const pendingFirst = (a: Transaction, b: Transaction) => {
+    const isPending = (t: Transaction) => t.status === 'ceka' || t.status === 'nesplaceno'
+    if (isPending(a) && !isPending(b)) return -1
+    if (!isPending(a) && isPending(b)) return 1
+    return 0
+  }
+  const shown = [...tabMap[activeTab]].sort(pendingFirst)
 
   const tabHeaders: Record<Tab, string[]> = {
     vse: ['Název', 'Typ', 'Částka', 'Datum', 'Status', ''],
     prijmy: ['Klient', 'Částka', 'Datum', 'Opakování', 'Status', ''],
     vydaje: ['Název', 'Částka', 'Datum', 'Kategorie', 'Opakování', ''],
-    fixni: ['Název', 'Částka', 'Opakování', ''],
+    fixni: ['Název', 'Částka', 'Od kdy', 'Opakování', ''],
     dluhy: ['Směr', 'Komu / Kdo', 'Částka', 'Datum', 'Status', ''],
   }
 
@@ -166,6 +188,8 @@ export default function FinancePage() {
 
   return (
     <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      {confirmDialog}
       <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 24, color: 'var(--text)' }}>Finance</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -193,45 +217,76 @@ export default function FinancePage() {
       </div>
 
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px', marginBottom: 24, boxShadow: 'var(--shadow)' }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: 'var(--text)' }}>Posledních 12 měsíců</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>Čistý zisk po měsících</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setChartYear(y => y - 1)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', color: 'var(--muted)', cursor: 'pointer', fontSize: 13 }}>←</button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', minWidth: 40, textAlign: 'center' }}>{chartYear}</span>
+            <button onClick={() => setChartYear(y => y + 1)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', color: 'var(--muted)', cursor: 'pointer', fontSize: 13 }}>→</button>
+          </div>
+        </div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
             <XAxis dataKey="month" stroke={chartTick} tick={{ fill: chartTick, fontSize: 12 }} />
             <YAxis stroke={chartTick} tick={{ fill: chartTick, fontSize: 12 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
             <Tooltip contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8 }} labelStyle={{ color: tooltipLabel }} formatter={(v) => czk(Number(v))} />
-            <Legend wrapperStyle={{ color: chartTick, fontSize: 13 }} />
-            <Bar dataKey="Příjmy" fill="#10b981" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Výdaje" fill="#e53e3e" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Čistý zisk" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={i} fill={entry['Čistý zisk'] >= 0 ? '#10b981' : '#e53e3e'} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 8, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 8, width: 'fit-content' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 10, flexWrap: 'wrap' }}>
+        <div className="tab-bar" style={{ display: 'flex', gap: 4, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 6, width: 'fit-content', maxWidth: '100%' }}>
           {(['vse', 'prijmy', 'vydaje', 'fixni', 'dluhy'] as Tab[]).map(tab => (
             <button key={tab} style={tabStyle(activeTab === tab)} onClick={() => setActiveTab(tab)}>
               {tab === 'vse' ? 'Vše' : tab === 'prijmy' ? 'Příjmy' : tab === 'vydaje' ? 'Výdaje' : tab === 'fixni' ? 'Fixní náklady' : 'Dluhy'}
             </button>
           ))}
         </div>
-        {activeTab !== 'vse' && (
-          <button onClick={() => openAdd(addTypMap[activeTab]!)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={14} /> Přidat {addLabelMap[activeTab]}
-          </button>
-        )}
+        <button onClick={() => activeTab === 'vse' ? openAdd('prijem') : openAdd(addTypMap[activeTab]!)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+          <Plus size={16} /> Přidat {activeTab === 'vse' ? 'transakci' : addLabelMap[activeTab]}
+        </button>
       </div>
 
-      {activeTab === 'fixni' && (
-        <div style={{ display: 'flex', gap: 24, marginBottom: 12, fontSize: 14, color: 'var(--muted)' }}>
-          <span>Měsíčně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedMonthly)}</span></span>
-          <span>Ročně: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedYearly)}</span></span>
-          <span>Průměr/měsíc: <span style={{ color: '#e53e3e', fontWeight: 600 }}>{czk(fixedTotal)}</span></span>
-        </div>
-      )}
+      {(() => {
+        const statStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)' }
+        const valStyle = (color: string): React.CSSProperties => ({ color, fontWeight: 700, fontSize: 15 })
+        const pill = (label: string, value: string, color: string) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={statStyle}>{label}</span>
+            <span style={valStyle(color)}>{value}</span>
+          </div>
+        )
+        const divider = <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
 
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        const pendingIncome = prijmy.filter(t => t.status === 'ceka').reduce((s, t) => s + Number(t.castka), 0)
+        const monthExpenses = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
+        const totalExpenses = vydaje.reduce((s, t) => s + Number(t.castka), 0)
+        const myDebt = dluhy.filter(d => d.smer === 'moje' && d.status === 'nesplaceno').reduce((s, d) => s + Number(d.castka), 0)
+        const theirDebt = dluhy.filter(d => d.status !== 'splaceno' && (d.smer === 'mne' || (d.typ === 'prijem' && d.status === 'dluh'))).reduce((s, d) => s + Number(d.castka), 0)
+
+        const stats: Record<Tab, React.ReactNode> = {
+          vse: <>{pill('Příjmy tento měsíc', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Výdaje tento měsíc', czk(monthExpenseTotal), '#e53e3e')}{divider}{pill('Čistý zisk', czk(profit), profit >= 0 ? '#10b981' : '#e53e3e')}</>,
+          prijmy: <>{pill('Tento měsíc', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Čeká na platbu', czk(pendingIncome), '#f59e0b')}{divider}{pill('Celkem zaplaceno', czk(lifetimeIncome), '#10b981')}</>,
+          vydaje: <>{pill('Tento měsíc', czk(monthExpenses), '#e53e3e')}{divider}{pill('Celkem výdaje', czk(totalExpenses), '#e53e3e')}</>,
+          fixni: <>{pill('Měsíčně', czk(fixedMonthly), '#e53e3e')}{divider}{pill('Ročně', czk(fixedYearly), '#e53e3e')}{divider}{pill('Průměr / měsíc', czk(fixedTotal), '#e53e3e')}</>,
+          dluhy: <>{pill('Dlužím já', czk(myDebt), '#e53e3e')}{divider}{pill('Dluží mi', czk(theirDebt), '#10b981')}</>,
+        }
+
+        return (
+          <div className="stats-bar" style={{ display: 'flex', gap: 24, alignItems: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 20px', marginBottom: 12, boxShadow: 'var(--shadow)' }}>
+            {stats[activeTab]}
+          </div>
+        )
+      })()}
+
+      <div className="table-scroll" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
           <thead><tr style={{ background: 'var(--table-header)' }}>
             {tabHeaders[activeTab].map(h => <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>{h}</th>)}
           </tr></thead>
@@ -244,37 +299,38 @@ export default function FinancePage() {
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px' }}><TypBadge typ={t.typ} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 {activeTab === 'prijmy' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.klient || t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#10b981' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: '#dbeafe', color: '#2563eb' }}>{t.opakovani || '—'}</span></td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 {activeTab === 'vydaje' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.kategorie || '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'mesicni' ? '#dbeafe' : '#f3f4f6', color: t.opakovani === 'mesicni' ? '#2563eb' : '#6b7280' }}>{t.opakovani === 'mesicni' ? 'Opakující se' : 'Jednorázový'}</span></td>
                 </>}
                 {activeTab === 'fixni' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'rocni' ? '#fef3c7' : '#dbeafe', color: t.opakovani === 'rocni' ? '#d97706' : '#2563eb' }}>{t.opakovani === 'rocni' ? 'Roční' : 'Měsíční'}</span></td>
                 </>}
                 {activeTab === 'dluhy' && <>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.smer === 'moje' ? '#fee2e2' : '#d1fae5', color: t.smer === 'moje' ? '#e53e3e' : '#059669' }}>
-                      {t.smer === 'moje' ? 'Dluhu já' : 'Dluží mi'}
+                      {t.smer === 'moje' ? 'Dlužím já' : 'Dluží mi'}
                     </span>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.smer === 'moje' ? '#e53e3e' : '#10b981' }}>{czk(Number(t.castka))}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? (t.opakovani && t.opakovani !== 'jednorazovy' ? getMonthLabel(new Date(t.datum)) : new Date(t.datum).toLocaleDateString('cs-CZ')) : '—'}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 <td style={{ padding: '12px 16px' }}>
@@ -289,34 +345,42 @@ export default function FinancePage() {
         </table>
       </div>
 
-      <Modal isOpen={modal} onClose={() => { setModal(false); setEditTx(null) }} title={editTx ? 'Upravit záznam' : `Nový ${addLabelMap[activeTab] || 'záznam'}`}>
+      <Modal isOpen={modal} onClose={() => { setModal(false); setEditTx(null); setFormErrors({}) }} title={editTx ? 'Upravit záznam' : `Nový ${addLabelMap[activeTab] || 'záznam'}`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!editTx && activeTab === 'vse' && (
             <div><label style={labelStyle}>Typ</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.typ} onChange={e => { const typ = e.target.value as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }}>
-                <option value="prijem">Příjem</option>
-                <option value="vydaj">Výdaj</option>
-                <option value="fixni_naklad">Fixní náklad</option>
-                <option value="dluh">Dluh</option>
-              </select>
+              <Select value={form.typ} onChange={val => { const typ = val as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'fixni_naklad', label: 'Fixní náklad' }, { value: 'dluh', label: 'Dluh' }]} />
             </div>
           )}
 
           {form.typ === 'prijem' && (
-            <div><label style={labelStyle}>Klient</label><input style={inputStyle} value={form.klient} onChange={e => setForm({ ...form, klient: e.target.value })} /></div>
+            <div>
+              <label style={labelStyle}>Klient</label>
+              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#e53e3e' : undefined }} value={form.klient} onChange={e => { setForm({ ...form, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} />
+              {formErrors.klient && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.klient}</div>}
+            </div>
           )}
           {form.typ !== 'prijem' && (
             <div>
-              <label style={labelStyle}>{form.typ === 'dluh' ? (form.smer === 'moje' ? 'Komu dluhu' : 'Kdo mi dluží') : 'Název'}</label>
-              <input style={inputStyle} value={form.nazev} onChange={e => setForm({ ...form, nazev: e.target.value })} />
+              <label style={labelStyle}>{form.typ === 'dluh' ? (
+                <>
+                  <span style={{ color: form.smer === 'moje' ? 'var(--text)' : 'var(--muted)', }}>Komu dlužím</span>
+                  <span style={{ color: 'var(--muted)', margin: '0 4px' }}>/</span>
+                  <span style={{ color: form.smer === 'mne' ? 'var(--text)' : 'var(--muted)' }}>Kdo mi dluží</span>
+                </>
+              ) : 'Název'}</label>
+              <input placeholder={form.typ === 'dluh' ? (form.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} />
+              {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
             </div>
           )}
 
-          <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={form.castka} onChange={e => setForm({ ...form, castka: e.target.value })} /></div>
+          <div>
+            <label style={labelStyle}>Částka (Kč)</label>
+            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#e53e3e' : undefined }} value={form.castka} onChange={e => { setForm({ ...form, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
+            {formErrors.castka && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.castka}</div>}
+          </div>
 
-          {form.typ !== 'fixni_naklad' && (
-            <div><label style={labelStyle}>Datum</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
-          )}
+          <div><label style={labelStyle}>{form.typ === 'fixni_naklad' ? 'Od kdy' : 'Datum'}</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
 
           {form.typ === 'vydaj' && (
             <div><label style={labelStyle}>Kategorie</label><input style={inputStyle} value={form.kategorie} onChange={e => setForm({ ...form, kategorie: e.target.value })} /></div>
@@ -324,53 +388,35 @@ export default function FinancePage() {
 
           {(form.typ === 'prijem' || form.typ === 'vydaj') && (
             <div><label style={labelStyle}>Opakování</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.opakovani} onChange={e => setForm({ ...form, opakovani: e.target.value })}>
-                <option value="jednorazovy">Jednorázový</option>
-                <option value="mesicni">Měsíční</option>
-                <option value="rocni">Roční</option>
-              </select>
+              <Select value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
             </div>
           )}
           {form.typ === 'fixni_naklad' && (
             <div><label style={labelStyle}>Opakování</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.opakovani} onChange={e => setForm({ ...form, opakovani: e.target.value })}>
-                <option value="mesicni">Měsíční</option>
-                <option value="rocni">Roční</option>
-              </select>
+              <Select value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
             </div>
           )}
 
           {form.typ === 'prijem' && (
             <div><label style={labelStyle}>Status</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                <option value="zaplaceno">Zaplaceno</option>
-                <option value="ceka">Čeká</option>
-                <option value="dluh">Dluh (dluží mi)</option>
-              </select>
+              <Select value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
             </div>
           )}
 
           {form.typ === 'dluh' && (
             <>
               <div><label style={labelStyle}>Typ dluhu</label>
-                <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.smer} onChange={e => setForm({ ...form, smer: e.target.value })}>
-                  <option value="moje">Dluhu já (komu)</option>
-                  <option value="mne">Dluží mi (kdo)</option>
-                </select>
+                <Select value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dlužím já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
               </div>
               <div><label style={labelStyle}>Status</label>
-                <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                  <option value="nesplaceno">Nesplaceno</option>
-                  <option value="splaceno">Splaceno</option>
-                </select>
+                <Select value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
               </div>
-              <div><label style={labelStyle}>Poznámka</label><input style={inputStyle} value={form.poznamka} onChange={e => setForm({ ...form, poznamka: e.target.value })} /></div>
             </>
           )}
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => { setModal(false); setEditTx(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving || !form.castka || (form.typ === 'prijem' ? !form.klient : !form.nazev)} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

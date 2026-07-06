@@ -3,12 +3,15 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Goal, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check } from 'lucide-react'
+import Select from '@/components/Select'
+import { Toast, useToast } from '@/components/Toast'
+import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check, Sliders, Zap, Calculator } from 'lucide-react'
 import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
 import { seedRecurring } from '@/lib/seedRecurring'
 
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
 const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none' }
 const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
@@ -22,9 +25,11 @@ export default function PrehledPage() {
   const [menu, setMenu] = useState(false)
   const [addModal, setAddModal] = useState<'finance' | 'ukol' | 'goal' | null>(null)
   const [saving, setSaving] = useState(false)
-  const [txForm, setTxForm] = useState({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka' })
-  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'Medium', deadline: '' })
-  const [goalForm, setGoalForm] = useState({ nazev: '', deadline: '', popis: '' })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const { toast, showToast, hideToast } = useToast()
+  const [txForm, setTxForm] = useState({ nazev: '', klient: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka', kategorie: '', opakovani: 'jednorazovy', smer: 'moje', poznamka: '' })
+  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'Medium', deadline: todayISO(), status: 'Todo', projekt: '' })
+  const [goalForm, setGoalForm] = useState({ nazev: '', deadline: todayISO(), popis: '', typ: 'manual' as 'manual' | 'number' | 'income', progress: 0, current_value: '', target_value: '', status: 'active' as 'active' | 'completed' })
 
   useEffect(() => {
     const supabase = createClient()
@@ -54,21 +59,36 @@ export default function PrehledPage() {
   }
 
   async function saveTransaction() {
+    const errors: Record<string, string> = {}
+    if (!txForm.castka) errors.castka = 'Částka je povinná'
+    if (txForm.typ === 'prijem' && !txForm.klient.trim()) errors.klient = 'Klient je povinný'
+    if (txForm.typ !== 'prijem' && !txForm.nazev.trim()) errors.nazev = 'Název je povinný'
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
     const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setSaving(false); return }
     const { data } = await supabase.from('transakce').insert({
-      nazev: txForm.nazev, castka: Number(txForm.castka), datum: txForm.datum,
-      typ: txForm.typ, status: txForm.status, user_id: user.id,
+      nazev: txForm.typ === 'prijem' ? txForm.klient : txForm.nazev,
+      klient: txForm.typ === 'prijem' ? txForm.klient : null,
+      castka: Number(txForm.castka),
+      datum: txForm.typ === 'fixni_naklad' ? null : txForm.datum,
+      typ: txForm.typ, status: txForm.status,
+      kategorie: txForm.kategorie || null,
+      opakovani: txForm.opakovani,
+      smer: txForm.typ === 'dluh' ? txForm.smer : null,
+      poznamka: txForm.poznamka || null,
+      user_id: user.id,
     }).select().single()
     if (data) setTransactions(prev => [data, ...prev])
-    setSaving(false); setAddModal(null)
-    setTxForm({ nazev: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem', status: 'ceka' })
+    setSaving(false); setAddModal(null); setFormErrors({})
+    setTxForm({ nazev: '', klient: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem', status: 'ceka', kategorie: '', opakovani: 'jednorazovy', smer: 'moje', poznamka: '' })
+    showToast('Transakce přidána')
   }
 
   async function saveTask() {
+    if (!taskForm.nazev.trim()) { setFormErrors({ nazev: 'Název je povinný' }); return }
     const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -76,26 +96,37 @@ export default function PrehledPage() {
     if (!user) { setSaving(false); return }
     const { data } = await supabase.from('ukoly').insert({
       nazev: taskForm.nazev, priorita: taskForm.priorita,
-      deadline: taskForm.deadline || null, status: 'Todo', user_id: user.id,
+      deadline: taskForm.deadline || null, status: taskForm.status, projekt: taskForm.projekt || null, user_id: user.id,
     }).select().single()
     if (data) setTasks(prev => [data, ...prev])
-    setSaving(false); setAddModal(null)
-    setTaskForm({ nazev: '', priorita: 'Medium', deadline: '' })
+    setSaving(false); setAddModal(null); setFormErrors({})
+    setTaskForm({ nazev: '', priorita: 'Medium', deadline: todayISO(), status: 'Todo', projekt: '' })
+    showToast('Úkol přidán')
   }
 
   async function saveGoal() {
+    if (!goalForm.nazev.trim()) { setFormErrors({ nazev: 'Název je povinný' }); return }
     const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setSaving(false); return }
+    const progress = goalForm.typ === 'manual' ? goalForm.progress
+      : goalForm.typ === 'number' && goalForm.target_value ? Math.min(100, Math.round(Number(goalForm.current_value) / Number(goalForm.target_value) * 100))
+      : goalForm.typ === 'income' && goalForm.target_value ? Math.min(100, Math.round(monthIncome / Number(goalForm.target_value) * 100))
+      : 0
     const { data } = await supabase.from('goaly').insert({
       nazev: goalForm.nazev, deadline: goalForm.deadline || null,
-      popis: goalForm.popis || null, progress: 0, status: 'active', user_id: user.id,
+      popis: goalForm.popis || null, progress,
+      status: goalForm.status, user_id: user.id,
+      typ: goalForm.typ,
+      target_value: goalForm.target_value ? Number(goalForm.target_value) : null,
+      current_value: goalForm.current_value ? Number(goalForm.current_value) : null,
     }).select().single()
     if (data) setGoals(prev => [...prev, data])
-    setSaving(false); setAddModal(null)
-    setGoalForm({ nazev: '', deadline: '', popis: '' })
+    setSaving(false); setAddModal(null); setFormErrors({})
+    setGoalForm({ nazev: '', deadline: todayISO(), popis: '', typ: 'manual', progress: 0, current_value: '', target_value: '', status: 'active' })
+    showToast('Goal přidán')
   }
 
   const now = new Date()
@@ -108,14 +139,16 @@ export default function PrehledPage() {
   const monthExpense = transactions.filter(t => t.typ === 'vydaj' && t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
 
   const openTasks = tasks.filter(t => t.status !== 'Done')
+  const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
   const urgentTasks = [...openTasks]
     .sort((a, b) => {
+      const pd = (priorityOrder[a.priorita] ?? 1) - (priorityOrder[b.priorita] ?? 1)
+      if (pd !== 0) return pd
       if (!a.deadline && !b.deadline) return 0
       if (!a.deadline) return 1
       if (!b.deadline) return -1
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     })
-    .slice(0, 5)
 
   const singleGoal = goals.length === 1 ? goals[0] : null
   const last5tx = transactions.slice(0, 5)
@@ -155,12 +188,13 @@ export default function PrehledPage() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Přehled</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Přehled</h1>
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setMenu(m => !m)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Plus size={14} /> Přidat
+          <button onClick={() => setMenu(m => !m)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+            <Plus size={16} /> Přidat
           </button>
           {menu && (
             <>
@@ -185,7 +219,7 @@ export default function PrehledPage() {
       </div>
 
       {/* Rings */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
+      <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
         <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={120} />
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={120} />
         <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={120} />
@@ -224,17 +258,32 @@ export default function PrehledPage() {
                   <div style={{ background: '#e53e3e', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
                 </div>
                 {isOpen && (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input
-                      type="number"
-                      autoFocus
-                      placeholder={typ === 'number' ? `+ hodnota (aktuálně ${g.current_value ?? 0})` : 'Nové % (0–100)'}
-                      value={quickValue}
-                      onChange={e => setQuickValue(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
-                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #e53e3e', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
-                    />
-                    <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {typ === 'manual' ? (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="range" min={0} max={100}
+                          value={quickValue || g.progress || 0}
+                          onChange={e => setQuickValue(e.target.value)}
+                          style={{ flex: 1, accentColor: '#e53e3e' }}
+                        />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#e53e3e', minWidth: 32, textAlign: 'right' }}>{quickValue || g.progress || 0}%</span>
+                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          autoFocus
+                          placeholder={`+ hodnota (aktuálně ${g.current_value ?? 0})`}
+                          value={quickValue}
+                          onChange={e => setQuickValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
+                          style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #e53e3e', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                        />
+                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -244,7 +293,7 @@ export default function PrehledPage() {
       )}
 
       {/* Bottom grid — fills remaining height */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
+      <div className="bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, flex: 1, minHeight: 0 }}>
         {/* Tasks */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
@@ -254,17 +303,22 @@ export default function PrehledPage() {
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
             {urgentTasks.length === 0 ? (
               <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', paddingTop: 16 }}>Žádné otevřené úkoly 🎉</div>
-            ) : urgentTasks.map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+            ) : urgentTasks.map(t => {
+              const isOverdue = t.status !== 'Done' && t.deadline && new Date(t.deadline) < new Date(new Date().toDateString())
+              return (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: isOverdue ? 'rgba(229,62,62,0.06)' : 'transparent', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ width: 4, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityColor[t.priorita], flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '8px 10px' }}>
                 <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
                   style={{ width: 15, height: 15, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
-                  {t.deadline && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
+                  {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
                 </div>
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0 }}>{t.priorita}</span>
+                </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -312,30 +366,65 @@ export default function PrehledPage() {
       </div>
 
       {/* Finance modal */}
-      <Modal isOpen={addModal === 'finance'} onClose={() => setAddModal(null)} title="Přidat transakci">
+      <Modal isOpen={addModal === 'finance'} onClose={() => setAddModal(null)} title="Nová transakce">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={txForm.nazev} onChange={e => setTxForm({ ...txForm, nazev: e.target.value })} placeholder="např. Faktura klient" autoFocus /></div>
-          <div><label style={labelStyle}>Částka (Kč)</label><input type="number" style={inputStyle} value={txForm.castka} onChange={e => setTxForm({ ...txForm, castka: e.target.value })} /></div>
-          <div><label style={labelStyle}>Datum</label><DatePicker value={txForm.datum} onChange={v => setTxForm({ ...txForm, datum: v })} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div><label style={labelStyle}>Typ</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={txForm.typ} onChange={e => setTxForm({ ...txForm, typ: e.target.value as Transaction['typ'], status: e.target.value === 'prijem' ? 'ceka' : e.target.value === 'dluh' ? 'nesplaceno' : '' })}>
-                <option value="prijem">Příjem</option>
-                <option value="vydaj">Výdaj</option>
-                <option value="dluh">Dluh</option>
-              </select>
-            </div>
-            <div><label style={labelStyle}>Status</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={txForm.status} onChange={e => setTxForm({ ...txForm, status: e.target.value })}>
-                {txForm.typ === 'prijem' && <><option value="zaplaceno">Zaplaceno</option><option value="ceka">Čeká</option><option value="dluh">Dluh</option></>}
-                {txForm.typ === 'vydaj' && <option value="">—</option>}
-                {txForm.typ === 'dluh' && <><option value="nesplaceno">Nesplaceno</option><option value="splaceno">Splaceno</option></>}
-              </select>
-            </div>
+          <div><label style={labelStyle}>Typ</label>
+            <Select value={txForm.typ} onChange={val => { const typ = val as Transaction['typ']; setTxForm({ ...txForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'fixni_naklad', label: 'Fixní náklad' }, { value: 'dluh', label: 'Dluh' }]} />
           </div>
+          {txForm.typ === 'prijem' && (
+            <div>
+              <label style={labelStyle}>Klient</label>
+              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#e53e3e' : undefined }} value={txForm.klient} onChange={e => { setTxForm({ ...txForm, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} autoFocus />
+              {formErrors.klient && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.klient}</div>}
+            </div>
+          )}
+          {txForm.typ !== 'prijem' && (
+            <div>
+              <label style={labelStyle}>{txForm.typ === 'dluh' ? (
+                <>
+                  <span style={{ color: txForm.smer === 'moje' ? 'var(--text)' : 'var(--muted)', }}>Komu dlužím</span>
+                  <span style={{ color: 'var(--muted)', margin: '0 4px' }}>/</span>
+                  <span style={{ color: txForm.smer === 'mne' ? 'var(--text)' : 'var(--muted)' }}>Kdo mi dluží</span>
+                </>
+              ) : 'Název'}</label>
+              <input placeholder={txForm.typ === 'dluh' ? (txForm.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={txForm.nazev} onChange={e => { setTxForm({ ...txForm, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} autoFocus />
+              {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+            </div>
+          )}
+          <div>
+            <label style={labelStyle}>Částka (Kč)</label>
+            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#e53e3e' : undefined }} value={txForm.castka} onChange={e => { setTxForm({ ...txForm, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
+            {formErrors.castka && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.castka}</div>}
+          </div>
+          {txForm.typ !== 'fixni_naklad' && (
+            <div><label style={labelStyle}>Datum</label><DatePicker value={txForm.datum} onChange={v => setTxForm({ ...txForm, datum: v })} /></div>
+          )}
+          {txForm.typ === 'vydaj' && (
+            <div><label style={labelStyle}>Kategorie</label><input style={inputStyle} value={txForm.kategorie} onChange={e => setTxForm({ ...txForm, kategorie: e.target.value })} /></div>
+          )}
+          {(txForm.typ === 'prijem' || txForm.typ === 'vydaj') && (
+            <div><label style={labelStyle}>Opakování</label>
+              <Select value={txForm.opakovani} onChange={val => setTxForm({ ...txForm, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+            </div>
+          )}
+          {txForm.typ === 'prijem' && (
+            <div><label style={labelStyle}>Status</label>
+              <Select value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
+            </div>
+          )}
+          {txForm.typ === 'dluh' && (
+            <>
+              <div><label style={labelStyle}>Typ dluhu</label>
+                <Select value={txForm.smer} onChange={val => setTxForm({ ...txForm, smer: val })} options={[{ value: 'moje', label: 'Dluhu já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
+              </div>
+              <div><label style={labelStyle}>Status</label>
+                <Select value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveTransaction} disabled={saving || !txForm.nazev || !txForm.castka} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveTransaction} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
@@ -343,20 +432,24 @@ export default function PrehledPage() {
       </Modal>
 
       {/* Task modal */}
-      <Modal isOpen={addModal === 'ukol'} onClose={() => setAddModal(null)} title="Přidat úkol">
+      <Modal isOpen={addModal === 'ukol'} onClose={() => { setAddModal(null); setFormErrors({}) }} title="Nový úkol">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={taskForm.nazev} onChange={e => setTaskForm({ ...taskForm, nazev: e.target.value })} placeholder="Co je potřeba udělat?" autoFocus /></div>
+          <div>
+            <label style={labelStyle}>Název</label>
+            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={taskForm.nazev} onChange={e => { setTaskForm({ ...taskForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
+            {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+          </div>
           <div><label style={labelStyle}>Priorita</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={taskForm.priorita} onChange={e => setTaskForm({ ...taskForm, priorita: e.target.value })}>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+            <Select value={taskForm.priorita} onChange={val => setTaskForm({ ...taskForm, priorita: val })} options={[{ value: 'High', label: 'High' }, { value: 'Medium', label: 'Medium' }, { value: 'Low', label: 'Low' }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={taskForm.deadline} onChange={v => setTaskForm({ ...taskForm, deadline: v })} /></div>
+          <div><label style={labelStyle}>Status</label>
+            <Select value={taskForm.status} onChange={val => setTaskForm({ ...taskForm, status: val })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
+          </div>
+          <div><label style={labelStyle}>Projekt</label><input style={inputStyle} value={taskForm.projekt} onChange={e => setTaskForm({ ...taskForm, projekt: e.target.value })} /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveTask} disabled={saving || !taskForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveTask} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
@@ -364,14 +457,76 @@ export default function PrehledPage() {
       </Modal>
 
       {/* Goal modal */}
-      <Modal isOpen={addModal === 'goal'} onClose={() => setAddModal(null)} title="Přidat goal">
+      <Modal isOpen={addModal === 'goal'} onClose={() => { setAddModal(null); setFormErrors({}) }} title="Nový goal">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={goalForm.nazev} onChange={e => setGoalForm({ ...goalForm, nazev: e.target.value })} placeholder="Čeho chceš dosáhnout?" autoFocus /></div>
+          <div>
+            <label style={labelStyle}>Název</label>
+            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={goalForm.nazev} onChange={e => { setGoalForm({ ...goalForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
+            {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+          </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={goalForm.deadline} onChange={v => setGoalForm({ ...goalForm, deadline: v })} /></div>
-          <div><label style={labelStyle}>Popis</label><textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} value={goalForm.popis} onChange={e => setGoalForm({ ...goalForm, popis: e.target.value })} placeholder="Volitelný popis..." /></div>
+          <div>
+            <label style={labelStyle}>Typ sledování pokroku</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {(['manual', 'number', 'income'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setGoalForm({ ...goalForm, typ: t })} style={{
+                  padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: `2px solid ${goalForm.typ === t ? '#e53e3e' : 'var(--border)'}`,
+                  background: goalForm.typ === t ? '#e53e3e22' : 'transparent',
+                  color: goalForm.typ === t ? '#e53e3e' : 'var(--muted)',
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                    {t === 'manual' ? <Sliders size={12} /> : t === 'number' ? <Calculator size={12} /> : <Zap size={12} />}
+                    {t === 'manual' ? 'Manuální %' : t === 'number' ? 'Číselný cíl' : 'Příjmy'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {goalForm.typ === 'manual' && (
+            <div>
+              <label style={labelStyle}>Pokrok: {goalForm.progress}%</label>
+              <input type="range" min={0} max={100} value={goalForm.progress} onChange={e => setGoalForm({ ...goalForm, progress: Number(e.target.value) })} style={{ width: '100%', accentColor: '#e53e3e' }} />
+            </div>
+          )}
+          {goalForm.typ === 'number' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div><label style={labelStyle}>Aktuální hodnota</label><input type="number" style={inputStyle} placeholder="0" value={goalForm.current_value} onChange={e => setGoalForm({ ...goalForm, current_value: e.target.value })} /></div>
+                <div><label style={labelStyle}>Cílová hodnota</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
+              </div>
+              {goalForm.current_value && goalForm.target_value && (() => {
+                const pct = Math.min(100, Math.round(Number(goalForm.current_value) / Number(goalForm.target_value) * 100))
+                return (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', fontSize: 12, color: 'var(--muted)', marginBottom: 6, gap: 4 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{czk(Number(goalForm.current_value))}</span>
+                      <span style={{ color: '#e53e3e', fontWeight: 700, textAlign: 'center' }}>{pct}%</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{czk(Number(goalForm.target_value))}</span>
+                    </div>
+                    <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: '#e53e3e', borderRadius: 4, transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+          {goalForm.typ === 'income' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ background: '#e53e3e11', border: '1px solid #e53e3e33', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#e53e3e' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Zap size={13} /> Progress se počítá automaticky z příjmů tohoto měsíce</span>
+              </div>
+              <div><label style={labelStyle}>Cílová částka (Kč)</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
+            </div>
+          )}
+          <div>
+            <label style={labelStyle}>Status</label>
+            <Select value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val as 'active' | 'completed' })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
+          </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveGoal} disabled={saving || !goalForm.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveGoal} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

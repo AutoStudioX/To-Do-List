@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TimeBlock } from '@/lib/types'
 import Modal from '@/components/Modal'
+import Select from '@/components/Select'
+import { Toast, useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const DAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
@@ -27,6 +30,9 @@ export default function CasovyPlanPage() {
   const [editBlock, setEditBlock] = useState<TimeBlock | null>(null)
   const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#e53e3e', kategorie: '' })
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -52,7 +58,7 @@ export default function CasovyPlanPage() {
       do: hour !== undefined ? `${(hour + 1).toString().padStart(2, '0')}:00` : '10:00',
       barva: '#e53e3e', kategorie: ''
     })
-    setEditBlock(null); setModal(true)
+    setEditBlock(null); setFormError(''); setModal(true)
   }
 
   function openEdit(b: TimeBlock) {
@@ -61,6 +67,7 @@ export default function CasovyPlanPage() {
   }
 
   async function save() {
+    if (!form.nazev.trim()) { setFormError('Název je povinný'); return }
     const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -72,12 +79,14 @@ export default function CasovyPlanPage() {
     } else {
       await supabase.from('casovy_plan').insert({ ...payload, user_id: user.id })
     }
-    setSaving(false); setModal(false); load()
+    setSaving(false); setModal(false); setFormError(''); load()
+    showToast(editBlock ? 'Blok upraven' : 'Blok přidán')
   }
 
   async function deleteBlock(id: string) {
-    if (!confirm('Smazat blok?')) return
+    if (!await confirm('Smazat blok?')) return
     await createClient().from('casovy_plan').delete().eq('id', id); load()
+    showToast('Blok smazán')
   }
 
   const CELL_HEIGHT = 48
@@ -88,6 +97,8 @@ export default function CasovyPlanPage() {
 
   return (
     <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      {confirmDialog}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Časový plán</h1>
         <button onClick={() => openAdd()} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -147,14 +158,16 @@ export default function CasovyPlanPage() {
         </div>
       </div>
 
-      <Modal isOpen={modal} onClose={() => setModal(false)} title={editBlock ? 'Upravit blok' : 'Nový časový blok'}>
+      <Modal isOpen={modal} onClose={() => { setModal(false); setFormError('') }} title={editBlock ? 'Upravit blok' : 'Nový časový blok'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={form.nazev} onChange={e => setForm({ ...form, nazev: e.target.value })} /></div>
+          <div>
+            <label style={labelStyle}>Název</label>
+            <input style={{ ...inputStyle, borderColor: formError ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} />
+            {formError && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formError}</div>}
+          </div>
           <div>
             <label style={labelStyle}>Den</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.den} onChange={e => setForm({ ...form, den: Number(e.target.value) })}>
-              {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
+            <Select value={String(form.den)} onChange={val => setForm({ ...form, den: Number(val) })} options={DAYS.map((d, i) => ({ value: String(i), label: d }))} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div><label style={labelStyle}>Od</label><input type="time" style={inputStyle} value={form.od} onChange={e => setForm({ ...form, od: e.target.value })} /></div>
@@ -177,7 +190,7 @@ export default function CasovyPlanPage() {
               <button onClick={() => { deleteBlock(editBlock.id); setModal(false) }} style={{ background: 'transparent', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', color: '#e53e3e', cursor: 'pointer', fontSize: 14 }}>Smazat</button>
             )}
             <button onClick={() => setModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { createClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/Sidebar'
+import MobileLayout from '@/components/MobileLayout'
 import AuthGuard from '@/components/AuthGuard'
 import { ThemeProvider } from '@/components/ThemeProvider'
-import ThemeToggle from '@/components/ThemeToggle'
 
 export const metadata: Metadata = {
   title: 'AutoStudio Dashboard',
@@ -47,26 +46,5 @@ async function LayoutInner({ children }: { children: React.ReactNode }) {
   }
 
 
-  return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <header style={{
-          height: 52,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          padding: '0 24px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--card)',
-          flexShrink: 0,
-        }}>
-          <ThemeToggle />
-        </header>
-        <main style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+  return <MobileLayout>{children}</MobileLayout>
 }

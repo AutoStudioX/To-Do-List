@@ -30,6 +30,8 @@ export async function seedRecurring(supabase: SupabaseClient, userId: string) {
     seen.add(key)
 
     if (t.opakovani === 'mesicni') {
+      const templateMonth = t.datum ? t.datum.substring(0, 7) : null
+      if (templateMonth && templateMonth > yearMonth) continue
       const exists = existing?.some(e => e.nazev === t.nazev && e.typ === t.typ && e.datum?.startsWith(yearMonth))
       if (!exists) {
         inserts.push({

@@ -78,3 +78,50 @@ a {
 a:hover {
   opacity: 0.75;
 }
+
+/* Mobile helpers */
+.bottom-nav { display: none; }
+.mobile-only { display: none !important; }
+.desktop-only { display: block; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 768px) {
+  /* Layout */
+  .sidebar { display: none !important; }
+  .bottom-nav { display: flex !important; }
+  .mobile-only { display: flex !important; }
+  .desktop-only { display: none !important; }
+  .main-content { padding: 16px 12px !important; padding-bottom: 80px !important; }
+
+  /* Přehled grids */
+  .bottom-grid { grid-template-columns: 1fr !important; }
+  .rings-grid { gap: 6px !important; padding: 10px 8px !important; }
+
+  /* Modal → bottom sheet */
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .modal-content {
+    min-width: unset !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 92vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 20px 16px !important;
+  }
+
+  /* Touch targets */
+  .btn-primary, .btn-secondary { min-height: 44px !important; font-size: 15px !important; }
+  input, select, textarea { min-height: 44px !important; font-size: 16px !important; }
+
+  /* Finance chart pills wrap */
+  .stats-bar { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* Headings */
+  h1 { font-size: 22px !important; }
+
+  /* Goal cards grid */
+  .goal-grid { grid-template-columns: 1fr !important; }
+
+  /* Finance tab bar scroll */
+  .tab-bar { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab-bar::-webkit-scrollbar { display: none; }
+}

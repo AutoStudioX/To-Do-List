@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 const DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 const MONTHS = ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen', 'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec']
@@ -40,6 +40,7 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
   const today = new Date()
 
   const [open, setOpen] = useState(false)
+  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({})
   const [viewYear, setViewYear] = useState((parsed || today).getFullYear())
   const [viewMonth, setViewMonth] = useState((parsed || today).getMonth())
   const [mode, setMode] = useState<'days' | 'months' | 'years'>('days')
@@ -56,6 +57,26 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
   useEffect(() => {
     if (open) setMode('days')
   }, [open])
+
+  function toggleOpen() {
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      const calHeight = 310
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      const spaceAbove = rect.top - 8
+      const openUp = spaceBelow < calHeight && spaceAbove > spaceBelow
+      setDropStyle({
+        position: 'fixed',
+        left: rect.left,
+        width: Math.max(rect.width, 268),
+        zIndex: 9999,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+      })
+    }
+    setOpen(o => !o)
+  }
 
   function selectDay(day: number) {
     onChange(toISO(new Date(viewYear, viewMonth, day)))
@@ -98,15 +119,15 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
 
   return (
     <div ref={ref} style={{ position: 'relative', width: '100%' }}>
-      <button type="button" onClick={() => setOpen(o => !o)} style={inputStyle}>
+      <button type="button" onClick={toggleOpen} style={inputStyle}>
         {displayLabel || <span style={{ color: 'var(--muted)' }}>{placeholder}</span>}
       </button>
 
       {open && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100,
+          ...dropStyle,
           background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.35)', padding: 12, width: 268,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.35)', padding: 12,
           animation: 'fadeUp 0.12s ease',
         }}>
 

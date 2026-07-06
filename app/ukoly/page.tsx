@@ -1,9 +1,12 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/lib/types'
 import Modal from '@/components/Modal'
+import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
+import { Toast, useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 import { Plus, Trash2, Pencil, Calendar, Folder } from 'lucide-react'
 
 const priorityBorder: Record<string, string> = {
@@ -27,7 +30,8 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none',
 }
 const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
-const emptyForm = { nazev: '', priorita: 'Medium' as Task['priorita'], deadline: '', status: 'Todo' as Task['status'], projekt: '' }
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+const emptyForm = { nazev: '', priorita: 'Medium' as Task['priorita'], deadline: todayISO(), status: 'Todo' as Task['status'], projekt: '' }
 
 export default function UkolyPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -39,6 +43,9 @@ export default function UkolyPage() {
   const [filterPriority, setFilterPriority] = useState('All')
   const [saving, setSaving] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [formError, setFormError] = useState('')
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, dialog: confirmDialog } = useConfirm()
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -53,13 +60,14 @@ export default function UkolyPage() {
 
   useEffect(() => { load() }, [load])
 
-  function openAdd() { setForm(emptyForm); setEditTask(null); setModalOpen(true) }
+  function openAdd() { setForm(emptyForm); setEditTask(null); setFormError(''); setModalOpen(true) }
   function openEdit(t: Task) {
     setForm({ nazev: t.nazev, priorita: t.priorita, deadline: t.deadline || '', status: t.status, projekt: t.projekt || '' })
     setEditTask(t); setModalOpen(true)
   }
 
   async function save() {
+    if (!form.nazev.trim()) { setFormError('Název je povinný'); return }
     const supabase = createClient()
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -71,19 +79,33 @@ export default function UkolyPage() {
     } else {
       await supabase.from('ukoly').insert({ ...payload, user_id: user.id })
     }
-    setSaving(false); setModalOpen(false); load()
+    setSaving(false); setModalOpen(false); setFormError(''); load()
+    showToast(editTask ? 'Úkol upraven' : 'Úkol přidán')
   }
 
   async function deleteTask(id: string) {
-    if (!confirm('Smazat úkol?')) return
+    if (!await confirm('Smazat úkol?')) return
     await createClient().from('ukoly').delete().eq('id', id)
     load()
+    showToast('Úkol smazán')
   }
 
-  const filtered = tasks.filter(t =>
-    (filterStatus === 'All' || t.status === filterStatus) &&
-    (filterPriority === 'All' || t.priorita === filterPriority)
-  )
+  const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+  const filtered = tasks
+    .filter(t =>
+      (filterStatus === 'All' || t.status === filterStatus) &&
+      (filterPriority === 'All' || t.priorita === filterPriority)
+    )
+    .sort((a, b) => {
+      const aDone = a.status === 'Done' ? 1 : 0
+      const bDone = b.status === 'Done' ? 1 : 0
+      if (aDone !== bDone) return aDone - bDone
+      const pDiff = (priorityOrder[a.priorita] ?? 1) - (priorityOrder[b.priorita] ?? 1)
+      if (pDiff !== 0) return pDiff
+      const aD = a.deadline ? new Date(a.deadline).getTime() : Infinity
+      const bD = b.deadline ? new Date(b.deadline).getTime() : Infinity
+      return aD - bD
+    })
   const openCount = tasks.filter(t => t.status !== 'Done').length
 
   const pillBase: React.CSSProperties = {
@@ -105,7 +127,7 @@ export default function UkolyPage() {
       </div>
 
       {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'Todo', 'In Progress', 'Done'] as const).map(s => {
             const activeColors: Record<string, { bg: string; color: string; border: string }> = {
@@ -156,16 +178,17 @@ export default function UkolyPage() {
         <div style={{ color: 'var(--muted)', padding: 32, textAlign: 'center', background: 'var(--card)', borderRadius: 14, border: '1px solid var(--border)' }}>Žádné úkoly</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(t => (
-            <div key={t.id}
+          {filtered.flatMap((t, i) => {
+            const isDivider = t.status === 'Done' && i > 0 && filtered[i - 1].status !== 'Done'
+            const isOverdue = t.status !== 'Done' && t.deadline && new Date(t.deadline) < new Date(new Date().toDateString())
+            const card = <div key={t.id}
               onMouseEnter={() => setHoveredId(t.id)}
               onMouseLeave={() => setHoveredId(null)}
               style={{
-                background: 'var(--card)',
-                border: '1px solid var(--border)',
+                background: isOverdue ? '#fff5f5' : 'var(--card)',
+                border: `1px solid ${isOverdue ? '#fca5a5' : 'var(--border)'}`,
                 borderRadius: 12,
                 display: 'flex',
-                alignItems: 'center',
                 overflow: 'hidden',
                 boxShadow: hoveredId === t.id ? '0 8px 24px rgba(0,0,0,0.14)' : '0 2px 8px rgba(0,0,0,0.06)',
                 transform: hoveredId === t.id ? 'translateY(-2px)' : 'translateY(0)',
@@ -173,14 +196,34 @@ export default function UkolyPage() {
               }}
             >
               {/* Priority border */}
-              <div style={{ width: 5, alignSelf: 'stretch', background: priorityBorder[t.priorita], flexShrink: 0 }} />
+              <div style={{ width: 5, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityBorder[t.priorita], flexShrink: 0 }} />
 
-              {/* Content */}
-              <div style={{ flex: 1, padding: '14px 18px', minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', marginBottom: 5 }}>{t.nazev}</div>
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+              {/* Content + actions */}
+              <div style={{ flex: 1, padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Row 1: title + action buttons */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', lineHeight: 1.3 }}>{t.nazev}</div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center' }}>
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => deleteTask(t.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center' }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                {/* Row 2: meta */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
+                  </div>
                   {t.deadline && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
                       <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}
                     </span>
                   )}
@@ -191,47 +234,33 @@ export default function UkolyPage() {
                   )}
                 </div>
               </div>
-
-              {/* Status + actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 90 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 100 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
-                </div>
-                <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
-                  <Pencil size={13} />
-                </button>
-                <button onClick={() => deleteTask(t.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
             </div>
-          ))}
+            return isDivider ? [<div key={`div-${t.id}`} style={{ borderTop: '1px solid var(--muted)', margin: '8px 0', opacity: 0.5 }} />, card] : [card]
+          })}
         </div>
       )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editTask ? 'Upravit úkol' : 'Nový úkol'}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      {confirmDialog}
+
+      <Modal isOpen={modalOpen} onClose={() => { setModalOpen(false); setFormError('') }} title={editTask ? 'Upravit úkol' : 'Nový úkol'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={labelStyle}>Název</label><input style={inputStyle} value={form.nazev} onChange={e => setForm({ ...form, nazev: e.target.value })} autoFocus /></div>
+          <div>
+            <label style={labelStyle}>Název</label>
+            <input style={{ ...inputStyle, borderColor: formError ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} autoFocus />
+            {formError && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formError}</div>}
+          </div>
           <div><label style={labelStyle}>Priorita</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.priorita} onChange={e => setForm({ ...form, priorita: e.target.value as Task['priorita'] })}>
-              <option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option>
-            </select>
+            <Select value={form.priorita} onChange={val => setForm({ ...form, priorita: val as Task['priorita'] })} options={[{ value: 'High', label: 'High' }, { value: 'Medium', label: 'Medium' }, { value: 'Low', label: 'Low' }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} /></div>
           <div><label style={labelStyle}>Status</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.status} onChange={e => setForm({ ...form, status: e.target.value as Task['status'] })}>
-              <option value="Todo">Todo</option><option value="In Progress">In Progress</option><option value="Done">Done</option>
-            </select>
+            <Select value={form.status} onChange={val => setForm({ ...form, status: val as Task['status'] })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
           </div>
           <div><label style={labelStyle}>Projekt</label><input style={inputStyle} value={form.projekt} onChange={e => setForm({ ...form, projekt: e.target.value })} /></div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
             <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving || !form.nazev} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving || !form.nazev ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
