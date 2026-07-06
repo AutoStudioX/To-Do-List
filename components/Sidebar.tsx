@@ -73,6 +73,11 @@ export default function Sidebar() {
         })}
       </nav>
 
+      <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ color: '#e53e3e', fontSize: 13, lineHeight: 1 }}>⚡</span>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>by AutoStudio</span>
+      </div>
+
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
         <button onClick={handleLogout} style={{
           display: 'flex',
