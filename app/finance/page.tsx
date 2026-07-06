@@ -114,8 +114,7 @@ export default function FinancePage() {
           .update({ status: 'splaceno' })
           .eq('user_id', user.id)
           .eq('smer', 'mne')
-          .eq('komu_kdo', editIncome.klient)
-          .eq('castka', editIncome.castka)
+          .eq('popis', `Příjem: ${editIncome.klient}`)
           .eq('status', 'nesplaceno')
       }
     } else {
