@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/lib/types'
 import Modal from '@/components/Modal'
 import DatePicker from '@/components/DatePicker'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, Calendar, Folder } from 'lucide-react'
 
 const priorityBorder: Record<string, string> = {
   High: '#e53e3e',
@@ -38,6 +38,7 @@ export default function UkolyPage() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
   const [saving, setSaving] = useState(false)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -83,84 +84,108 @@ export default function UkolyPage() {
     (filterStatus === 'All' || t.status === filterStatus) &&
     (filterPriority === 'All' || t.priorita === filterPriority)
   )
+  const openCount = tasks.filter(t => t.status !== 'Done').length
+
+  const pillBase: React.CSSProperties = {
+    padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.15s',
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Úkoly</h1>
-        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '11px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Úkoly</h1>
+          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>{openCount} otevřených</span>
+        </div>
+        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
           <Plus size={16} /> Přidat úkol
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-        <div>
-          <label style={labelStyle}>Status</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}>
-            {['All', 'Todo', 'In Progress', 'Done'].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['All', 'Todo', 'In Progress', 'Done'].map(s => (
+            <button key={s} onClick={() => setFilterStatus(s)} style={{
+              ...pillBase,
+              background: filterStatus === s ? 'var(--text)' : 'var(--card)',
+              color: filterStatus === s ? 'var(--bg)' : 'var(--muted)',
+              border: `1px solid ${filterStatus === s ? 'var(--text)' : 'var(--border)'}`,
+            }}>{s === 'All' ? 'Vše' : s}</button>
+          ))}
         </div>
-        <div>
-          <label style={labelStyle}>Priorita</label>
-          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}>
-            {['All', 'High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['All', 'High', 'Medium', 'Low'] as const).map(p => (
+            <button key={p} onClick={() => setFilterPriority(p)} style={{
+              ...pillBase,
+              background: filterPriority === p ? (p === 'All' ? 'var(--text)' : priorityBorder[p]) : 'var(--card)',
+              color: filterPriority === p ? (p === 'All' ? 'var(--bg)' : 'white') : 'var(--muted)',
+              border: `1px solid ${filterPriority === p ? (p === 'All' ? 'var(--text)' : priorityBorder[p]) : 'var(--border)'}`,
+            }}>{p === 'All' ? 'Vše' : p}</button>
+          ))}
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: 'var(--table-header)', borderBottom: '2px solid var(--border)' }}>
-              {['Název', 'Priorita', 'Deadline', 'Status', 'Projekt', ''].map(h => (
-                <th key={h} style={{ padding: '14px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Načítání...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Žádné úkoly</td></tr>
-            ) : filtered.map(t => (
-              <tr key={t.id}
-                style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.12s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                <td style={{ padding: '0', paddingRight: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <div style={{ width: 4, alignSelf: 'stretch', background: priorityBorder[t.priorita], borderRadius: '2px 0 0 2px', minHeight: 48, flexShrink: 0 }} />
-                    <span style={{ padding: '14px 14px', fontSize: 14, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220, display: 'block' }}>{t.nazev}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, fontWeight: 600, ...priorityBadge[t.priorita] }}>{t.priorita}</span>
-                </td>
-                <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--muted)' }}>
-                  {t.deadline ? new Date(t.deadline).toLocaleDateString('cs-CZ') : '—'}
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, fontWeight: 600, ...statusBadge[t.status] }}>{t.status}</span>
-                </td>
-                <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.projekt || '—'}</td>
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => openEdit(t)} style={{ background: 'var(--hover-bg)', border: 'none', borderRadius: 6, color: 'var(--muted)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
-                      <Pencil size={13} />
-                    </button>
-                    <button onClick={() => deleteTask(t.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 6, color: '#e53e3e', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Cards */}
+      {loading ? (
+        <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ color: 'var(--muted)', padding: 32, textAlign: 'center', background: 'var(--card)', borderRadius: 14, border: '1px solid var(--border)' }}>Žádné úkoly</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filtered.map(t => (
+            <div key={t.id}
+              onMouseEnter={() => setHoveredId(t.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                overflow: 'hidden',
+                boxShadow: hoveredId === t.id ? '0 8px 24px rgba(0,0,0,0.14)' : '0 2px 8px rgba(0,0,0,0.06)',
+                transform: hoveredId === t.id ? 'translateY(-2px)' : 'translateY(0)',
+                transition: 'box-shadow 0.18s, transform 0.18s',
+              }}
+            >
+              {/* Priority border */}
+              <div style={{ width: 5, alignSelf: 'stretch', background: priorityBorder[t.priorita], flexShrink: 0 }} />
+
+              {/* Content */}
+              <div style={{ flex: 1, padding: '14px 18px', minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', marginBottom: 5 }}>{t.nazev}</div>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                  {t.deadline && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                      <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}
+                    </span>
+                  )}
+                  {t.projekt && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                      <Folder size={11} /> {t.projekt}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Badges + actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, ...priorityBadge[t.priorita] }}>{t.priorita}</span>
+                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, ...statusBadge[t.status] }}>{t.status}</span>
+                <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
+                  <Pencil size={13} />
+                </button>
+                <button onClick={() => deleteTask(t.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editTask ? 'Upravit úkol' : 'Nový úkol'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
