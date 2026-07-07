@@ -17,12 +17,12 @@ export default function Icon() {
       }}
     >
       <svg
-        width="19"
-        height="19"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="white"
         stroke="white"
-        strokeWidth="1"
+        strokeWidth="1.5"
         strokeLinejoin="round"
         strokeLinecap="round"
       >
