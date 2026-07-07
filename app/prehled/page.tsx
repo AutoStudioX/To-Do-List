@@ -230,7 +230,10 @@ export default function PrehledPage() {
       <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
         <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} />
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} />
-        <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
+          <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 📞</div>
+        </div>
       </div>
 
       {/* Goals */}
