@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { createClient } from '@/lib/supabase/server'
 import MobileLayout from '@/components/MobileLayout'
-import AuthGuard from '@/components/AuthGuard'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata: Metadata = {
@@ -37,14 +35,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   )
 }
 
-async function LayoutInner({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return <AuthGuard>{children}</AuthGuard>
-  }
-
-
+function LayoutInner({ children }: { children: React.ReactNode }) {
   return <MobileLayout>{children}</MobileLayout>
 }
