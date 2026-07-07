@@ -162,18 +162,24 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         })
         const json = await res.json()
 
-        if (json.action !== 'unknown') {
+        const actions = json.actions || []
+        const hasReal = actions.some((a: { action: string }) => a.action !== 'unknown')
+        if (hasReal) {
           const supabase = createClient()
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
-            await writeToSupabase(json.action, json.data, session.user.id)
+            for (const a of actions) {
+              if (a.action !== 'unknown') {
+                await writeToSupabase(a.action, a.data, session.user.id)
+              }
+            }
           }
         }
 
         setResponse(json.response || 'Hotovo.')
         setStatus('done')
         setPanelOpen(true)
-        if (json.action !== 'unknown') onSuccess?.()
+        if (hasReal) onSuccess?.()
       } catch {
         setResponse('Chyba při zpracování.')
         setStatus('error')

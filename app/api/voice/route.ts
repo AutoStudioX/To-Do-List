@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
   const contextBlock = context ? `
-Existující úkoly uživatele (pro mazání/úpravu):
+Existující úkoly uživatele (pro úpravy):
 ${JSON.stringify(context.ukoly || [], null, 2)}
 ` : ''
 
@@ -22,50 +22,41 @@ ${JSON.stringify(context.ukoly || [], null, 2)}
 Dnešní datum: ${today()}
 ${contextBlock}
 
-Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
+Analyzuj příkaz. Může obsahovat VÍCE akcí najednou. Vrať JSON (bez markdown) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "update_ukol" | "delete_vydaje_month" | "unknown",
-  "data": { ... },
-  "response": "Krátká česká potvrzovací zpráva co jsi udělal"
+  "actions": [
+    { "action": "...", "data": { ... } },
+    ...
+  ],
+  "response": "Krátká česká potvrzovací zpráva co vše jsi udělal"
 }
 
-Pro add_ukol data obsahuje: { nazev, priorita ("High"|"Medium"|"Low"), deadline (YYYY-MM-DD nebo null), projekt (nebo null) }
-Pro add_prijem data obsahuje: { klient, castka (číslo), datum (YYYY-MM-DD), opakovani ("jednorazovy"|"mesicni"), status ("ceka"|"zaplaceno") }
-Pro add_vydaj data obsahuje: { nazev, castka (číslo), datum (YYYY-MM-DD), kategorie (nebo "Ostatní") }
-Pro add_goal data obsahuje: { nazev, deadline (YYYY-MM-DD nebo null), popis (nebo null) }
-Pro add_dluh data obsahuje: { komu_kdo (jméno osoby), castka (číslo), smer ("moje" = já dlužím, "mne" = dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
-  - "dluh od X" nebo "X mi dluží" → smer: "mne"
-  - "dlužím X" nebo "půjčil jsem si od X" → smer: "moje"
-Pro add_fixni data obsahuje: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
-Pro update_ukol data obsahuje: { id (UUID), status ("Todo"|"In Progress"|"Done"|null), priorita ("High"|"Medium"|"Low"|null), deadline (YYYY-MM-DD nebo null) }
-  - "označ úkol X jako hotový" nebo "smaž úkol X" nebo "hotovo X" nebo "dokončil jsem X" → update_ukol, status: "Done" (NIKDY úkol nemaž, jen označ jako hotový)
-  - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
+Možné akce:
+- add_ukol: { nazev, priorita ("High"|"Medium"|"Low"), deadline (YYYY-MM-DD nebo null), projekt (nebo null) }
+- add_prijem: { klient, castka (číslo), datum (YYYY-MM-DD), opakovani ("jednorazovy"|"mesicni"), status ("ceka"|"zaplaceno") }
+- add_vydaj: { nazev, castka (číslo), datum (YYYY-MM-DD), kategorie (nebo "Ostatní") }
+- add_goal: { nazev, deadline (YYYY-MM-DD nebo null), popis (nebo null) }
+- add_dluh: { komu_kdo, castka (číslo), smer ("moje"=já dlužím | "mne"=dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
+- add_fixni: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
+- update_ukol: { id (UUID z kontextu), status ("Done"|"In Progress"|"Todo"|null), priorita (nebo null), deadline (nebo null) }
+- delete_vydaje_month: { year: YYYY, month: MM }
+- unknown: { reason: "proč nevím" }
 
-BEZPEČNOSTNÍ PRAVIDLA — nikdy neprováděj:
-- Mazání všech záznamů najednou bez konkrétního filtru (měsíc, rok, jméno)
-- Příkazy jako "smaž vše", "odstraň všechno", "vymaž všechna data", "smaž všechny úkoly", "smaž všechny příjmy" apod.
-- Pokud příkaz zní nebezpečně nebo hromadně bez jasného omezení, vrať "unknown" a vysvětli že to nelze provést z bezpečnostních důvodů.
-
-Pokud příkaz nerozumíš nebo neodpovídá žádné akci, použij "unknown" a v response vysvětli proč.
+PRAVIDLA:
+- "smaž úkol X" nebo "hotovo X" → update_ukol status Done (nikdy nemaž)
+- Nikdy neprováděj hromadné mazání bez filtru (měsíc/rok/jméno)
+- Pokud část příkazu nerozumíš, přidej pro tu část { action: "unknown", data: { reason: "..." } }
 
 Příklady:
-- "přidej úkol zavolat klientovi do pátku" → add_ukol
-- "přidej příjem od Honzy pět tisíc korun" → add_prijem
-- "přidej výdaj za oběd dvě stě korun" → add_vydaj
-- "přidej goal dokončit projekt do konce měsíce" → add_goal
-- "přidej dluh od mamky 200 korun" → add_dluh, smer: "mne"
-- "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
-- "přidej fixní náklad Netflix 300 korun měsíčně" → add_fixni
-- "smaž úkol zavolat klientovi" → update_ukol, status: "Done" (označí jako hotový, nemaže)
-- "odstraň všechny výdaje z tohoto měsíce" → delete_vydaje_month, data: { year: YYYY, month: MM }
-- "označ úkol X jako hotový" → update_ukol, status: "Done"
-- "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
+- "přidej příjem od Honzy 5000 a úkol zavolat mu" → 2 akce: add_prijem + add_ukol
+- "přidej výdaj za oběd 200 a dluh od Petra 1000" → 2 akce: add_vydaj + add_dluh
+- "hotovo zavolat klientovi a přidej úkol poslat fakturu" → update_ukol Done + add_ukol
 
 Vrať pouze JSON, žádný jiný text.`
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
+    max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })
 
@@ -73,8 +64,12 @@ Vrať pouze JSON, žádný jiný text.`
     .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
     const parsed = JSON.parse(raw)
+    // Support both old single-action format and new multi-action format
+    if (!parsed.actions && parsed.action) {
+      parsed.actions = [{ action: parsed.action, data: parsed.data }]
+    }
     return NextResponse.json(parsed)
   } catch {
-    return NextResponse.json({ action: 'unknown', data: {}, response: `Nerozuměl jsem: ${raw.slice(0, 100)}` })
+    return NextResponse.json({ actions: [{ action: 'unknown', data: {} }], response: `Nerozuměl jsem: ${raw.slice(0, 100)}` })
   }
 }
