@@ -153,9 +153,24 @@ export default function FinancePage() {
   }
 
   async function deleteTx(id: string) {
+    const tx = transactions.find(t => t.id === id)
     if (!await confirm('Smazat záznam?')) return
-    const { error } = await createClient().from('transakce').delete().eq('id', id)
-    if (error) { showToast('Chyba: ' + error.message); return }
+    const supabase = createClient()
+    // If recurring, delete all records with same nazev+typ+opakovani so seedRecurring doesn't re-insert
+    if (tx && tx.opakovani && tx.opakovani !== 'jednorazovy') {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (user) {
+        await supabase.from('transakce').delete()
+          .eq('user_id', user.id)
+          .eq('nazev', tx.nazev)
+          .eq('typ', tx.typ)
+          .eq('opakovani', tx.opakovani)
+      }
+    } else {
+      const { error } = await supabase.from('transakce').delete().eq('id', id)
+      if (error) { showToast('Chyba: ' + error.message); return }
+    }
     await load(); showToast('Záznam smazán')
   }
 
