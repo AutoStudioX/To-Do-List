@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Mic, MicOff, Loader } from 'lucide-react'
+import { Mic, MicOff, Loader, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'idle' | 'listening' | 'thinking' | 'done' | 'error'
@@ -32,6 +32,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const [status, setStatus] = useState<Status>('idle')
   const [transcript, setTranscript] = useState('')
   const [response, setResponse] = useState('')
+  const [panelOpen, setPanelOpen] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const todayISO = () => {
@@ -173,6 +174,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
         setResponse(json.response || 'Hotovo.')
         setStatus('done')
+        setPanelOpen(true)
         if (json.action !== 'unknown') onSuccess?.()
       } catch {
         setResponse('Chyba při zpracování.')
@@ -210,37 +212,43 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
   return (
     <>
-      {/* Floating mic button */}
+      {/* Inline mic button */}
       <button
         onClick={handleVoice}
         disabled={status === 'thinking'}
         title={labels[status]}
         style={{
-          position: 'fixed', bottom: 90, right: 20, zIndex: 100,
-          width: 52, height: 52, borderRadius: '50%', border: 'none',
+          width: 40, height: 40, borderRadius: 10, border: 'none',
           cursor: status === 'thinking' ? 'default' : 'pointer',
           background: colors[status], display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: status === 'listening' ? '0 0 0 8px rgba(16,185,129,0.2)' : '0 4px 16px rgba(0,0,0,0.25)',
-          transition: 'all 0.2s',
+          boxShadow: status === 'listening' ? '0 0 0 6px rgba(16,185,129,0.2)' : '0 4px 14px rgba(229,62,62,0.35)',
+          transition: 'all 0.2s', flexShrink: 0,
         }}
       >
         {status === 'thinking'
-          ? <Loader size={20} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+          ? <Loader size={16} color="white" style={{ animation: 'spin 1s linear infinite' }} />
           : status === 'listening'
-          ? <MicOff size={20} color="white" />
-          : <Mic size={20} color="white" />
+          ? <MicOff size={16} color="white" />
+          : <Mic size={16} color="white" />
         }
       </button>
 
-      {/* Popup result */}
-      {(transcript || response) && (
+      {/* Collapsible result panel */}
+      {panelOpen && (transcript || response) && (
         <div style={{
-          position: 'fixed', bottom: 152, right: 20, zIndex: 100,
+          position: 'absolute', top: '110%', right: 0, zIndex: 50,
           background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12,
-          padding: '12px 14px', maxWidth: 260, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          padding: '12px 14px', width: 280, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
         }}>
-          {transcript && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>"{transcript}"</div>}
-          {response && <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : '#10b981', fontWeight: 500 }}>{response}</div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              {transcript && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>"{transcript}"</div>}
+              {response && <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : '#10b981', fontWeight: 500 }}>{response}</div>}
+            </div>
+            <button onClick={() => setPanelOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0, flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 
