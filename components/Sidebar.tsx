@@ -69,9 +69,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
           <Zap size={18} color="white" fill="white" />
         </div>
         <div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>powered by</div>
           <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
-            <span style={{ color: 'var(--text)' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
+            <span style={{ color: 'var(--text)' }}>To-Do </span><span style={{ color: '#e53e3e' }}>List</span>
           </div>
         </div>
       </div>
