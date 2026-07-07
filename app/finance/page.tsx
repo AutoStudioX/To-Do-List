@@ -70,6 +70,10 @@ export default function FinancePage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    window.addEventListener('voice-data-changed', load)
+    return () => window.removeEventListener('voice-data-changed', load)
+  }, [load])
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)

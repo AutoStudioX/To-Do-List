@@ -58,7 +58,11 @@ export default function PrehledPage() {
     } catch { }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    window.addEventListener('voice-data-changed', load)
+    return () => window.removeEventListener('voice-data-changed', load)
+  }, [])
 
   async function checkTask(task: Task) {
     const newStatus = task.status === 'Done' ? 'Todo' : 'Done'

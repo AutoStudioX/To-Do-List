@@ -181,7 +181,10 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
         setResponse(json.response || 'Hotovo.')
         setPanelOpen(true)
-        if (hasReal) onSuccess?.()
+        if (hasReal) {
+          onSuccess?.()
+          window.dispatchEvent(new CustomEvent('voice-data-changed'))
+        }
         setStatus('listening')
       } catch {
         setResponse('Chyba při zpracování.')

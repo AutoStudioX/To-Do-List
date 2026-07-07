@@ -59,6 +59,10 @@ export default function UkolyPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    window.addEventListener('voice-data-changed', load)
+    return () => window.removeEventListener('voice-data-changed', load)
+  }, [load])
 
   function openAdd() { setForm(emptyForm); setEditTask(null); setFormError(''); setModalOpen(true) }
   function openEdit(t: Task) {
