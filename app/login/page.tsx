@@ -22,7 +22,7 @@ export default function LoginPage() {
           outline: '1px solid rgba(0,0,0,0.06)',
         }}>
           {/* CardHeader */}
-          <div className="px-4 pt-4 pb-2">
+          <div className="px-4 pt-7 pb-2">
             <p className="text-sm font-medium" style={{ color: '#6b6b6b' }}>Přihlášení</p>
           </div>
           {/* CardContent */}
