@@ -80,6 +80,18 @@ export default function VoiceAgent() {
         progress: 0,
         status: 'active',
       })
+    } else if (action === 'add_dluh') {
+      await supabase.from('transakce').insert({
+        user_id: userId,
+        nazev: data.komu_kdo,
+        castka: data.castka,
+        datum: data.datum || todayISO(),
+        typ: 'dluh',
+        smer: data.smer || 'mne',
+        status: 'nesplaceno',
+        opakovani: 'jednorazovy',
+        poznamka: data.popis || null,
+      })
     }
   }
 

@@ -18,15 +18,18 @@ Dnešní datum: ${today()}
 
 Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "unknown",
+  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "unknown",
   "data": { ... },
   "response": "Krátká česká potvrzovací zpráva co jsi udělal"
 }
 
 Pro add_ukol data obsahuje: { nazev, priorita ("High"|"Medium"|"Low"), deadline (YYYY-MM-DD nebo null), projekt (nebo null) }
 Pro add_prijem data obsahuje: { klient, castka (číslo), datum (YYYY-MM-DD), opakovani ("jednorazovy"|"mesicni"), status ("ceka"|"zaplaceno") }
-Pro add_vydaj data obsahuje: { nazev, castka (číslo), datum (YYYY-MM-DD), kategorie (nebo "Ostatní"), opakovani (false) }
+Pro add_vydaj data obsahuje: { nazev, castka (číslo), datum (YYYY-MM-DD), kategorie (nebo "Ostatní") }
 Pro add_goal data obsahuje: { nazev, deadline (YYYY-MM-DD nebo null), popis (nebo null) }
+Pro add_dluh data obsahuje: { komu_kdo (jméno osoby), castka (číslo), smer ("moje" = já dlužím, "mne" = dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
+  - "dluh od X" nebo "X mi dluží" → smer: "mne"
+  - "dlužím X" nebo "půjčil jsem si od X" → smer: "moje"
 
 Pokud příkaz nerozumíš nebo neodpovídá žádné akci, použij "unknown" a v response vysvětli proč.
 
@@ -35,6 +38,8 @@ Příklady:
 - "přidej příjem od Honzy pět tisíc korun" → add_prijem
 - "přidej výdaj za oběd dvě stě korun" → add_vydaj
 - "přidej goal dokončit projekt do konce měsíce" → add_goal
+- "přidej dluh od mamky 200 korun" → add_dluh, smer: "mne"
+- "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
 
 Vrať pouze JSON, žádný jiný text.`
 
