@@ -16,6 +16,7 @@ interface SpeechRecognitionInstance {
   lang: string
   interimResults: boolean
   maxAlternatives: number
+  continuous: boolean
   onstart: (() => void) | null
   onresult: ((e: SpeechRecognitionEvent) => void) | null
   onerror: (() => void) | null
@@ -25,7 +26,7 @@ interface SpeechRecognitionInstance {
 }
 
 interface SpeechRecognitionEvent {
-  results: { [index: number]: { [index: number]: { transcript: string } } }
+  results: { length: number; [index: number]: { [index: number]: { transcript: string } } }
 }
 
 export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
@@ -121,8 +122,9 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   async function handleVoice() {
-    if (status === 'listening') {
+    if (status === 'listening' || status === 'thinking') {
       recognitionRef.current?.stop()
+      setStatus('idle')
       return
     }
 
@@ -137,12 +139,13 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     recognition.lang = 'cs-CZ'
     recognition.interimResults = false
     recognition.maxAlternatives = 1
+    recognition.continuous = true
     recognitionRef.current = recognition
 
     recognition.onstart = () => setStatus('listening')
 
     recognition.onresult = async (e) => {
-      const text = e.results[0][0].transcript
+      const text = e.results[e.results.length - 1][0].transcript
       setTranscript(text)
       setStatus('thinking')
 
@@ -177,9 +180,9 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         }
 
         setResponse(json.response || 'Hotovo.')
-        setStatus('done')
         setPanelOpen(true)
         if (hasReal) onSuccess?.()
+        setStatus('listening')
       } catch {
         setResponse('Chyba při zpracování.')
         setStatus('error')
@@ -192,7 +195,10 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     }
 
     recognition.onend = () => {
-      setStatus(s => s === 'listening' ? 'idle' : s)
+      setStatus(s => {
+        if (s === 'listening') { recognition.start(); return 'listening' }
+        return s
+      })
     }
 
     recognition.start()

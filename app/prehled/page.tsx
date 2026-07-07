@@ -10,7 +10,6 @@ import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
 import { seedRecurring } from '@/lib/seedRecurring'
-import VoiceAgent from '@/components/VoiceAgent'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -206,9 +205,6 @@ export default function PrehledPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Přehled</h1>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <div style={{ position: 'relative' }}>
-        <VoiceAgent onSuccess={load} />
-        </div>
         <div style={{ position: 'relative' }}>
           <button onClick={() => setMenu(m => !m)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
             <Plus size={16} /> Přidat

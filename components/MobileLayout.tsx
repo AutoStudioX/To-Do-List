@@ -5,6 +5,7 @@ import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import ThemeToggle from './ThemeToggle'
 import { Menu, Zap } from 'lucide-react'
+import VoiceAgent from './VoiceAgent'
 
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -37,7 +38,10 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>To-Do <span style={{ color: '#e53e3e' }}>List</span></span>
           </div>
           <div className="desktop-only" />
-          <ThemeToggle />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <VoiceAgent />
+            <ThemeToggle />
+          </div>
         </header>
         <main className="main-content" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {children}
