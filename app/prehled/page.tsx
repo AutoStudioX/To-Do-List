@@ -235,7 +235,7 @@ export default function PrehledPage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
           {userEmail === 'larisaprodanets2055@gmail.com' && (
-            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 📞</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 😜</div>
           )}
         </div>
       </div>
