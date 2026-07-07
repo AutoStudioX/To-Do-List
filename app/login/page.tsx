@@ -3,8 +3,7 @@ import LoginForm from './LoginForm'
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="absolute inset-0 -z-10" style={{ background: 'radial-gradient(ellipse at top right, rgba(232,25,44,0.10) 0%, transparent 60%), #ffffff' }} />
+    <div className="flex min-h-screen flex-col" style={{ background: '#ffffff' }}>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-8 p-4">
         <div className="text-center">
