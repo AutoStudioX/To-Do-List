@@ -25,13 +25,19 @@ interface SpeechRecognitionInstance {
   stop: () => void
 }
 
+interface SpeechRecognitionResult {
+  isFinal: boolean
+  0: { transcript: string }
+}
+
 interface SpeechRecognitionEvent {
-  results: { length: number; [index: number]: { [index: number]: { transcript: string } } }
+  results: { length: number; [index: number]: SpeechRecognitionResult }
 }
 
 export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const [status, setStatus] = useState<Status>('idle')
   const [transcript, setTranscript] = useState('')
+  const [interim, setInterim] = useState('')
   const [response, setResponse] = useState('')
   const [panelOpen, setPanelOpen] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
@@ -41,10 +47,11 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  async function writeToSupabase(action: string, data: Record<string, unknown>, userId: string) {
+  async function writeToSupabase(action: string, data: Record<string, unknown>, userId: string): Promise<string | null> {
     const supabase = createClient()
     if (action === 'add_ukol') {
-      await supabase.from('ukoly').insert({
+      if (!data.nazev) return 'Chybí název úkolu'
+      const { error } = await supabase.from('ukoly').insert({
         user_id: userId,
         nazev: data.nazev,
         priorita: data.priorita || 'Medium',
@@ -52,19 +59,24 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         projekt: data.projekt || null,
         status: 'Todo',
       })
+      if (error) return error.message
     } else if (action === 'add_prijem') {
-      await supabase.from('transakce').insert({
+      const nazev = data.klient || data.nazev
+      if (!nazev || !data.castka) return 'Chybí klient nebo částka'
+      const { error } = await supabase.from('transakce').insert({
         user_id: userId,
-        nazev: data.klient,
-        klient: data.klient,
+        nazev,
+        klient: nazev,
         castka: data.castka,
         datum: data.datum || todayISO(),
         typ: 'prijem',
         opakovani: data.opakovani || 'jednorazovy',
         status: data.status || 'ceka',
       })
+      if (error) return error.message
     } else if (action === 'add_vydaj') {
-      await supabase.from('transakce').insert({
+      if (!data.nazev || !data.castka) return 'Chybí název nebo částka'
+      const { error } = await supabase.from('transakce').insert({
         user_id: userId,
         nazev: data.nazev,
         castka: data.castka,
@@ -73,34 +85,46 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         kategorie: data.kategorie || 'Ostatní',
         opakovani: 'jednorazovy',
       })
+      if (error) return error.message
     } else if (action === 'add_goal') {
-      await supabase.from('goaly').insert({
+      if (!data.nazev) return 'Chybí název goalu'
+      const { error } = await supabase.from('goaly').insert({
         user_id: userId,
         nazev: data.nazev,
         deadline: data.deadline || null,
         popis: data.popis || null,
         progress: 0,
         status: 'active',
+        typ: 'manual',
       })
+      if (error) return error.message
     } else if (action === 'delete_transakce') {
-      await supabase.from('transakce').delete().eq('id', data.id)
+      if (!data.id) return 'Nenašel jsem transakci ke smazání'
+      const { error } = await supabase.from('transakce').delete().eq('id', data.id)
+      if (error) return error.message
     } else if (action === 'delete_vydaje_month') {
       const year = data.year || new Date().getFullYear()
-      const month = String(data.month || (new Date().getMonth() + 1)).padStart(2, '0')
-      const from = `${year}-${month}-01`
-      const to = `${year}-${month}-31`
-      await supabase.from('transakce').delete()
+      const month = Number(data.month || (new Date().getMonth() + 1))
+      const from = `${year}-${String(month).padStart(2, '0')}-01`
+      const lastDay = new Date(Number(year), month, 0).getDate()
+      const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
+      const { error } = await supabase.from('transakce').delete()
         .eq('user_id', userId).eq('typ', 'vydaj')
         .gte('datum', from).lte('datum', to)
+      if (error) return error.message
     } else if (action === 'update_ukol') {
+      if (!data.id) return 'Nenašel jsem úkol k aktualizaci'
       const updates: Record<string, unknown> = {}
       if (data.status) updates.status = data.status
       if (data.priorita) updates.priorita = data.priorita
       if (data.deadline !== undefined) updates.deadline = data.deadline
       if (data.nazev) updates.nazev = data.nazev
-      await supabase.from('ukoly').update(updates).eq('id', data.id)
+      if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
+      const { error } = await supabase.from('ukoly').update(updates).eq('id', data.id)
+      if (error) return error.message
     } else if (action === 'add_fixni') {
-      await supabase.from('transakce').insert({
+      if (!data.nazev || !data.castka) return 'Chybí název nebo částka'
+      const { error } = await supabase.from('transakce').insert({
         user_id: userId,
         nazev: data.nazev,
         castka: data.castka,
@@ -108,8 +132,10 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         opakovani: data.opakovani || 'mesicni',
         datum: todayISO(),
       })
+      if (error) return error.message
     } else if (action === 'add_dluh') {
-      await supabase.from('transakce').insert({
+      if (!data.komu_kdo || !data.castka) return 'Chybí jméno nebo částka'
+      const { error } = await supabase.from('transakce').insert({
         user_id: userId,
         nazev: data.komu_kdo,
         castka: data.castka,
@@ -120,7 +146,19 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         opakovani: 'jednorazovy',
         poznamka: data.popis || null,
       })
+      if (error) return error.message
+    } else if (action === 'update_goal') {
+      if (!data.id) return 'Nenašel jsem goal k aktualizaci'
+      const updates: Record<string, unknown> = {}
+      if (data.progress !== undefined) updates.progress = Math.min(100, Math.max(0, Number(data.progress)))
+      if (data.status) updates.status = data.status
+      if (data.nazev) updates.nazev = data.nazev
+      if (data.deadline !== undefined) updates.deadline = data.deadline
+      if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
+      const { error } = await supabase.from('goaly').update(updates).eq('id', data.id)
+      if (error) return error.message
     }
+    return null
   }
 
   async function handleVoice() {
@@ -139,16 +177,26 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
     const recognition = new SpeechRecognition()
     recognition.lang = 'cs-CZ'
-    recognition.interimResults = false
+    recognition.interimResults = true
     recognition.maxAlternatives = 1
     recognition.continuous = true
     recognitionRef.current = recognition
 
-    recognition.onstart = () => setStatus('listening')
+    recognition.onstart = () => { setStatus('listening'); setPanelOpen(true); setInterim(''); setResponse('') }
 
     recognition.onresult = async (e) => {
-      const text = e.results[e.results.length - 1][0].transcript
+      // Show live interim transcript
+      let interimText = ''
+      let finalText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript
+        else interimText += e.results[i][0].transcript
+      }
+      if (interimText) { setInterim(interimText); return }
+
+      const text = finalText || e.results[e.results.length - 1][0].transcript
       setTranscript(text)
+      setInterim('')
       setStatus('thinking')
 
       try {
@@ -156,11 +204,12 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         const { data: { session: s } } = await supabaseCtx.auth.getSession()
         let context = {}
         if (s?.user) {
-          const [{ data: ukoly }, { data: transakce }] = await Promise.all([
+          const [{ data: ukoly }, { data: transakce }, { data: goaly }] = await Promise.all([
             supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).neq('status', 'Done'),
             supabaseCtx.from('transakce').select('id, nazev, klient, castka, typ, datum').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(50),
+            supabaseCtx.from('goaly').select('id, nazev, progress, status').eq('user_id', s.user.id).eq('status', 'active'),
           ])
-          context = { ukoly: ukoly || [], transakce: transakce || [] }
+          context = { ukoly: ukoly || [], transakce: transakce || [], goaly: goaly || [] }
         }
 
         const res = await fetch('/api/voice', {
@@ -176,10 +225,18 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
           const supabase = createClient()
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
+            const errors: string[] = []
             for (const a of actions) {
               if (a.action !== 'unknown') {
-                await writeToSupabase(a.action, a.data, session.user.id)
+                const err = await writeToSupabase(a.action, a.data, session.user.id)
+                if (err) errors.push(err)
               }
+            }
+            if (errors.length > 0) {
+              setResponse('Chyba: ' + errors.join(', '))
+              setPanelOpen(true)
+              setStatus('error')
+              return
             }
           }
         }
@@ -191,6 +248,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
           window.dispatchEvent(new CustomEvent('voice-data-changed'))
         }
         setStatus('listening')
+        // Recognition may have auto-stopped during thinking — restart it
+        try { recognition.start() } catch { /* already running */ }
       } catch {
         setResponse('Chyba při zpracování.')
         setStatus('error')
@@ -251,17 +310,41 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         }
       </button>
 
-      {/* Collapsible result panel */}
-      {panelOpen && (transcript || response) && (
+      {/* Live transcript + result panel */}
+      {panelOpen && (
         <div style={{
           position: 'absolute', top: '110%', right: 0, zIndex: 50,
           background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12,
-          padding: '12px 14px', width: 280, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          padding: '12px 14px', width: 300, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              {transcript && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>"{transcript}"</div>}
-              {response && <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : '#10b981', fontWeight: 500 }}>{response}</div>}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Live interim — what you're saying right now */}
+              {interim && (
+                <div style={{ fontSize: 13, color: '#10b981', fontStyle: 'italic', marginBottom: 4, wordBreak: 'break-word' }}>
+                  {interim}
+                </div>
+              )}
+              {/* Final confirmed transcript */}
+              {!interim && transcript && (
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4, wordBreak: 'break-word' }}>
+                  "{transcript}"
+                </div>
+              )}
+              {/* Response from AI */}
+              {response && (
+                <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>
+                  {response}
+                </div>
+              )}
+              {/* Thinking indicator */}
+              {status === 'thinking' && !response && (
+                <div style={{ fontSize: 12, color: '#f59e0b' }}>Zpracovávám...</div>
+              )}
+              {/* Idle hint */}
+              {status === 'listening' && !interim && !transcript && !response && (
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Poslouchám, mluv...</div>
+              )}
             </div>
             <button onClick={() => setPanelOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0, flexShrink: 0 }}>
               <X size={14} />

@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
 Existující úkoly uživatele (pro úpravy):
 ${JSON.stringify(context.ukoly || [], null, 2)}
 
+Existující goaly uživatele (pro aktualizaci progressu):
+${JSON.stringify(context.goaly || [], null, 2)}
+
 Existující transakce uživatele (pro mazání — posledních 50):
 ${JSON.stringify(context.transakce || [], null, 2)}
 ` : ''
@@ -42,6 +45,7 @@ Možné akce:
 - add_dluh: { komu_kdo, castka (číslo), smer ("moje"=já dlužím | "mne"=dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
 - add_fixni: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
 - update_ukol: { id (UUID z kontextu), status ("Done"|"In Progress"|"Todo"|null), priorita (nebo null), deadline (nebo null) }
+- update_goal: { id (UUID z kontextu goalů — najdi nejpodobnější název), progress (0-100, číslo), status ("active"|"completed"|null) }
 - delete_transakce: { id (UUID z kontextu transakcí — vyber nejpodobnější název/klienta) }
 - delete_vydaje_month: { year: YYYY, month: MM }
 - unknown: { reason: "proč nevím" }
@@ -49,6 +53,8 @@ Možné akce:
 PRAVIDLA:
 - "smaž úkol X" nebo "hotovo X" → update_ukol status Done (nikdy nemaž)
 - Nikdy neprováděj hromadné mazání bez filtru (měsíc/rok/jméno)
+- "nastav progress goalu X na 50" nebo "goal X je na 50 procentech" → update_goal s progress: 50
+- "dokončil jsem goal X" nebo "goal X je hotový" → update_goal s status: "completed"
 - Pokud část příkazu nerozumíš, přidej pro tu část { action: "unknown", data: { reason: "..." } }
 
 Příklady:
@@ -56,6 +62,7 @@ Příklady:
 - "přidej výdaj za oběd 200 a dluh od Petra 1000" → 2 akce: add_vydaj + add_dluh
 - "hotovo zavolat klientovi a přidej úkol poslat fakturu" → update_ukol Done + add_ukol
 - "smaž příjem od Honzy" nebo "odstraň transakci Netflix" → delete_transakce (najdi nejpodobnější v kontextu transakcí)
+- "goal naučit se španělsky je na 30 procentech" → update_goal progress: 30
 
 Vrať pouze JSON, žádný jiný text.`
 
