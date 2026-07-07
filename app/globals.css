@@ -127,5 +127,5 @@ a:hover {
   .tab-bar::-webkit-scrollbar { display: none; }
 
   /* Úkoly filter bar */
-  .filter-bar { flex-direction: column !important; }
+  .filter-bar { flex-wrap: wrap !important; }
 }
