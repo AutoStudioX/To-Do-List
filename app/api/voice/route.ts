@@ -24,7 +24,7 @@ ${contextBlock}
 
 Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "delete_ukol" | "update_ukol" | "delete_vydaje_month" | "unknown",
+  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "update_ukol" | "delete_vydaje_month" | "unknown",
   "data": { ... },
   "response": "Krátká česká potvrzovací zpráva co jsi udělal"
 }
@@ -37,10 +37,8 @@ Pro add_dluh data obsahuje: { komu_kdo (jméno osoby), castka (číslo), smer ("
   - "dluh od X" nebo "X mi dluží" → smer: "mne"
   - "dlužím X" nebo "půjčil jsem si od X" → smer: "moje"
 Pro add_fixni data obsahuje: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
-Pro delete_ukol data obsahuje: { id (UUID z existujících úkolů — vyber nejpodobnější název) }
-Pro update_ukol data obsahuje: { id (UUID), nazev (nový nebo stejný), status ("Todo"|"In Progress"|"Done"|null), priorita ("High"|"Medium"|"Low"|null), deadline (YYYY-MM-DD nebo null) }
-  - "označ úkol X jako hotový" → update_ukol, status: "Done"
-  - "smaž úkol X" → delete_ukol
+Pro update_ukol data obsahuje: { id (UUID), status ("Todo"|"In Progress"|"Done"|null), priorita ("High"|"Medium"|"Low"|null), deadline (YYYY-MM-DD nebo null) }
+  - "označ úkol X jako hotový" nebo "smaž úkol X" nebo "hotovo X" nebo "dokončil jsem X" → update_ukol, status: "Done" (NIKDY úkol nemaž, jen označ jako hotový)
   - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
 
 BEZPEČNOSTNÍ PRAVIDLA — nikdy neprováděj:
@@ -58,7 +56,7 @@ Příklady:
 - "přidej dluh od mamky 200 korun" → add_dluh, smer: "mne"
 - "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
 - "přidej fixní náklad Netflix 300 korun měsíčně" → add_fixni
-- "smaž úkol zavolat klientovi" → delete_ukol (najdi nejpodobnější v seznamu)
+- "smaž úkol zavolat klientovi" → update_ukol, status: "Done" (označí jako hotový, nemaže)
 - "odstraň všechny výdaje z tohoto měsíce" → delete_vydaje_month, data: { year: YYYY, month: MM }
 - "označ úkol X jako hotový" → update_ukol, status: "Done"
 - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"

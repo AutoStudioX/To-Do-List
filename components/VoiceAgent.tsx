@@ -89,8 +89,6 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       await supabase.from('transakce').delete()
         .eq('user_id', userId).eq('typ', 'vydaj')
         .gte('datum', from).lte('datum', to)
-    } else if (action === 'delete_ukol') {
-      await supabase.from('ukoly').delete().eq('id', data.id)
     } else if (action === 'update_ukol') {
       const updates: Record<string, unknown> = {}
       if (data.status) updates.status = data.status
