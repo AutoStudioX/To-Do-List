@@ -24,6 +24,7 @@ export default function PrehledPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [menu, setMenu] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
     check()
@@ -45,6 +46,7 @@ export default function PrehledPage() {
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user
         if (!user) return
+        setUserEmail(user.email ?? null)
         await seedRecurring(supabase, user.id)
         const [tr, gr, txr] = await Promise.all([
           supabase.from('ukoly').select('*').eq('user_id', user.id),
@@ -232,7 +234,9 @@ export default function PrehledPage() {
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
-          <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 📞</div>
+          {userEmail === 'larisaprodanets2055@gmail.com' && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 📞</div>
+          )}
         </div>
       </div>
 
