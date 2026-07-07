@@ -149,7 +149,7 @@ export default function UkolyPage() {
           })}
         </div>
         <div className="desktop-only" style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
-        <div className="desktop-only" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'High', 'Medium', 'Low'] as const).map(p => {
             const priorityActive: Record<string, { bg: string; color: string; border: string }> = {
               All: { bg: 'var(--text)', color: 'var(--bg)', border: 'var(--text)' },
