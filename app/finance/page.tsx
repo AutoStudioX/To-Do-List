@@ -271,8 +271,8 @@ export default function FinancePage() {
         const theirDebt = dluhy.filter(d => d.status !== 'splaceno' && (d.smer === 'mne' || (d.typ === 'prijem' && d.status === 'dluh'))).reduce((s, d) => s + Number(d.castka), 0)
 
         const stats: Record<Tab, React.ReactNode> = {
-          vse: <>{pill('Příjmy tento měsíc', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Výdaje tento měsíc', czk(monthExpenseTotal), '#e53e3e')}{divider}{pill('Čistý zisk', czk(profit), profit >= 0 ? '#10b981' : '#e53e3e')}</>,
-          prijmy: <>{pill('Tento měsíc', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Čeká na platbu', czk(pendingIncome), '#f59e0b')}{divider}{pill('Celkem zaplaceno', czk(lifetimeIncome), '#10b981')}</>,
+          vse: <>{pill('Příjmy tento m.', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Výdaje tento m.', czk(monthExpenseTotal), '#e53e3e')}{divider}{pill('Čistý zisk', czk(profit), profit >= 0 ? '#10b981' : '#e53e3e')}</>,
+          prijmy: <>{pill('Tento m.', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Čeká na platbu', czk(pendingIncome), '#f59e0b')}{divider}{pill('Celkem zaplaceno', czk(lifetimeIncome), '#10b981')}</>,
           vydaje: <>{pill('Tento měsíc', czk(monthExpenses), '#e53e3e')}{divider}{pill('Celkem výdaje', czk(totalExpenses), '#e53e3e')}</>,
           fixni: <>{pill('Měsíčně', czk(fixedMonthly), '#e53e3e')}{divider}{pill('Ročně', czk(fixedYearly), '#e53e3e')}{divider}{pill('Průměr / měsíc', czk(fixedTotal), '#e53e3e')}</>,
           dluhy: <>{pill('Dlužím já', czk(myDebt), '#e53e3e')}{divider}{pill('Dluží mi', czk(theirDebt), '#10b981')}</>,
