@@ -193,7 +193,13 @@ export default function PrehledPage() {
   }
 
   // Goal ring: single goal → show its progress; multiple → show % completed
-  const goalRingValue = singleGoal ? singleGoal.progress : goals.filter(g => g.status === 'completed').length
+  const calcGoalProgress = (g: Goal) => {
+    const typ = g.typ || 'manual'
+    if (typ === 'income') return Math.min(100, Math.round(monthIncome / (g.target_value ?? 1) * 100))
+    if (typ === 'number') return Math.min(100, Math.round((g.current_value ?? 0) / (g.target_value ?? 1) * 100))
+    return g.progress
+  }
+  const goalRingValue = singleGoal ? calcGoalProgress(singleGoal) : goals.filter(g => g.status === 'completed').length
   const goalRingMax = singleGoal ? 100 : Math.max(goals.length, 1)
   const goalRingLabel = singleGoal ? singleGoal.nazev : 'Goaly splněny'
   const goalRingSublabel = singleGoal ? singleGoal.nazev : undefined
