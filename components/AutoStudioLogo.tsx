@@ -7,9 +7,8 @@ export default function AutoStudioLogo() {
         <Zap className="h-5 w-5" style={{ fill: 'white', stroke: 'white', strokeWidth: 1.5 }} />
       </div>
       <div>
-        <p className="text-xs leading-none mb-0.5" style={{ color: '#9ca3af' }}>powered by</p>
         <p className="text-lg font-bold leading-none" style={{ color: '#111111' }}>
-          Auto<span style={{ color: '#e53e3e' }}>Studio</span>
+          To-Do <span style={{ color: '#e53e3e' }}>List</span>
         </p>
       </div>
     </div>
