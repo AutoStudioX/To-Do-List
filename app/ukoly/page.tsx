@@ -12,12 +12,12 @@ import { Plus, Trash2, Pencil, Calendar, Folder } from 'lucide-react'
 const priorityBorder: Record<string, string> = {
   High: '#e53e3e',
   Medium: '#f59e0b',
-  Low: '#9ca3af',
+  Low: '#10b981',
 }
 const priorityDot: Record<string, string> = {
   High: '#e53e3e',
   Medium: '#f59e0b',
-  Low: '#9ca3af',
+  Low: '#10b981',
 }
 const statusConfig: Record<string, { dot: string; label: string }> = {
   'Todo': { dot: '#9ca3af', label: 'Todo' },
@@ -155,7 +155,7 @@ export default function UkolyPage() {
               All: { bg: 'var(--text)', color: 'var(--bg)', border: 'var(--text)' },
               High: { bg: '#fee2e2', color: '#c53030', border: '#e53e3e' },
               Medium: { bg: '#fef3c7', color: '#b45309', border: '#f59e0b' },
-              Low: { bg: '#e5e7eb', color: '#4b5563', border: '#9ca3af' },
+              Low: { bg: '#d1fae5', color: '#065f46', border: '#10b981' },
             }
             const active = filterPriority === p
             return (
