@@ -34,11 +34,11 @@ export default function LoginForm() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#ffffff' }}>
       {/* Title */}
-      <div style={{ marginBottom: 24, textAlign: 'center' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#111', margin: 0 }}>
+      <div style={{ marginBottom: 32, textAlign: 'center' }}>
+        <h1 style={{ fontSize: 32, fontWeight: 700, color: '#111', margin: 0 }}>
           To-Do <span style={{ color: '#e53e3e' }}>List</span>
         </h1>
-        <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 6 }}>Přihlaste se pro přístup k aplikaci</p>
+        <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 8 }}>Přihlaste se pro přístup k aplikaci</p>
       </div>
 
       {/* Card */}
