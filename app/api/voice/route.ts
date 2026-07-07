@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
   const contextBlock = context ? `
 Existující úkoly uživatele (pro úpravy):
 ${JSON.stringify(context.ukoly || [], null, 2)}
+
+Existující transakce uživatele (pro mazání — posledních 50):
+${JSON.stringify(context.transakce || [], null, 2)}
 ` : ''
 
   const prompt = `Jsi asistent pro osobní produktivitu. Uživatel ti řekl: "${text}"
@@ -39,6 +42,7 @@ Možné akce:
 - add_dluh: { komu_kdo, castka (číslo), smer ("moje"=já dlužím | "mne"=dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
 - add_fixni: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
 - update_ukol: { id (UUID z kontextu), status ("Done"|"In Progress"|"Todo"|null), priorita (nebo null), deadline (nebo null) }
+- delete_transakce: { id (UUID z kontextu transakcí — vyber nejpodobnější název/klienta) }
 - delete_vydaje_month: { year: YYYY, month: MM }
 - unknown: { reason: "proč nevím" }
 
@@ -51,6 +55,7 @@ Příklady:
 - "přidej příjem od Honzy 5000 a úkol zavolat mu" → 2 akce: add_prijem + add_ukol
 - "přidej výdaj za oběd 200 a dluh od Petra 1000" → 2 akce: add_vydaj + add_dluh
 - "hotovo zavolat klientovi a přidej úkol poslat fakturu" → update_ukol Done + add_ukol
+- "smaž příjem od Honzy" nebo "odstraň transakci Netflix" → delete_transakce (najdi nejpodobnější v kontextu transakcí)
 
 Vrať pouze JSON, žádný jiný text.`
 

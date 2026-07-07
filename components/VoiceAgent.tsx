@@ -82,6 +82,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         progress: 0,
         status: 'active',
       })
+    } else if (action === 'delete_transakce') {
+      await supabase.from('transakce').delete().eq('id', data.id)
     } else if (action === 'delete_vydaje_month') {
       const year = data.year || new Date().getFullYear()
       const month = String(data.month || (new Date().getMonth() + 1)).padStart(2, '0')
@@ -154,8 +156,11 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         const { data: { session: s } } = await supabaseCtx.auth.getSession()
         let context = {}
         if (s?.user) {
-          const { data: ukoly } = await supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).neq('status', 'Done')
-          context = { ukoly: ukoly || [] }
+          const [{ data: ukoly }, { data: transakce }] = await Promise.all([
+            supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).neq('status', 'Done'),
+            supabaseCtx.from('transakce').select('id, nazev, klient, castka, typ, datum').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(50),
+          ])
+          context = { ukoly: ukoly || [], transakce: transakce || [] }
         }
 
         const res = await fetch('/api/voice', {
