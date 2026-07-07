@@ -161,6 +161,9 @@ export default function PrehledPage() {
 
   const ringSize = isMobile ? 76 : 120
   const singleGoal = goals.length === 1 ? goals[0] : null
+  const pendingIncome = prijmy.filter(t => t.status === 'ceka').reduce((s, t) => s + Number(t.castka), 0)
+  const myDebt = transactions.filter(t => t.typ === 'dluh' && t.smer === 'moje' && t.status === 'nesplaceno').reduce((s, t) => s + Number(t.castka), 0)
+  const theirDebt = transactions.filter(t => t.typ === 'dluh' && t.smer === 'mne' && t.status === 'nesplaceno').reduce((s, t) => s + Number(t.castka), 0)
   const last5tx = transactions.slice(0, 5)
 
   const [quickGoalId, setQuickGoalId] = useState<string | null>(null)
@@ -359,6 +362,20 @@ export default function PrehledPage() {
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#e53e3e' }}>{czk(monthExpense)}</div>
             </div>
+            {userEmail !== 'larisaprodanets2055@gmail.com' && <>
+              <div style={{ background: '#fef3c722', border: '1px solid #fef3c7', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 11, color: '#d97706', fontWeight: 500, marginBottom: 3 }}>Čeká na platbu</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#d97706' }}>{czk(pendingIncome)}</div>
+              </div>
+              <div style={{ background: '#ede9fe22', border: '1px solid #ede9fe', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 3 }}>Dluhy</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>
+                  <span style={{ color: '#e53e3e' }}>−{czk(myDebt)}</span>
+                  <span style={{ color: 'var(--muted)', fontWeight: 400, margin: '0 4px' }}>/</span>
+                  <span style={{ color: '#10b981' }}>+{czk(theirDebt)}</span>
+                </div>
+              </div>
+            </>}
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 500, flexShrink: 0 }}>Poslední transakce</div>
