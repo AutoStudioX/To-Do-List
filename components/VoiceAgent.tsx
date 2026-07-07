@@ -80,6 +80,15 @@ export default function VoiceAgent() {
         progress: 0,
         status: 'active',
       })
+    } else if (action === 'delete_ukol') {
+      await supabase.from('ukoly').delete().eq('id', data.id)
+    } else if (action === 'update_ukol') {
+      const updates: Record<string, unknown> = {}
+      if (data.status) updates.status = data.status
+      if (data.priorita) updates.priorita = data.priorita
+      if (data.deadline !== undefined) updates.deadline = data.deadline
+      if (data.nazev) updates.nazev = data.nazev
+      await supabase.from('ukoly').update(updates).eq('id', data.id)
     } else if (action === 'add_fixni') {
       await supabase.from('transakce').insert({
         user_id: userId,
@@ -131,10 +140,18 @@ export default function VoiceAgent() {
       setStatus('thinking')
 
       try {
+        const supabaseCtx = createClient()
+        const { data: { session: s } } = await supabaseCtx.auth.getSession()
+        let context = {}
+        if (s?.user) {
+          const { data: ukoly } = await supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).neq('status', 'Done')
+          context = { ukoly: ukoly || [] }
+        }
+
         const res = await fetch('/api/voice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, context }),
         })
         const json = await res.json()
 

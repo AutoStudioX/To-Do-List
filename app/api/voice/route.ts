@@ -9,16 +9,22 @@ const today = () => {
 }
 
 export async function POST(req: NextRequest) {
-  const { text } = await req.json()
+  const { text, context } = await req.json()
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
+
+  const contextBlock = context ? `
+Existující úkoly uživatele (pro mazání/úpravu):
+${JSON.stringify(context.ukoly || [], null, 2)}
+` : ''
 
   const prompt = `Jsi asistent pro osobní produktivitu. Uživatel ti řekl: "${text}"
 
 Dnešní datum: ${today()}
+${contextBlock}
 
 Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "unknown",
+  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "delete_ukol" | "update_ukol" | "unknown",
   "data": { ... },
   "response": "Krátká česká potvrzovací zpráva co jsi udělal"
 }
@@ -31,6 +37,11 @@ Pro add_dluh data obsahuje: { komu_kdo (jméno osoby), castka (číslo), smer ("
   - "dluh od X" nebo "X mi dluží" → smer: "mne"
   - "dlužím X" nebo "půjčil jsem si od X" → smer: "moje"
 Pro add_fixni data obsahuje: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
+Pro delete_ukol data obsahuje: { id (UUID z existujících úkolů — vyber nejpodobnější název) }
+Pro update_ukol data obsahuje: { id (UUID), nazev (nový nebo stejný), status ("Todo"|"In Progress"|"Done"|null), priorita ("High"|"Medium"|"Low"|null), deadline (YYYY-MM-DD nebo null) }
+  - "označ úkol X jako hotový" → update_ukol, status: "Done"
+  - "smaž úkol X" → delete_ukol
+  - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
 
 Pokud příkaz nerozumíš nebo neodpovídá žádné akci, použij "unknown" a v response vysvětli proč.
 
@@ -42,6 +53,9 @@ Příklady:
 - "přidej dluh od mamky 200 korun" → add_dluh, smer: "mne"
 - "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
 - "přidej fixní náklad Netflix 300 korun měsíčně" → add_fixni
+- "smaž úkol zavolat klientovi" → delete_ukol (najdi nejpodobnější v seznamu)
+- "označ úkol X jako hotový" → update_ukol, status: "Done"
+- "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
 
 Vrať pouze JSON, žádný jiný text.`
 
