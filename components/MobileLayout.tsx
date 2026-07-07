@@ -38,7 +38,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>To-Do <span style={{ color: '#e53e3e' }}>List</span></span>
           </div>
           <div className="desktop-only" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
             <VoiceAgent />
             <ThemeToggle />
           </div>
