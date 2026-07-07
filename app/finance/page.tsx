@@ -161,11 +161,12 @@ export default function FinancePage() {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (user) {
-        await supabase.from('transakce').delete()
+        const { error } = await supabase.from('transakce').delete()
           .eq('user_id', user.id)
           .eq('nazev', tx.nazev)
           .eq('typ', tx.typ)
           .eq('opakovani', tx.opakovani)
+        if (error) { showToast('Chyba: ' + error.message); return }
       }
     } else {
       const { error } = await supabase.from('transakce').delete().eq('id', id)
