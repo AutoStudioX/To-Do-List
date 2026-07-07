@@ -127,7 +127,7 @@ export default function UkolyPage() {
       </div>
 
       {/* Filter pills */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'Todo', 'In Progress', 'Done'] as const).map(s => {
             const activeColors: Record<string, { bg: string; color: string; border: string }> = {
@@ -148,6 +148,7 @@ export default function UkolyPage() {
             )
           })}
         </div>
+        <div className="desktop-only" style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'High', 'Medium', 'Low'] as const).map(p => {
             const priorityActive: Record<string, { bg: string; color: string; border: string }> = {
@@ -213,6 +214,10 @@ export default function UkolyPage() {
                 </div>
                 {/* Row 2: meta */}
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
                     <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>

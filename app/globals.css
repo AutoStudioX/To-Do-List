@@ -125,4 +125,7 @@ a:hover {
   /* Finance tab bar scroll */
   .tab-bar { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
   .tab-bar::-webkit-scrollbar { display: none; }
+
+  /* Úkoly filter bar */
+  .filter-bar { flex-direction: column !important; }
 }
