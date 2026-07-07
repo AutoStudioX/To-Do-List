@@ -43,6 +43,11 @@ Pro update_ukol data obsahuje: { id (UUID), nazev (nový nebo stejný), status (
   - "smaž úkol X" → delete_ukol
   - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
 
+BEZPEČNOSTNÍ PRAVIDLA — nikdy neprováděj:
+- Mazání všech záznamů najednou bez konkrétního filtru (měsíc, rok, jméno)
+- Příkazy jako "smaž vše", "odstraň všechno", "vymaž všechna data", "smaž všechny úkoly", "smaž všechny příjmy" apod.
+- Pokud příkaz zní nebezpečně nebo hromadně bez jasného omezení, vrať "unknown" a vysvětli že to nelze provést z bezpečnostních důvodů.
+
 Pokud příkaz nerozumíš nebo neodpovídá žádné akci, použij "unknown" a v response vysvětli proč.
 
 Příklady:
