@@ -286,7 +286,7 @@ export default function FinancePage() {
       })()}
 
       <div className="table-scroll" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+        <table className="finance-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr style={{ background: 'var(--table-header)' }}>
             {tabHeaders[activeTab].map(h => <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>{h}</th>)}
           </tr></thead>

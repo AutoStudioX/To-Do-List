@@ -128,4 +128,9 @@ a:hover {
 
   /* Úkoly filter bar */
   .filter-bar { flex-wrap: wrap !important; }
+
+  /* Finance table — hide less important columns on mobile */
+  .finance-table td, .finance-table th { padding: 10px 8px !important; }
+  .finance-table td:nth-child(4), .finance-table th:nth-child(4) { display: none; }
+  .finance-table td:nth-child(5), .finance-table th:nth-child(5) { display: none; }
 }
