@@ -18,7 +18,7 @@ Dnešní datum: ${today()}
 
 Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "unknown",
+  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "unknown",
   "data": { ... },
   "response": "Krátká česká potvrzovací zpráva co jsi udělal"
 }
@@ -30,6 +30,7 @@ Pro add_goal data obsahuje: { nazev, deadline (YYYY-MM-DD nebo null), popis (neb
 Pro add_dluh data obsahuje: { komu_kdo (jméno osoby), castka (číslo), smer ("moje" = já dlužím, "mne" = dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
   - "dluh od X" nebo "X mi dluží" → smer: "mne"
   - "dlužím X" nebo "půjčil jsem si od X" → smer: "moje"
+Pro add_fixni data obsahuje: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
 
 Pokud příkaz nerozumíš nebo neodpovídá žádné akci, použij "unknown" a v response vysvětli proč.
 
@@ -40,6 +41,7 @@ Příklady:
 - "přidej goal dokončit projekt do konce měsíce" → add_goal
 - "přidej dluh od mamky 200 korun" → add_dluh, smer: "mne"
 - "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
+- "přidej fixní náklad Netflix 300 korun měsíčně" → add_fixni
 
 Vrať pouze JSON, žádný jiný text.`
 

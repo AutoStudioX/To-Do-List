@@ -80,6 +80,15 @@ export default function VoiceAgent() {
         progress: 0,
         status: 'active',
       })
+    } else if (action === 'add_fixni') {
+      await supabase.from('transakce').insert({
+        user_id: userId,
+        nazev: data.nazev,
+        castka: data.castka,
+        typ: 'fixni_naklad',
+        opakovani: data.opakovani || 'mesicni',
+        datum: todayISO(),
+      })
     } else if (action === 'add_dluh') {
       await supabase.from('transakce').insert({
         user_id: userId,

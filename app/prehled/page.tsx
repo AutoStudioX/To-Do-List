@@ -567,7 +567,7 @@ export default function PrehledPage() {
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Hlasový asistent</div>
         <VoiceAgent />
         <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
-          Zkus: "přidej úkol zavolat klientovi" · "přidej příjem od Honzy 5000" · "přidej výdaj za oběd 200"
+          Zkus: "přidej úkol zavolat klientovi" · "přidej příjem od Honzy 5000" · "přidej výdaj za oběd 200" · "přidej fixní náklad Netflix 300" · "přidej dluh od Petra 1000" · "přidej goal dokončit projekt"
         </div>
       </div>
     </div>
