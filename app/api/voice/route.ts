@@ -66,10 +66,11 @@ Vrať pouze JSON, žádný jiný text.`
   })
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim()
+    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
     const parsed = JSON.parse(raw)
     return NextResponse.json(parsed)
   } catch {
-    return NextResponse.json({ action: 'unknown', data: {}, response: 'Nerozuměl jsem příkazu.' })
+    return NextResponse.json({ action: 'unknown', data: {}, response: `Nerozuměl jsem: ${raw.slice(0, 100)}` })
   }
 }
