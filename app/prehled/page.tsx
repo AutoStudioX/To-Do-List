@@ -163,7 +163,7 @@ export default function PrehledPage() {
   const singleGoal = goals.length === 1 ? goals[0] : null
   const pendingIncome = prijmy.filter(t => t.status === 'ceka').reduce((s, t) => s + Number(t.castka), 0)
   const myDebt = transactions.filter(t => t.typ === 'dluh' && t.smer === 'moje' && t.status === 'nesplaceno').reduce((s, t) => s + Number(t.castka), 0)
-  const theirDebt = transactions.filter(t => t.typ === 'dluh' && t.smer === 'mne' && t.status === 'nesplaceno').reduce((s, t) => s + Number(t.castka), 0)
+  const theirDebt = transactions.filter(t => t.status !== 'splaceno' && (t.smer === 'mne' || (t.typ === 'prijem' && t.status === 'dluh'))).reduce((s, t) => s + Number(t.castka), 0)
   const last5tx = transactions.slice(0, 5)
 
   const [quickGoalId, setQuickGoalId] = useState<string | null>(null)
@@ -367,13 +367,9 @@ export default function PrehledPage() {
                 <div style={{ fontSize: 11, color: '#d97706', fontWeight: 500, marginBottom: 3 }}>Čeká na platbu</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#d97706' }}>{czk(pendingIncome)}</div>
               </div>
-              <div style={{ background: '#ede9fe22', border: '1px solid #ede9fe', borderRadius: 8, padding: '8px 12px' }}>
-                <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 3 }}>Dluhy</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>
-                  <span style={{ color: '#e53e3e' }}>−{czk(myDebt)}</span>
-                  <span style={{ color: 'var(--muted)', fontWeight: 400, margin: '0 4px' }}>/</span>
-                  <span style={{ color: '#10b981' }}>+{czk(theirDebt)}</span>
-                </div>
+              <div style={{ background: '#d1fae522', border: '1px solid #d1fae5', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 11, color: '#10b981', fontWeight: 500, marginBottom: 3 }}>Dluží mi</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981' }}>{czk(theirDebt)}</div>
               </div>
             </>}
           </div>
