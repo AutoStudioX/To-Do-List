@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import ThemeToggle from './ThemeToggle'
@@ -7,6 +8,11 @@ import { Menu } from 'lucide-react'
 
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
+
+  if (pathname === '/login' || pathname.startsWith('/auth')) {
+    return <>{children}</>
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
