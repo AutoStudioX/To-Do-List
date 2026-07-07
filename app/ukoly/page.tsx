@@ -214,7 +214,7 @@ export default function UkolyPage() {
                 </div>
                 {/* Row 2: meta */}
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
                     <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
                   </div>
