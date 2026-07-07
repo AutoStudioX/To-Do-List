@@ -40,7 +40,7 @@ export default function LoginForm() {
     }}>
       {/* App name */}
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', color: '#111827', margin: 0, lineHeight: 1.2 }}>
+        <h1 style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.03em', color: '#111827', margin: 0, lineHeight: 1.2 }}>
           To-Do <span style={{ color: '#E8192C' }}>List</span>
         </h1>
         <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 8, margin: '8px 0 0' }}>Přihlaste se pro přístup k aplikaci</p>
@@ -48,12 +48,12 @@ export default function LoginForm() {
 
       {/* Card */}
       <div style={{
-        background: '#ffffff', borderRadius: 16, padding: '28px 32px',
-        width: '100%', maxWidth: 384,
+        background: '#ffffff', borderRadius: 16, padding: '24px 28px',
+        width: '100%', maxWidth: 340,
         boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)',
         border: '1px solid #f3f4f6',
       }}>
-        <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500, marginBottom: 20 }}>Přihlásit se</div>
+        <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500, marginBottom: 20 }}>Přihlášení</div>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 6, fontWeight: 500 }}>E-mail</label>
