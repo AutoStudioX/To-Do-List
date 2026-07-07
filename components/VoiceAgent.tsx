@@ -28,7 +28,7 @@ interface SpeechRecognitionEvent {
   results: { [index: number]: { [index: number]: { transcript: string } } }
 }
 
-export default function VoiceAgent() {
+export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const [status, setStatus] = useState<Status>('idle')
   const [transcript, setTranscript] = useState('')
   const [response, setResponse] = useState('')
@@ -165,6 +165,7 @@ export default function VoiceAgent() {
 
         setResponse(json.response || 'Hotovo.')
         setStatus('done')
+        if (json.action !== 'unknown') onSuccess?.()
       } catch {
         setResponse('Chyba při zpracování.')
         setStatus('error')
