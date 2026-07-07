@@ -367,9 +367,9 @@ export default function PrehledPage() {
                 <div style={{ fontSize: 11, color: '#d97706', fontWeight: 500, marginBottom: 3 }}>Čeká na platbu</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#d97706' }}>{czk(pendingIncome)}</div>
               </div>
-              <div style={{ background: '#d1fae522', border: '1px solid #d1fae5', borderRadius: 8, padding: '8px 12px' }}>
-                <div style={{ fontSize: 11, color: '#10b981', fontWeight: 500, marginBottom: 3 }}>Dluží mi</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981' }}>{czk(theirDebt)}</div>
+              <div style={{ background: '#ede9fe22', border: '1px solid #ede9fe', borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 3 }}>Dluží mi</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#7c3aed' }}>{czk(theirDebt)}</div>
               </div>
             </>}
           </div>
