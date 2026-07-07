@@ -24,7 +24,7 @@ ${contextBlock}
 
 Analyzuj příkaz a vrať JSON (bez markdown, jen čistý JSON) v tomto formátu:
 {
-  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "delete_ukol" | "update_ukol" | "unknown",
+  "action": "add_ukol" | "add_prijem" | "add_vydaj" | "add_goal" | "add_dluh" | "add_fixni" | "delete_ukol" | "update_ukol" | "delete_vydaje_month" | "unknown",
   "data": { ... },
   "response": "Krátká česká potvrzovací zpráva co jsi udělal"
 }
@@ -54,6 +54,7 @@ Příklady:
 - "dlužím Petrovi 500 korun" → add_dluh, smer: "moje"
 - "přidej fixní náklad Netflix 300 korun měsíčně" → add_fixni
 - "smaž úkol zavolat klientovi" → delete_ukol (najdi nejpodobnější v seznamu)
+- "odstraň všechny výdaje z tohoto měsíce" → delete_vydaje_month, data: { year: YYYY, month: MM }
 - "označ úkol X jako hotový" → update_ukol, status: "Done"
 - "změň prioritu úkolu X na vysokou" → update_ukol, priorita: "High"
 

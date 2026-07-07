@@ -561,14 +561,8 @@ export default function PrehledPage() {
         </div>
       </Modal>
 
-      {/* Voice Agent */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Hlasový asistent</div>
-        <VoiceAgent onSuccess={load} />
-        <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
-          Zkus: "přidej úkol zavolat klientovi" · "přidej příjem od Honzy 5000" · "přidej výdaj za oběd 200" · "přidej fixní náklad Netflix 300" · "přidej dluh od Petra 1000" · "přidej goal dokončit projekt"
-        </div>
-      </div>
+      {/* Voice Agent — floating */}
+      <VoiceAgent onSuccess={load} />
     </div>
   )
 }

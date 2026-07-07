@@ -80,6 +80,14 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         progress: 0,
         status: 'active',
       })
+    } else if (action === 'delete_vydaje_month') {
+      const year = data.year || new Date().getFullYear()
+      const month = String(data.month || (new Date().getMonth() + 1)).padStart(2, '0')
+      const from = `${year}-${month}-01`
+      const to = `${year}-${month}-31`
+      await supabase.from('transakce').delete()
+        .eq('user_id', userId).eq('typ', 'vydaj')
+        .gte('datum', from).lte('datum', to)
     } else if (action === 'delete_ukol') {
       await supabase.from('ukoly').delete().eq('id', data.id)
     } else if (action === 'update_ukol') {
@@ -201,36 +209,42 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+    <>
+      {/* Floating mic button */}
       <button
         onClick={handleVoice}
         disabled={status === 'thinking'}
+        title={labels[status]}
         style={{
-          width: 64, height: 64, borderRadius: '50%', border: 'none', cursor: status === 'thinking' ? 'default' : 'pointer',
+          position: 'fixed', bottom: 90, right: 20, zIndex: 100,
+          width: 52, height: 52, borderRadius: '50%', border: 'none',
+          cursor: status === 'thinking' ? 'default' : 'pointer',
           background: colors[status], display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: status === 'listening' ? '0 0 0 8px rgba(16,185,129,0.2)' : '0 4px 14px rgba(0,0,0,0.15)',
+          boxShadow: status === 'listening' ? '0 0 0 8px rgba(16,185,129,0.2)' : '0 4px 16px rgba(0,0,0,0.25)',
           transition: 'all 0.2s',
         }}
       >
         {status === 'thinking'
-          ? <Loader size={24} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+          ? <Loader size={20} color="white" style={{ animation: 'spin 1s linear infinite' }} />
           : status === 'listening'
-          ? <MicOff size={24} color="white" />
-          : <Mic size={24} color="white" />
+          ? <MicOff size={20} color="white" />
+          : <Mic size={20} color="white" />
         }
       </button>
-      <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>{labels[status]}</div>
-      {transcript && (
-        <div style={{ fontSize: 13, color: 'var(--text)', background: 'var(--hover-bg)', borderRadius: 8, padding: '8px 12px', maxWidth: 280, textAlign: 'center' }}>
-          "{transcript}"
+
+      {/* Popup result */}
+      {(transcript || response) && (
+        <div style={{
+          position: 'fixed', bottom: 152, right: 20, zIndex: 100,
+          background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12,
+          padding: '12px 14px', maxWidth: 260, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        }}>
+          {transcript && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>"{transcript}"</div>}
+          {response && <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : '#10b981', fontWeight: 500 }}>{response}</div>}
         </div>
       )}
-      {response && (
-        <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : '#10b981', fontWeight: 500, textAlign: 'center', maxWidth: 280 }}>
-          {response}
-        </div>
-      )}
+
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
-    </div>
+    </>
   )
 }
