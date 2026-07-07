@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import ThemeToggle from './ThemeToggle'
-import { Menu } from 'lucide-react'
+import { Menu, Zap } from 'lucide-react'
 
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -30,6 +30,12 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           }}>
             <Menu size={22} />
           </button>
+          <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={14} color="white" fill="white" strokeWidth={1.5} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Auto<span style={{ color: '#e53e3e' }}>Studio</span></span>
+          </div>
           <div className="desktop-only" />
           <ThemeToggle />
         </header>
