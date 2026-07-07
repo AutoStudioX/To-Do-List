@@ -2,6 +2,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, Zap, X } from 'lucide-react'
+import AutoStudioLogo from './AutoStudioLogo'
 import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
@@ -33,9 +34,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1 }}>
-          <span style={{ color: 'var(--text)' }}>To-Do </span><span style={{ color: '#e53e3e' }}>List</span>
-        </div>
+        <AutoStudioLogo />
         {onClose && (
           <button onClick={onClose} className="mobile-only" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4, display: 'flex' }}>
             <X size={20} />
