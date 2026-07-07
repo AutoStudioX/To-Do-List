@@ -5,7 +5,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col" style={{ background: '#ffffff' }}>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 p-4">
+      <div className="flex flex-1 flex-col items-center justify-center gap-8 p-4" style={{ paddingBottom: '20vh' }}>
         <div className="text-center">
           <p className="text-3xl font-bold tracking-tight" style={{ color: '#0a0a0a', fontFamily: 'system-ui, sans-serif' }}>
             To-Do{' '}
