@@ -55,7 +55,9 @@ PRAVIDLA:
 - Nikdy neprováděj hromadné mazání bez filtru (měsíc/rok/jméno)
 - "nastav progress goalu X na 50" nebo "goal X je na 50 procentech" → update_goal s progress: 50
 - "dokončil jsem goal X" nebo "goal X je hotový" → update_goal s status: "completed"
-- Pokud část příkazu nerozumíš, přidej pro tu část { action: "unknown", data: { reason: "..." } }
+- Slova jako "změn", "uprav", "nastav", "dej zpátky", "přesuň" → VŽDY update_ukol nebo update_goal, NIKDY add_ukol nebo add_goal
+- Pokud si nejsi 100% jistý který konkrétní úkol/goal uživatel myslí → vrať unknown, NESNAŽ SE HÁDAT ani vybírat nejpodobnější
+- Pokud část příkazu nerozumíš nebo si nejsi jistý → vrať unknown s důvodem, NEDĚLEJ nic navíc
 
 Příklady:
 - "přidej příjem od Honzy 5000 a úkol zavolat mu" → 2 akce: add_prijem + add_ukol
