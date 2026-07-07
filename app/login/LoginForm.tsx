@@ -32,45 +32,63 @@ export default function LoginForm() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#ffffff' }}>
-      {/* Title */}
-      <div style={{ marginBottom: 32, textAlign: 'center' }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, color: '#111', margin: 0 }}>
-          To-Do <span style={{ color: '#e53e3e' }}>List</span>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 32, padding: 16,
+      background: 'radial-gradient(circle at 100% 0%, rgba(232,25,44,0.10) 0%, transparent 60%), #ffffff',
+    }}>
+      {/* App name */}
+      <div style={{ textAlign: 'center' }}>
+        <h1 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', color: '#111827', margin: 0, lineHeight: 1.2 }}>
+          To-Do <span style={{ color: '#E8192C' }}>List</span>
         </h1>
-        <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 8 }}>Přihlaste se pro přístup k aplikaci</p>
+        <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 8, margin: '8px 0 0' }}>Přihlaste se pro přístup k aplikaci</p>
       </div>
 
       {/* Card */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 16, padding: '36px 40px', width: 420, maxWidth: '90vw', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, fontWeight: 500 }}>Přihlášení</div>
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{
+        background: '#ffffff', borderRadius: 16, padding: '28px 32px',
+        width: '100%', maxWidth: 384,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)',
+        border: '1px solid #f3f4f6',
+      }}>
+        <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500, marginBottom: 20 }}>Přihlásit se</div>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 5, fontWeight: 500 }}>E-mail</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              style={{ width: '100%', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, padding: '9px 13px', color: '#111', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 6, fontWeight: 500 }}>E-mail</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              style={{ width: '100%', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', color: '#111827', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
           </div>
           <div>
-            <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 5, fontWeight: 500 }}>Heslo</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              style={{ width: '100%', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, padding: '9px 13px', color: '#111', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+            <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 6, fontWeight: 500 }}>Heslo</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              style={{ width: '100%', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', color: '#111827', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
           </div>
-          {error && <p style={{ color: '#e53e3e', fontSize: 13, margin: 0 }}>{error}</p>}
-          <button type="submit" disabled={loading}
-            style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '11px', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 4 }}>
+          {error && <p style={{ color: '#E8192C', fontSize: 13, margin: 0 }}>{error}</p>}
+          <button
+            type="submit" disabled={loading}
+            style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 8, padding: '11px 16px', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 4 }}
+          >
             {loading ? 'Přihlašování...' : 'Přihlásit se'}
           </button>
         </form>
       </div>
 
-      {/* Powered by */}
-      <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Powered by AutoStudio */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Zap size={22} color="white" fill="white" />
+          <Zap size={20} color="white" fill="white" strokeWidth={1.5} />
         </div>
         <div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: -2, lineHeight: 1 }}>powered by</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#111' }}>Auto<span style={{ color: '#e53e3e' }}>Studio</span></div>
+          <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.2 }}>powered by</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#111111', lineHeight: 1.2 }}>
+            Auto<span style={{ color: '#e53e3e' }}>Studio</span>
+          </div>
         </div>
       </div>
     </div>
