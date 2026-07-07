@@ -10,6 +10,7 @@ import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
 import { seedRecurring } from '@/lib/seedRecurring'
+import VoiceAgent from '@/components/VoiceAgent'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -560,6 +561,15 @@ export default function PrehledPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Voice Agent */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 16px', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Hlasový asistent</div>
+        <VoiceAgent />
+        <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
+          Zkus: "přidej úkol zavolat klientovi" · "přidej příjem od Honzy 5000" · "přidej výdaj za oběd 200"
+        </div>
+      </div>
     </div>
   )
 }
