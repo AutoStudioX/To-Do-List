@@ -133,4 +133,8 @@ a:hover {
   .finance-table td, .finance-table th { padding: 10px 8px !important; }
   .finance-table td:nth-child(4), .finance-table th:nth-child(4) { display: none; }
   .finance-table td:nth-child(5), .finance-table th:nth-child(5) { display: none; }
+
+  /* Finance stats bar — wrap nicely, hide dividers */
+  .stats-bar { flex-wrap: wrap !important; gap: 12px !important; padding: 12px !important; }
+  .stats-divider { display: none !important; }
 }

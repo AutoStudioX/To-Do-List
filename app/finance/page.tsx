@@ -262,7 +262,7 @@ export default function FinancePage() {
             <span style={valStyle(color)}>{value}</span>
           </div>
         )
-        const divider = <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+        const divider = <div className="stats-divider" style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
 
         const pendingIncome = prijmy.filter(t => t.status === 'ceka').reduce((s, t) => s + Number(t.castka), 0)
         const monthExpenses = vydaje.filter(t => t.datum && new Date(t.datum) >= monthStart && new Date(t.datum) <= monthEnd).reduce((s, t) => s + Number(t.castka), 0)
