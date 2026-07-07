@@ -136,5 +136,5 @@ a:hover {
 
   /* Finance stats bar — wrap nicely, hide dividers */
   .stats-bar { flex-wrap: wrap !important; gap: 12px !important; padding: 12px !important; }
-  .stats-divider { display: none !important; }
+  .stats-divider { display: block !important; width: 100% !important; height: 1px !important; align-self: auto !important; }
 }
