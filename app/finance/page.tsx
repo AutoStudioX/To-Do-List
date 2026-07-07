@@ -154,8 +154,9 @@ export default function FinancePage() {
 
   async function deleteTx(id: string) {
     if (!await confirm('Smazat záznam?')) return
-    await createClient().from('transakce').delete().eq('id', id)
-    load(); showToast('Záznam smazán')
+    const { error } = await createClient().from('transakce').delete().eq('id', id)
+    if (error) { showToast('Chyba: ' + error.message); return }
+    await load(); showToast('Záznam smazán')
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
