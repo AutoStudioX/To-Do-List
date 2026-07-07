@@ -205,7 +205,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         let context = {}
         if (s?.user) {
           const [{ data: ukoly }, { data: transakce }, { data: goaly }] = await Promise.all([
-            supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).neq('status', 'Done'),
+            supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(100),
             supabaseCtx.from('transakce').select('id, nazev, klient, castka, typ, datum').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(50),
             supabaseCtx.from('goaly').select('id, nazev, progress, status').eq('user_id', s.user.id).eq('status', 'active'),
           ])
