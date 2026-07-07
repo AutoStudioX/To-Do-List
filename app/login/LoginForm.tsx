@@ -42,7 +42,7 @@ export default function LoginForm() {
       </div>
 
       {/* Card */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '32px 36px', width: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 16, padding: '36px 40px', width: 420, maxWidth: '90vw', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, fontWeight: 500 }}>Přihlášení</div>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
