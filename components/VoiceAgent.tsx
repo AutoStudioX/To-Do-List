@@ -115,7 +115,7 @@ function describeToolCall(t: ToolCall): string {
     case 'add_task':
       return `Přidat úkol: "${d.nazev}", priorita ${d.priorita || 'Medium'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
     case 'add_income':
-      return `Přidat příjem: ${d.klient} — ${d.castka} Kč${d.typ === 'mesicni' ? ' (měsíční)' : ''}`
+      return `Přidat příjem: ${d.klient} — ${d.castka} Kč${d.typ === 'mesicni' ? ' (měsíční)' : ''}${d.status === 'ceka' ? ' (čeká na platbu)' : ''}`
     case 'add_expense':
       return `Přidat výdaj: ${d.nazev} — ${d.castka} Kč${d.kategorie ? ` (${d.kategorie})` : ''}`
     case 'add_goal':
@@ -237,7 +237,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         datum: d.datum || todayISO(),
         typ: 'prijem',
         opakovani: d.typ || 'jednorazovy',
-        status: 'ceka',
+        status: d.status || 'zaplaceno',
       })
       if (error) return error.message
     } else if (t.name === 'add_expense') {

@@ -7,6 +7,8 @@ const SYSTEM_PROMPT = `Jsi asistent pro úkoly, finance, cíle a projekty. Odpov
 
 Zavolej přesně jeden nástroj podle záměru uživatele. Pokud je příkaz nejasný, obecný nebo kratší než 3 slova, nevolej nic a požádej o upřesnění.
 
+Pro volitelná pole NIKDY se neptej na upřesnění — vždy použij výchozí hodnotu: datum bez zmínky=dnes, typ příjmu/výdaje bez zmínky=jednorázový, status příjmu bez zmínky=zaplaceno, kategorie bez zmínky=Ostatní. Pokud uživatel zmíní zdroj příjmu jen nepřímo (např. "za projekt X"), použij to jako klienta/zdroj — neptej se znovu.
+
 Částky piš číslem (patnáct tisíc=15000, stovka=100). Relativní data přepočítej na YYYY-MM-DD. Priorita: urgentně/hned=High, bez zmínky=Medium, někdy=Low.
 
 Pokud uživatel zmíní čas (v 8 hodin, na 9:30, v půl čtvrté), přidej tento čas do názvu úkolu ve formátu "v HH:MM" a nastav deadline na správné datum. Čas bez data = dnes, "zítra" = zítřejší datum. Česká zlomková vyjádření: "v půl čtvrté"=15:30, "ve čtvrt na devět"=08:15, "tři čtvrtě na devět"=08:45, "v osm ráno"=08:00, "v osm večer"=20:00.
@@ -112,6 +114,7 @@ const tools: Anthropic.Tool[] = [
         klient: { type: 'string', description: 'Jméno klienta nebo zdroj' },
         datum: { type: ['string', 'null'], description: 'Datum, nebo null' },
         typ: { type: 'string', enum: ['jednorazovy', 'mesicni'], description: 'jednorazovy nebo mesicni' },
+        status: { type: 'string', enum: ['zaplaceno', 'ceka'], description: 'zaplaceno nebo ceka, default zaplaceno' },
       },
       required: ['castka', 'klient'],
     },
