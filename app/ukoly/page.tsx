@@ -7,7 +7,7 @@ import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { Plus, Trash2, Pencil, Calendar, Folder } from 'lucide-react'
+import { Plus, Trash2, Pencil, Calendar, Folder, Search, X } from 'lucide-react'
 
 const priorityBorder: Record<string, string> = {
   High: '#e53e3e',
@@ -42,7 +42,7 @@ export default function UkolyPage() {
   const [form, setForm] = useState(emptyForm)
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
-  const [filterProjekt, setFilterProjekt] = useState('All')
+  const [projektSearch, setProjektSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -80,9 +80,9 @@ export default function UkolyPage() {
       // Backfill: pull in any project names already used on tasks but not yet saved in projekty (once per mount)
       if (!backfillRef.current) {
         backfillRef.current = true
-        const existingNames = new Set(cleanProjekty.map(p => p.nazev.toLowerCase()))
+        const existingNames = new Set(cleanProjekty.map((p: Projekt) => p.nazev.toLowerCase()))
         const missing = Array.from(new Set(
-          (taskData || []).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
+          ((taskData || []) as Task[]).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
         ))
         if (missing.length > 0) {
           const { data: inserted } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
@@ -149,11 +149,12 @@ export default function UkolyPage() {
   }
 
   const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+  const projektSearchTrim = projektSearch.trim().toLowerCase()
   const filtered = tasks
     .filter(t =>
       (filterStatus === 'All' || t.status === filterStatus) &&
       (filterPriority === 'All' || t.priorita === filterPriority) &&
-      (filterProjekt === 'All' || t.projekt === filterProjekt)
+      (projektSearchTrim === '' || (t.projekt || '').toLowerCase().includes(projektSearchTrim))
     )
     .sort((a, b) => {
       const aDone = a.status === 'Done' ? 1 : 0
@@ -166,6 +167,18 @@ export default function UkolyPage() {
       return aD - bD
     })
   const openCount = tasks.filter(t => t.status !== 'Done').length
+
+  const topProjekty = (() => {
+    const counts = new Map<string, number>()
+    for (const t of tasks) {
+      if (!t.projekt) continue
+      counts.set(t.projekt, (counts.get(t.projekt) || 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([nazev]) => nazev)
+  })()
 
   const pillBase: React.CSSProperties = {
     padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500,
@@ -186,7 +199,7 @@ export default function UkolyPage() {
       </div>
 
       {/* Filter pills */}
-      <div className="filter-bar" style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['All', 'Todo', 'In Progress', 'Done'] as const).map(s => {
             const activeColors: Record<string, { bg: string; color: string; border: string }> = {
@@ -228,18 +241,44 @@ export default function UkolyPage() {
             )
           })}
         </div>
-        {projekty.length > 0 && (
-          <>
-            <div className="desktop-only" style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
-            <div style={{ width: 160 }}>
-              <Select
-                value={filterProjekt}
-                onChange={setFilterProjekt}
-                options={[{ value: 'All', label: 'Vše' }, ...projekty.map(p => ({ value: p.nazev, label: p.nazev }))]}
-                style={{ padding: '5px 12px', fontSize: 13, borderRadius: 20 }}
-              />
-            </div>
-          </>
+      </div>
+
+      {/* Project search + quick filters */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ position: 'relative', maxWidth: 280, marginBottom: topProjekty.length > 0 ? 8 : 0 }}>
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
+          <input
+            value={projektSearch}
+            onChange={e => setProjektSearch(e.target.value)}
+            placeholder="Hledat projekt..."
+            style={{ ...inputStyle, padding: '7px 30px', fontSize: 13, borderRadius: 20 }}
+          />
+          {projektSearch && (
+            <button onClick={() => setProjektSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, display: 'flex' }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {topProjekty.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {topProjekty.map(nazev => {
+              const active = projektSearchTrim === nazev.toLowerCase()
+              return (
+                <button
+                  key={nazev}
+                  onClick={() => setProjektSearch(active ? '' : nazev)}
+                  style={{
+                    ...pillBase,
+                    padding: '4px 12px', fontSize: 12,
+                    background: active ? '#dbeafe' : 'var(--card)',
+                    color: active ? '#1d4ed8' : 'var(--muted)',
+                    border: `1px solid ${active ? '#3b82f6' : 'var(--border)'}`,
+                    fontWeight: active ? 600 : 500,
+                  }}
+                >{nazev}</button>
+              )
+            })}
+          </div>
         )}
       </div>
 
