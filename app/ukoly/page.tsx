@@ -62,7 +62,18 @@ export default function UkolyPage() {
         supabase.from('projekty').select('*').eq('user_id', user.id).order('nazev', { ascending: true }),
       ])
       setTasks(taskData || [])
-      setProjekty(projektData || [])
+
+      // Backfill: pull in any project names already used on tasks but not yet saved in projekty
+      const existingNames = new Set((projektData || []).map(p => p.nazev.toLowerCase()))
+      const missing = Array.from(new Set(
+        (taskData || []).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
+      ))
+      if (missing.length > 0) {
+        const { data: inserted } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
+        setProjekty([...(projektData || []), ...(inserted || [])].sort((a, b) => a.nazev.localeCompare(b.nazev)))
+      } else {
+        setProjekty(projektData || [])
+      }
     } catch { } finally { setLoading(false) }
   }, [])
 
