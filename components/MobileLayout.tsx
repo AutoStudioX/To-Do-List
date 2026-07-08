@@ -23,7 +23,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
         <header style={{
           height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 16px', borderBottom: '1px solid var(--border)',
-          background: 'var(--card)', flexShrink: 0,
+          background: 'var(--card)', flexShrink: 0, position: 'relative',
         }}>
           <button className="mobile-only" onClick={() => setSidebarOpen(true)} style={{
             background: 'transparent', border: 'none', color: 'var(--text)',
@@ -31,7 +31,10 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           }}>
             <Menu size={22} />
           </button>
-          <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="mobile-only" style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+          }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Zap size={14} color="white" fill="white" strokeWidth={1.5} />
             </div>
