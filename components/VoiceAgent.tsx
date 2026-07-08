@@ -113,7 +113,7 @@ function describeToolCall(t: ToolCall): string {
   const d = t.input || {}
   switch (t.name) {
     case 'add_task':
-      return `Přidat úkol: "${d.nazev}", priorita ${d.priorita || 'Medium'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
+      return `Přidat úkol: "${d.nazev}", priorita ${d.priorita || 'High'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
     case 'add_income':
       return `Přidat příjem: ${d.klient} — ${d.castka} Kč${d.typ === 'mesicni' ? ' (měsíční)' : ''}${d.status === 'ceka' ? ' (čeká na platbu)' : ''}`
     case 'add_expense':
@@ -222,8 +222,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       const { error } = await supabase.from('ukoly').insert({
         user_id: userId,
         nazev: d.nazev,
-        priorita: d.priorita || 'Medium',
-        deadline: d.deadline || null,
+        priorita: d.priorita || 'High',
+        deadline: d.deadline || todayISO(),
         projekt: d.projekt || null,
         status: 'Todo',
       })

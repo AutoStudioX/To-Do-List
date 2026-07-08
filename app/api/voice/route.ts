@@ -7,7 +7,7 @@ const SYSTEM_PROMPT = `Jsi asistent pro úkoly, finance, cíle a projekty. Odpov
 
 Zavolej přesně jeden nástroj podle záměru uživatele. Pokud je příkaz nejasný, obecný nebo kratší než 3 slova, nevolej nic a požádej o upřesnění.
 
-Pro volitelná pole NIKDY se neptej na upřesnění — vždy použij výchozí hodnotu: datum bez zmínky=dnes, typ příjmu/výdaje bez zmínky=jednorázový, status příjmu bez zmínky=zaplaceno, kategorie bez zmínky=Ostatní. Pokud uživatel zmíní zdroj příjmu jen nepřímo (např. "za projekt X"), použij to jako klienta/zdroj — neptej se znovu.
+Pro volitelná pole NIKDY se neptej na upřesnění — vždy použij výchozí hodnotu: datum bez zmínky=dnes, typ příjmu/výdaje bez zmínky=jednorázový, status příjmu bez zmínky=zaplaceno, kategorie bez zmínky=Ostatní. Pokud uživatel zmíní zdroj příjmu jen nepřímo (např. "za projekt X"), použij to jako klienta/zdroj — neptej se znovu. U úkolu (add_task): pokud není řečen deadline, nastav ho na dnešek. Pokud není řečena priorita, nastav High.
 
 Částky piš číslem (patnáct tisíc=15000, stovka=100). Relativní data přepočítej na YYYY-MM-DD. Priorita: urgentně/hned=High, bez zmínky=Medium, někdy=Low.
 
@@ -65,8 +65,8 @@ const tools: Anthropic.Tool[] = [
       type: 'object',
       properties: {
         nazev: { type: 'string', description: 'Konkrétní smysluplný název úkolu' },
-        priorita: { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Priorita, default Medium' },
-        deadline: { type: ['string', 'null'], description: 'Termín YYYY-MM-DD, nebo null' },
+        priorita: { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Priorita, default High' },
+        deadline: { type: ['string', 'null'], description: 'Termín YYYY-MM-DD, default dnes' },
         projekt: { type: ['string', 'null'], description: 'Název projektu, nebo null' },
       },
       required: ['nazev'],
