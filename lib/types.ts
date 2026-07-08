@@ -9,6 +9,13 @@ export interface Task {
   created_at: string
 }
 
+export interface Projekt {
+  id: string
+  user_id: string
+  nazev: string
+  created_at: string
+}
+
 export interface Goal {
   id: string
   user_id: string

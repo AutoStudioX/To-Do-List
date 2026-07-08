@@ -1,7 +1,7 @@
 'use client'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap } from 'lucide-react'
 import AutoStudioLogo from './AutoStudioLogo'
 import { createClient } from '@/lib/supabase/client'
 
@@ -64,8 +64,16 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         })}
       </nav>
 
-      <div style={{ padding: '10px 14px', margin: '0 8px 8px', textAlign: 'center' }}>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>Powered by AutoStudio</span>
+      <div style={{ padding: '10px 14px', margin: '0 8px 8px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Zap size={18} color="white" fill="white" />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.2 }}>powered by</div>
+          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+            <span style={{ color: 'var(--text)' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
+          </div>
+        </div>
       </div>
 
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>

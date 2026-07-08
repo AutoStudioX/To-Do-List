@@ -56,6 +56,13 @@ create table ukoly (
   created_at timestamptz default now()
 );
 
+create table projekty (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  nazev text not null,
+  created_at timestamptz default now()
+);
+
 create table goaly (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null,
@@ -133,6 +140,7 @@ create table dluhy (
 
 -- Enable RLS
 alter table ukoly enable row level security;
+alter table projekty enable row level security;
 alter table goaly enable row level security;
 alter table milniky enable row level security;
 alter table prijmy enable row level security;
@@ -143,6 +151,7 @@ alter table dluhy enable row level security;
 
 -- Policies
 create policy "Users can manage own ukoly" on ukoly for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Users can manage own projekty" on projekty for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own goaly" on goaly for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own milniky" on milniky for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own prijmy" on prijmy for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
