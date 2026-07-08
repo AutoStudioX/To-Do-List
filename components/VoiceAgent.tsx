@@ -68,8 +68,23 @@ function validateToolCall(t: ToolCall): string | null {
     if (!d.nazev || !d.castka) return 'Chybí název nebo částka u výdaje'
   } else if (t.name === 'add_goal') {
     if (!d.nazev) return 'Chybí název cíle'
+  } else if (t.name === 'update_goal_progress') {
+    if (!d.goal_name) return 'Chybí název cíle'
+    if (d.current_value === undefined || d.current_value === null || isNaN(Number(d.current_value))) return 'Chybí nová hodnota pokroku'
   }
   return null
+}
+
+function fuzzyFindGoal<T extends { nazev: string }>(goals: T[], name: string): T | null {
+  const q = name.trim().toLowerCase()
+  if (!q) return null
+  const exact = goals.find(g => g.nazev.trim().toLowerCase() === q)
+  if (exact) return exact
+  const partial = goals.find(g => {
+    const n = g.nazev.trim().toLowerCase()
+    return n.includes(q) || q.includes(n)
+  })
+  return partial || null
 }
 
 function describeToolCall(t: ToolCall): string {
@@ -83,6 +98,8 @@ function describeToolCall(t: ToolCall): string {
       return `Přidat výdaj: ${d.nazev} — ${d.castka} Kč${d.kategorie ? ` (${d.kategorie})` : ''}`
     case 'add_goal':
       return `Přidat cíl: "${d.nazev}"${d.deadline ? `, deadline ${d.deadline}` : ''}${d.target_value ? `, cíl ${d.target_value}` : ''}`
+    case 'update_goal_progress':
+      return `Aktualizovat pokrok cíle "${d.goal_name}" na ${d.current_value}`
     case 'get_summary':
       return 'Zobrazit přehled'
     default:
@@ -199,6 +216,28 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         current_value: d.target_value ? 0 : null,
       })
       if (error) return error.message
+    } else if (t.name === 'update_goal_progress') {
+      const { data: goals, error: fetchError } = await supabase
+        .from('goaly')
+        .select('id, nazev, target_value, current_value')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+      if (fetchError) return fetchError.message
+      const match = fuzzyFindGoal<{ id: string; nazev: string; target_value: number | null; current_value: number | null }>(goals || [], String(d.goal_name || ''))
+      if (!match) return `Nenašel jsem cíl "${d.goal_name}"`
+
+      const newValue = Number(d.current_value)
+      const updates: Record<string, unknown> = {}
+      if (match.target_value) {
+        // Numeric goal — recalculate progress from current_value / target_value
+        updates.current_value = newValue
+        updates.progress = Math.min(100, Math.max(0, Math.round((newValue / match.target_value) * 100)))
+      } else {
+        // Manual goal with no target — the number IS the progress percentage
+        updates.progress = Math.min(100, Math.max(0, Math.round(newValue)))
+      }
+      const { error } = await supabase.from('goaly').update(updates).eq('id', match.id)
+      if (error) return error.message
     }
     return null
   }
@@ -304,7 +343,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       return
     }
 
-    setResponse('Přidáno: ' + added.join('; '))
+    setResponse('Hotovo: ' + added.join('; '))
     setStatus('idle')
     onSuccess?.()
     window.dispatchEvent(new CustomEvent('voice-data-changed'))

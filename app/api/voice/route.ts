@@ -10,6 +10,7 @@ TVOJE SCHOPNOSTI:
 - Zaznamenávat příjmy (add_income)
 - Zaznamenávat výdaje (add_expense)
 - Přidávat cíle (add_goal)
+- Aktualizovat pokrok cíle (update_goal_progress)
 - Poskytovat přehled (get_summary)
 
 PRAVIDLA PRO ROZHODOVÁNÍ:
@@ -18,8 +19,9 @@ PRAVIDLA PRO ROZHODOVÁNÍ:
 3. add_income: pokud zmiňuje příjem, výdělek, platbu od klienta, fakturu
 4. add_expense: pokud zmiňuje výdaj, nákup, zaplatil, utratil
 5. add_goal: pokud chce přidat nový cíl nebo záměr do budoucna
-6. get_summary: pokud se ptá na přehled, statistiky nebo "jak na tom jsem"
-7. Pokud příkaz není jasný nebo je příliš krátký (méně než 3 slova), NEvolej žádný nástroj — odpověz česky že nerozumíš a požádej o upřesnění
+6. update_goal_progress: pokud uživatel říká že splnil část cíle, vydělal určitou částku směrem k cíli, nebo chce aktualizovat pokrok. Například "splnil jsem 25 000 z cíle vydělat 100k" nebo "přidej 5 000 k mému cíli".
+7. get_summary: pokud se ptá na přehled, statistiky nebo "jak na tom jsem"
+8. Pokud příkaz není jasný nebo je příliš krátký (méně než 3 slova), NEvolej žádný nástroj — odpověz česky že nerozumíš a požádej o upřesnění
 
 EXTRAKCE DAT:
 - Částky: "patnáct tisíc" = 15000, "půl mega" = 500000, "stovka" = 100
@@ -89,6 +91,18 @@ const tools: Anthropic.Tool[] = [
         target_value: { type: ['number', 'null'], description: 'Cílová číselná hodnota (např. částka), nebo null pro čistě manuální cíl bez čísla' },
       },
       required: ['nazev'],
+    },
+  },
+  {
+    name: 'update_goal_progress',
+    description: 'Aktualizuje pokrok existujícího cíle podle jména (fuzzy match, case insensitive). Použij když uživatel říká že splnil část cíle, vydělal určitou částku směrem k cíli, nebo chce aktualizovat pokrok.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_name: { type: 'string', description: 'Název cíle (nebo jeho část) tak jak ho uživatel zmínil — najde se nejpodobnější existující cíl' },
+        current_value: { type: 'number', description: 'Nová aktuální hodnota cíle (např. kolik už vydělal). Pokud cíl nemá cílovou číselnou hodnotu (manuální cíl), interpretuj toto číslo přímo jako procento pokroku (0-100)' },
+      },
+      required: ['goal_name', 'current_value'],
     },
   },
   {
