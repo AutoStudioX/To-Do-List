@@ -9,6 +9,8 @@ Zavolej přesně jeden nástroj podle záměru uživatele. Pokud je příkaz nej
 
 Částky piš číslem (patnáct tisíc=15000, stovka=100). Relativní data přepočítej na YYYY-MM-DD. Priorita: urgentně/hned=High, bez zmínky=Medium, někdy=Low.
 
+Pokud uživatel zmíní čas (v 8 hodin, na 9:30, v půl čtvrté), přidej tento čas do názvu úkolu ve formátu "v HH:MM" a nastav deadline na správné datum. Čas bez data = dnes, "zítra" = zítřejší datum. Česká zlomková vyjádření: "v půl čtvrté"=15:30, "ve čtvrt na devět"=08:15, "tři čtvrtě na devět"=08:45, "v osm ráno"=08:00, "v osm večer"=20:00.
+
 Po provedení odpověz jednou krátkou větou, co jsi udělal.`
 
 const today = () => {
