@@ -36,7 +36,7 @@ interface SpeechRecognitionEvent {
 
 type ToolCall = { id: string; name: string; input: Record<string, unknown> }
 
-const SILENCE_TIMEOUT_MS = 5000
+const SILENCE_TIMEOUT_MS = 2000
 const SILENCE_CHECK_INTERVAL_MS = 250
 const SILENCE_RMS_THRESHOLD = 0.02
 
@@ -399,7 +399,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
   const labels: Record<Status, string> = {
     idle: 'Mluvit',
-    listening: 'Poslouchám... (5s ticho = stop)',
+    listening: 'Poslouchám... (2s ticho = stop)',
     thinking: 'Zpracovávám...',
     confirm: 'Potvrď akci',
     saving: 'Ukládám...',
@@ -483,7 +483,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
               )}
               {/* Idle hint while listening */}
               {status === 'listening' && !interim && !transcript && (
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Poslouchám, mluv... (ticho 5s = automatický stop)</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Poslouchám, mluv... (ticho 2s = automatický stop)</div>
               )}
             </div>
             <button
