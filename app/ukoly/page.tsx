@@ -41,6 +41,7 @@ export default function UkolyPage() {
   const [form, setForm] = useState(emptyForm)
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
+  const [filterProjekt, setFilterProjekt] = useState('All')
   const [saving, setSaving] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -95,10 +96,12 @@ export default function UkolyPage() {
   }
 
   const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+  const projekty = Array.from(new Set(tasks.map(t => t.projekt).filter((p): p is string => !!p))).sort()
   const filtered = tasks
     .filter(t =>
       (filterStatus === 'All' || t.status === filterStatus) &&
-      (filterPriority === 'All' || t.priorita === filterPriority)
+      (filterPriority === 'All' || t.priorita === filterPriority) &&
+      (filterProjekt === 'All' || t.projekt === filterProjekt)
     )
     .sort((a, b) => {
       const aDone = a.status === 'Done' ? 1 : 0
@@ -173,6 +176,19 @@ export default function UkolyPage() {
             )
           })}
         </div>
+        {projekty.length > 0 && (
+          <>
+            <div className="desktop-only" style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+            <div style={{ width: 160 }}>
+              <Select
+                value={filterProjekt}
+                onChange={setFilterProjekt}
+                options={[{ value: 'All', label: 'Vše' }, ...projekty.map(p => ({ value: p, label: p }))]}
+                style={{ padding: '5px 12px', fontSize: 13, borderRadius: 20 }}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Cards */}
