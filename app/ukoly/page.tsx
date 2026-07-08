@@ -33,6 +33,7 @@ export default function UkolyPage() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterPriority, setFilterPriority] = useState('All')
   const [projektSearch, setProjektSearch] = useState('')
+  const [hideDoneFromPill, setHideDoneFromPill] = useState(false)
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -154,7 +155,8 @@ export default function UkolyPage() {
     .filter(t =>
       (filterStatus === 'All' || t.status === filterStatus) &&
       (filterPriority === 'All' || t.priorita === filterPriority) &&
-      (projektSearchTrim === '' || (t.projekt || '').toLowerCase().includes(projektSearchTrim))
+      (projektSearchTrim === '' || (t.projekt || '').toLowerCase().includes(projektSearchTrim)) &&
+      (!hideDoneFromPill || t.status !== 'Done')
     )
     .sort((a, b) => {
       const aDone = a.status === 'Done' ? 1 : 0
@@ -165,7 +167,7 @@ export default function UkolyPage() {
       const aD = a.deadline ? new Date(a.deadline).getTime() : Infinity
       const bD = b.deadline ? new Date(b.deadline).getTime() : Infinity
       return aD - bD
-    }), [tasks, filterStatus, filterPriority, projektSearchTrim])
+    }), [tasks, filterStatus, filterPriority, projektSearchTrim, hideDoneFromPill])
   const openCount = tasks.filter(t => t.status !== 'Done').length
 
   // Lightweight windowed rendering for long lists — only mounts rows near the viewport.
@@ -309,12 +311,12 @@ export default function UkolyPage() {
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
           <input
             value={projektSearch}
-            onChange={e => setProjektSearch(e.target.value)}
+            onChange={e => { setProjektSearch(e.target.value); setHideDoneFromPill(false) }}
             placeholder="Hledat projekt..."
             style={{ ...inputStyle, padding: '7px 30px', fontSize: 13, borderRadius: 20, touchAction: 'manipulation' }}
           />
           {projektSearch && (
-            <button onClick={() => setProjektSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, display: 'flex', touchAction: 'manipulation' }}>
+            <button onClick={() => { setProjektSearch(''); setHideDoneFromPill(false) }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, display: 'flex', touchAction: 'manipulation' }}>
               <X size={14} />
             </button>
           )}
@@ -326,7 +328,7 @@ export default function UkolyPage() {
               return (
                 <button
                   key={nazev}
-                  onClick={() => setProjektSearch(active ? '' : nazev)}
+                  onClick={() => { setProjektSearch(active ? '' : nazev); setHideDoneFromPill(!active) }}
                   style={{
                     ...pillBase,
                     padding: '4px 12px', fontSize: 12,
