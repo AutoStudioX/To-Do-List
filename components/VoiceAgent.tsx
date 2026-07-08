@@ -50,7 +50,7 @@ function isTaskNameValid(nazev: unknown): boolean {
   if (!trimmed) return false
   if (GENERIC_TASK_NAMES.has(trimmed.toLowerCase())) return false
   const wordCount = trimmed.split(/\s+/).filter(Boolean).length
-  if (wordCount < 3) return false
+  if (wordCount < 2) return false
   return true
 }
 
