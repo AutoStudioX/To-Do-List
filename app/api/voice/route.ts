@@ -16,6 +16,43 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Strips diacritics + lowercases so keyword matching survives ASR spelling variance ("úkol" vs "ukol").
+const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+const CATEGORY_TOOLS: Record<string, string[]> = {
+  task: ['add_task', 'update_task', 'delete_task'],
+  finance: ['add_income', 'add_expense', 'add_debt', 'add_fixed_cost', 'toggle_debt_status', 'delete_transaction'],
+  goal: ['add_goal', 'update_goal_progress', 'add_milestone', 'toggle_milestone'],
+  project: ['add_project'],
+  summary: ['get_summary'],
+}
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  task: ['ukol', 'task', 'udelat', 'splnit', 'pridat ukol'],
+  finance: ['prijem', 'vydaj', 'vydelal', 'zaplatil', 'dluh', 'kc', 'korun'],
+  goal: ['cil', 'goal', 'pokrok', 'splnil jsem'],
+  project: ['projekt'],
+  summary: ['jak na tom', 'prehled', 'shrn', 'kolik mam'],
+}
+
+// Bumped every time Claude actually picks a tool — used as the "top 5 most used" fallback pool.
+const toolUsageCounts: Record<string, number> = {}
+const DEFAULT_FALLBACK_TOOLS = ['add_task', 'add_income', 'add_expense', 'add_goal', 'get_summary']
+
+function detectToolNames(text: string): { names: string[]; matchedCategories: string[] } {
+  const n = normalize(text)
+  const matchedCategories = Object.keys(CATEGORY_KEYWORDS).filter(cat =>
+    CATEGORY_KEYWORDS[cat].some(kw => n.includes(normalize(kw)))
+  )
+  if (matchedCategories.length === 0) {
+    const ranked = Object.entries(toolUsageCounts).sort((a, b) => b[1] - a[1]).map(([name]) => name)
+    const names = ranked.length > 0 ? ranked.slice(0, 5) : DEFAULT_FALLBACK_TOOLS
+    return { names, matchedCategories: ['fallback:top5'] }
+  }
+  const names = Array.from(new Set(matchedCategories.flatMap(cat => CATEGORY_TOOLS[cat])))
+  return { names, matchedCategories }
+}
+
 const tools: Anthropic.Tool[] = [
   {
     name: 'add_task',
@@ -213,12 +250,16 @@ export async function POST(req: NextRequest) {
   const { text } = await req.json()
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
+  const { names: routedNames, matchedCategories } = detectToolNames(text)
+  const routedTools = tools.filter(t => routedNames.includes(t.name))
+  console.log(`[voice] routing categories=[${matchedCategories.join(',')}] tools=[${routedNames.join(',')}]`)
+
   const model = 'claude-haiku-4-5-20251001'
   const message = await client.messages.create({
     model,
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    tools,
+    tools: routedTools,
     messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
   })
 
@@ -230,6 +271,10 @@ export async function POST(req: NextRequest) {
   const toolCalls = message.content
     .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
     .map(b => ({ id: b.id, name: b.name, input: b.input as Record<string, unknown> }))
+
+  for (const call of toolCalls) {
+    toolUsageCounts[call.name] = (toolUsageCounts[call.name] || 0) + 1
+  }
 
   const text_ = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
