@@ -44,6 +44,11 @@ const GENERIC_TASK_NAMES = new Set([
   'nový úkol', 'novy ukol', 'úkol', 'ukol', 'priorita', 'priority', 'task', 'todo', 'new task', 'novy task',
 ])
 
+function capitalize(s: unknown): unknown {
+  if (typeof s !== 'string' || !s) return s
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 function isTaskNameValid(nazev: unknown): boolean {
   if (typeof nazev !== 'string') return false
   const trimmed = nazev.trim()
@@ -113,11 +118,11 @@ function describeToolCall(t: ToolCall): string {
   const d = t.input || {}
   switch (t.name) {
     case 'add_task':
-      return `Přidat úkol: "${d.nazev}", priorita ${d.priorita || 'High'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
+      return `Přidat úkol: "${capitalize(d.nazev)}", priorita ${d.priorita || 'High'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
     case 'add_income':
       return `Přidat příjem: ${d.klient} — ${d.castka} Kč${d.typ === 'mesicni' ? ' (měsíční)' : ''}${d.status === 'ceka' ? ' (čeká na platbu)' : ''}`
     case 'add_expense':
-      return `Přidat výdaj: ${d.nazev} — ${d.castka} Kč${d.kategorie ? ` (${d.kategorie})` : ''}`
+      return `Přidat výdaj: ${capitalize(d.nazev)} — ${d.castka} Kč${d.kategorie ? ` (${d.kategorie})` : ''}`
     case 'add_goal':
       return `Přidat cíl: "${d.nazev}"${d.deadline ? `, deadline ${d.deadline}` : ''}${d.target_value ? `, cíl ${d.target_value}` : ''}`
     case 'update_goal_progress':
@@ -221,7 +226,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     if (t.name === 'add_task') {
       const { error } = await supabase.from('ukoly').insert({
         user_id: userId,
-        nazev: d.nazev,
+        nazev: capitalize(d.nazev),
         priorita: d.priorita || 'High',
         deadline: d.deadline || todayISO(),
         projekt: d.projekt || null,
@@ -243,7 +248,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     } else if (t.name === 'add_expense') {
       const { error } = await supabase.from('transakce').insert({
         user_id: userId,
-        nazev: d.nazev,
+        nazev: capitalize(d.nazev),
         castka: d.castka,
         datum: d.datum || todayISO(),
         typ: 'vydaj',
