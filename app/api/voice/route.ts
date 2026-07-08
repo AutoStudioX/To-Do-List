@@ -58,6 +58,9 @@ PRAVIDLA:
 - Slova jako "změn", "uprav", "nastav", "dej zpátky", "přesuň" → VŽDY update_ukol nebo update_goal, NIKDY add_ukol nebo add_goal
 - Pokud si nejsi 100% jistý který konkrétní úkol/goal uživatel myslí → vrať unknown, NESNAŽ SE HÁDAT ani vybírat nejpodobnější
 - Pokud část příkazu nerozumíš nebo si nejsi jistý → vrať unknown s důvodem, NEDĚLEJ nic navíc
+- add_ukol.nazev NESMÍ být obecná fráze ("nový úkol", "úkol", "priorita") ani fragment kratší než 3 slova — pokud přepis obsahuje jen takový fragment (např. útržek řeči zachycený rozpoznávačem), vrať unknown místo add_ukol
+- add_ukol.priorita musí být přesně "High", "Medium" nebo "Low" (nebo vynechaná pole → default Medium), nikdy jiná hodnota
+- Každý požadavek zpracuj nezávisle na základě aktuálního přepisu a poskytnutého kontextu — nedomýšlej si nic, co v přepisu není
 
 Příklady:
 - "přidej příjem od Honzy 5000 a úkol zavolat mu" → 2 akce: add_prijem + add_ukol
