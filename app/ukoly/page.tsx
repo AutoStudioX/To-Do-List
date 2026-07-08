@@ -148,6 +148,12 @@ export default function UkolyPage() {
     showToast('Úkol smazán')
   }
 
+  async function toggleTask(task: Task) {
+    const newStatus = task.status === 'Done' ? 'Todo' : 'Done'
+    await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+  }
+
   const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
   const projektSearchTrim = projektSearch.trim().toLowerCase()
   const filtered = tasks
@@ -311,9 +317,13 @@ export default function UkolyPage() {
 
               {/* Content + actions */}
               <div style={{ flex: 1, padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Row 1: title + action buttons */}
+                {/* Row 1: checkbox + title + action buttons */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', lineHeight: 1.3 }}>{t.nazev}</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, minWidth: 0 }}>
+                    <input type="checkbox" checked={t.status === 'Done'} onChange={() => toggleTask(t)}
+                      style={{ width: 15, height: 15, marginTop: 3, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
+                    <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', lineHeight: 1.3 }}>{t.nazev}</div>
+                  </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center' }}>
                       <Pencil size={13} />
