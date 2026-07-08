@@ -133,7 +133,8 @@ a:hover {
   .table-scroll { overflow-x: hidden !important; }
   .finance-table { table-layout: fixed !important; width: 100% !important; }
   .finance-table td, .finance-table th { padding: 10px 6px !important; overflow: hidden; word-break: break-word; }
-  .finance-table td:first-child, .finance-table th:first-child { width: 72px; }
+  .finance-table td:last-child, .finance-table th:last-child { width: 64px; }
+  .finance-table-dluhy td:first-child, .finance-table-dluhy th:first-child { width: 72px; }
   .finance-table td:nth-child(4), .finance-table th:nth-child(4) { display: none; }
   .finance-table td:nth-child(5), .finance-table th:nth-child(5) { display: none; }
 
