@@ -160,6 +160,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const [interim, setInterim] = useState('')
   const [response, setResponse] = useState('')
   const [pendingCalls, setPendingCalls] = useState<ToolCall[] | null>(null)
+  const [tokenUsage, setTokenUsage] = useState<{ totalTokens: number } | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const finalTranscriptRef = useRef('')
@@ -412,6 +413,11 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       const json = await res.json()
       const toolCalls: ToolCall[] = json.toolCalls || []
 
+      if (json.usage) {
+        setTokenUsage({ totalTokens: json.usage.totalTokens })
+        console.log(`[voice] model=${json.usage.model} input_tokens=${json.usage.inputTokens} output_tokens=${json.usage.outputTokens} total_tokens=${json.usage.totalTokens}`)
+      }
+
       if (toolCalls.length === 0) {
         setResponse(json.response || 'Nerozuměl jsem.')
         setPanelOpen(true)
@@ -518,6 +524,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     setInterim('')
     setResponse('')
     setPendingCalls(null)
+    setTokenUsage(null)
     finalTranscriptRef.current = ''
 
     const recognition = new SpeechRecognition()
@@ -649,6 +656,9 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                       <X size={13} /> Zrušit
                     </button>
                   </div>
+                  {tokenUsage && (
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>Použito: {tokenUsage.totalTokens} tokenů</div>
+                  )}
                 </div>
               )}
               {/* Response text (get_summary answer, save confirmation, or unknown/error) */}
@@ -656,6 +666,9 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                 <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>
                   {response}
                 </div>
+              )}
+              {status !== 'confirm' && response && tokenUsage && (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Použito: {tokenUsage.totalTokens} tokenů</div>
               )}
               {/* Thinking / saving indicator */}
               {(status === 'thinking' || status === 'saving') && !response && (

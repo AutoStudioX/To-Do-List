@@ -234,13 +234,19 @@ export async function POST(req: NextRequest) {
   const { text } = await req.json()
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
+  const model = 'claude-haiku-4-5-20251001'
   const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model,
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     tools,
     messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
   })
+
+  const inputTokens = message.usage.input_tokens
+  const outputTokens = message.usage.output_tokens
+  const totalTokens = inputTokens + outputTokens
+  console.log(`[voice] model=${model} input_tokens=${inputTokens} output_tokens=${outputTokens} total_tokens=${totalTokens}`)
 
   const toolCalls = message.content
     .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
@@ -252,5 +258,9 @@ export async function POST(req: NextRequest) {
     .join(' ')
     .trim()
 
-  return NextResponse.json({ toolCalls, response: text_ })
+  return NextResponse.json({
+    toolCalls,
+    response: text_,
+    usage: { inputTokens, outputTokens, totalTokens, model },
+  })
 }
