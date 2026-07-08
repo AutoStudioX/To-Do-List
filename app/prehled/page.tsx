@@ -337,14 +337,14 @@ export default function PrehledPage() {
               return (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: isOverdue ? 'rgba(229,62,62,0.06)' : 'transparent', borderRadius: 6, overflow: 'hidden' }}>
                 <div style={{ width: 4, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityColor[t.priorita], flexShrink: 0 }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, padding: '8px 10px' }}>
                 <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
                   style={{ width: 15, height: 15, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
                   {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
                 </div>
-                <span className="desktop-only" style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0 }}>{t.priorita}</span>
+                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>{t.priorita}</span>
                 </div>
               </div>
             )})}
