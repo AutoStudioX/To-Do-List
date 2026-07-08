@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     tools,
