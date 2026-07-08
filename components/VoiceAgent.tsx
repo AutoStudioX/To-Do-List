@@ -71,17 +71,39 @@ function validateToolCall(t: ToolCall): string | null {
   } else if (t.name === 'update_goal_progress') {
     if (!d.goal_name) return 'Chybí název cíle'
     if (d.current_value === undefined || d.current_value === null || isNaN(Number(d.current_value))) return 'Chybí nová hodnota pokroku'
+  } else if (t.name === 'update_task') {
+    if (!d.task_name) return 'Chybí název úkolu k úpravě'
+    const upd = (d.updates || {}) as Record<string, unknown>
+    if (upd.priorita && !['High', 'Medium', 'Low'].includes(upd.priorita as string)) return `Neplatná priorita: "${upd.priorita}"`
+    if (upd.status && !['Todo', 'In Progress', 'Done'].includes(upd.status as string)) return `Neplatný status: "${upd.status}"`
+  } else if (t.name === 'delete_task') {
+    if (!d.task_name) return 'Chybí název úkolu ke smazání'
+  } else if (t.name === 'add_debt') {
+    if (!d.castka || !d.komu_kdo) return 'Chybí částka nebo jméno u dluhu'
+    if (d.smer && !['muj_dluh', 'dluzi_mi'].includes(d.smer as string)) return `Neplatný směr dluhu: "${d.smer}"`
+  } else if (t.name === 'add_fixed_cost') {
+    if (!d.nazev || !d.castka) return 'Chybí název nebo částka u fixního nákladu'
+  } else if (t.name === 'toggle_debt_status') {
+    if (!d.debt_name) return 'Chybí název dluhu'
+  } else if (t.name === 'delete_transaction') {
+    if (!d.nazev) return 'Chybí název transakce ke smazání'
+  } else if (t.name === 'add_milestone') {
+    if (!d.goal_name || !d.milestone_name) return 'Chybí název cíle nebo kroku'
+  } else if (t.name === 'toggle_milestone') {
+    if (!d.goal_name || !d.milestone_name) return 'Chybí název cíle nebo kroku'
+  } else if (t.name === 'add_project') {
+    if (!d.nazev) return 'Chybí název projektu'
   }
   return null
 }
 
-function fuzzyFindGoal<T extends { nazev: string }>(goals: T[], name: string): T | null {
+function fuzzyFindByName<T extends { nazev: string }>(items: T[], name: string): T | null {
   const q = name.trim().toLowerCase()
   if (!q) return null
-  const exact = goals.find(g => g.nazev.trim().toLowerCase() === q)
+  const exact = items.find(i => i.nazev.trim().toLowerCase() === q)
   if (exact) return exact
-  const partial = goals.find(g => {
-    const n = g.nazev.trim().toLowerCase()
+  const partial = items.find(i => {
+    const n = i.nazev.trim().toLowerCase()
     return n.includes(q) || q.includes(n)
   })
   return partial || null
@@ -100,6 +122,31 @@ function describeToolCall(t: ToolCall): string {
       return `Přidat cíl: "${d.nazev}"${d.deadline ? `, deadline ${d.deadline}` : ''}${d.target_value ? `, cíl ${d.target_value}` : ''}`
     case 'update_goal_progress':
       return `Aktualizovat pokrok cíle "${d.goal_name}" na ${d.current_value}`
+    case 'update_task': {
+      const upd = (d.updates || {}) as Record<string, unknown>
+      const parts: string[] = []
+      if (upd.status) parts.push(`status ${upd.status}`)
+      if (upd.priorita) parts.push(`priorita ${upd.priorita}`)
+      if (upd.deadline !== undefined) parts.push(`deadline ${upd.deadline}`)
+      if (upd.projekt !== undefined) parts.push(`projekt ${upd.projekt}`)
+      return `Upravit úkol "${d.task_name}" → ${parts.join(', ') || 'beze změny'}`
+    }
+    case 'delete_task':
+      return `Smazat úkol "${d.task_name}"`
+    case 'add_debt':
+      return `Přidat dluh: ${d.komu_kdo} — ${d.castka} Kč (${d.smer === 'muj_dluh' ? 'dlužím já' : 'dluží mi'})`
+    case 'add_fixed_cost':
+      return `Přidat fixní náklad: ${d.nazev} — ${d.castka} Kč/měsíc`
+    case 'toggle_debt_status':
+      return `Přepnout stav dluhu "${d.debt_name}"`
+    case 'delete_transaction':
+      return `Smazat transakci "${d.nazev}"${d.typ ? ` (${d.typ})` : ''}`
+    case 'add_milestone':
+      return `Přidat krok "${d.milestone_name}" k cíli "${d.goal_name}"`
+    case 'toggle_milestone':
+      return `Přepnout krok "${d.milestone_name}" u cíle "${d.goal_name}"`
+    case 'add_project':
+      return `Přidat projekt "${d.nazev}"`
     case 'get_summary':
       return 'Zobrazit přehled'
     default:
@@ -166,7 +213,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     }
   }
 
-  // Executes one of the 5 agent tools against Supabase. get_summary is handled separately (read-only, client-side).
+  // Executes one of the agent's mutating tools against Supabase. get_summary is handled separately (read-only, client-side).
   async function executeTool(t: ToolCall, userId: string): Promise<string | null> {
     const supabase = createClient()
     const d = t.input || {}
@@ -223,7 +270,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         .eq('user_id', userId)
         .eq('status', 'active')
       if (fetchError) return fetchError.message
-      const match = fuzzyFindGoal<{ id: string; nazev: string; target_value: number | null; current_value: number | null }>(goals || [], String(d.goal_name || ''))
+      const match = fuzzyFindByName<{ id: string; nazev: string; target_value: number | null; current_value: number | null }>(goals || [], String(d.goal_name || ''))
       if (!match) return `Nenašel jsem cíl "${d.goal_name}"`
 
       const newValue = Number(d.current_value)
@@ -238,6 +285,100 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       }
       const { error } = await supabase.from('goaly').update(updates).eq('id', match.id)
       if (error) return error.message
+    } else if (t.name === 'update_task') {
+      const { data: tasks, error: fe } = await supabase.from('ukoly').select('id, nazev').eq('user_id', userId)
+      if (fe) return fe.message
+      const match = fuzzyFindByName<{ id: string; nazev: string }>(tasks || [], String(d.task_name || ''))
+      if (!match) return `Nenašel jsem úkol "${d.task_name}"`
+      const upd = (d.updates || {}) as Record<string, unknown>
+      const updates: Record<string, unknown> = {}
+      if (upd.status) updates.status = upd.status
+      if (upd.priorita) updates.priorita = upd.priorita
+      if (upd.deadline !== undefined) updates.deadline = upd.deadline
+      if (upd.projekt !== undefined) updates.projekt = upd.projekt
+      if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
+      const { error } = await supabase.from('ukoly').update(updates).eq('id', match.id)
+      if (error) return error.message
+    } else if (t.name === 'delete_task') {
+      const { data: tasks, error: fe } = await supabase.from('ukoly').select('id, nazev').eq('user_id', userId)
+      if (fe) return fe.message
+      const match = fuzzyFindByName<{ id: string; nazev: string }>(tasks || [], String(d.task_name || ''))
+      if (!match) return `Nenašel jsem úkol "${d.task_name}"`
+      const { error } = await supabase.from('ukoly').delete().eq('id', match.id)
+      if (error) return error.message
+    } else if (t.name === 'add_debt') {
+      const smerDb = d.smer === 'muj_dluh' ? 'moje' : 'mne'
+      const { error } = await supabase.from('transakce').insert({
+        user_id: userId,
+        nazev: d.komu_kdo,
+        castka: d.castka,
+        datum: d.datum || todayISO(),
+        typ: 'dluh',
+        smer: smerDb,
+        status: 'nesplaceno',
+        opakovani: 'jednorazovy',
+        poznamka: d.popis || null,
+      })
+      if (error) return error.message
+    } else if (t.name === 'add_fixed_cost') {
+      const { error } = await supabase.from('transakce').insert({
+        user_id: userId,
+        nazev: d.nazev,
+        castka: d.castka,
+        typ: 'fixni_naklad',
+        opakovani: 'mesicni',
+        datum: todayISO(),
+      })
+      if (error) return error.message
+    } else if (t.name === 'toggle_debt_status') {
+      const { data: debts, error: fe } = await supabase.from('transakce').select('id, nazev, status').eq('user_id', userId).eq('typ', 'dluh')
+      if (fe) return fe.message
+      const match = fuzzyFindByName<{ id: string; nazev: string; status: string | null }>(debts || [], String(d.debt_name || ''))
+      if (!match) return `Nenašel jsem dluh "${d.debt_name}"`
+      const newStatus = match.status === 'splaceno' ? 'nesplaceno' : 'splaceno'
+      const { error } = await supabase.from('transakce').update({ status: newStatus }).eq('id', match.id)
+      if (error) return error.message
+    } else if (t.name === 'delete_transaction') {
+      let query = supabase.from('transakce').select('id, nazev, typ').eq('user_id', userId)
+      if (d.typ) query = query.eq('typ', d.typ as string)
+      const { data: txs, error: fe } = await query
+      if (fe) return fe.message
+      const match = fuzzyFindByName<{ id: string; nazev: string; typ: string }>(txs || [], String(d.nazev || ''))
+      if (!match) return `Nenašel jsem transakci "${d.nazev}"`
+      const { error } = await supabase.from('transakce').delete().eq('id', match.id)
+      if (error) return error.message
+    } else if (t.name === 'add_milestone') {
+      const { data: goals, error: fe } = await supabase.from('goaly').select('id, nazev').eq('user_id', userId)
+      if (fe) return fe.message
+      const goalMatch = fuzzyFindByName<{ id: string; nazev: string }>(goals || [], String(d.goal_name || ''))
+      if (!goalMatch) return `Nenašel jsem cíl "${d.goal_name}"`
+      const { error } = await supabase.from('milniky').insert({
+        user_id: userId,
+        goal_id: goalMatch.id,
+        nazev: d.milestone_name,
+        deadline: d.deadline || null,
+        done: false,
+      })
+      if (error) return error.message
+    } else if (t.name === 'toggle_milestone') {
+      const { data: goals, error: fe } = await supabase.from('goaly').select('id, nazev').eq('user_id', userId)
+      if (fe) return fe.message
+      const goalMatch = fuzzyFindByName<{ id: string; nazev: string }>(goals || [], String(d.goal_name || ''))
+      if (!goalMatch) return `Nenašel jsem cíl "${d.goal_name}"`
+      const { data: ms, error: fe2 } = await supabase.from('milniky').select('id, nazev, done').eq('goal_id', goalMatch.id)
+      if (fe2) return fe2.message
+      const msMatch = fuzzyFindByName<{ id: string; nazev: string; done: boolean }>(ms || [], String(d.milestone_name || ''))
+      if (!msMatch) return `Nenašel jsem krok "${d.milestone_name}" u cíle "${d.goal_name}"`
+      const { error } = await supabase.from('milniky').update({ done: !msMatch.done }).eq('id', msMatch.id)
+      if (error) return error.message
+    } else if (t.name === 'add_project') {
+      const nazev = String(d.nazev || '').trim()
+      const { data: existing } = await supabase.from('projekty').select('id, nazev').eq('user_id', userId)
+      const dup = (existing || []).find((p: { nazev: string }) => p.nazev.toLowerCase() === nazev.toLowerCase())
+      if (!dup) {
+        const { error } = await supabase.from('projekty').insert({ user_id: userId, nazev })
+        if (error) return error.message
+      }
     }
     return null
   }
