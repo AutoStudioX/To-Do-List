@@ -345,7 +345,7 @@ export default function FinancePage() {
                 </>}
                 {activeTab === 'dluhy' && <>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.smer === 'moje' ? '#fee2e2' : '#d1fae5', color: t.smer === 'moje' ? '#e53e3e' : '#059669' }}>
+                    <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.smer === 'moje' ? '#fee2e2' : '#d1fae5', color: t.smer === 'moje' ? '#e53e3e' : '#059669', whiteSpace: 'nowrap', display: 'inline-block' }}>
                       {t.smer === 'moje' ? 'Dlužím já' : 'Dluží mi'}
                     </span>
                   </td>
