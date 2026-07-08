@@ -1,5 +1,5 @@
 'use client'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Projekt } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -50,6 +50,7 @@ export default function UkolyPage() {
   const [newProjektName, setNewProjektName] = useState('')
   const { toast, showToast, hideToast } = useToast()
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const backfillRef = useRef(false)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -59,21 +60,36 @@ export default function UkolyPage() {
       if (!user) return
       const [{ data: taskData }, { data: projektData }] = await Promise.all([
         supabase.from('ukoly').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('projekty').select('*').eq('user_id', user.id).order('nazev', { ascending: true }),
+        supabase.from('projekty').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
       ])
       setTasks(taskData || [])
 
-      // Backfill: pull in any project names already used on tasks but not yet saved in projekty
-      const existingNames = new Set((projektData || []).map(p => p.nazev.toLowerCase()))
-      const missing = Array.from(new Set(
-        (taskData || []).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
-      ))
-      if (missing.length > 0) {
-        const { data: inserted } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
-        setProjekty([...(projektData || []), ...(inserted || [])].sort((a, b) => a.nazev.localeCompare(b.nazev)))
-      } else {
-        setProjekty(projektData || [])
+      // De-dupe any project rows that already exist (case-insensitive), keep the earliest
+      const seen = new Map<string, Projekt>()
+      const dupeIds: string[] = []
+      for (const p of projektData || []) {
+        const key = p.nazev.toLowerCase()
+        if (seen.has(key)) dupeIds.push(p.id)
+        else seen.set(key, p)
       }
+      if (dupeIds.length > 0) {
+        await supabase.from('projekty').delete().in('id', dupeIds)
+      }
+      let cleanProjekty = Array.from(seen.values())
+
+      // Backfill: pull in any project names already used on tasks but not yet saved in projekty (once per mount)
+      if (!backfillRef.current) {
+        backfillRef.current = true
+        const existingNames = new Set(cleanProjekty.map(p => p.nazev.toLowerCase()))
+        const missing = Array.from(new Set(
+          (taskData || []).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
+        ))
+        if (missing.length > 0) {
+          const { data: inserted } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
+          cleanProjekty = [...cleanProjekty, ...(inserted || [])]
+        }
+      }
+      setProjekty(cleanProjekty.sort((a, b) => a.nazev.localeCompare(b.nazev)))
     } catch { } finally { setLoading(false) }
   }, [])
 
