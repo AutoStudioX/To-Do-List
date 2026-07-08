@@ -30,7 +30,7 @@ const CATEGORY_TOOLS: Record<string, string[]> = {
 }
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  task: ['ukol', 'task', 'udelat', 'splnit', 'pridat ukol'],
+  task: ['ukol', 'task', 'udelat', 'splnit', 'pridat ukol', 'jit', 'zavolat', 'koupit', 'napsat', 'dokoncit', 'pripravit', 'poslat', 'zkontrolovat'],
   finance: ['prijem', 'vydaj', 'vydelal', 'zaplatil', 'dluh', 'kc', 'korun'],
   goal: ['cil', 'goal', 'pokrok', 'splnil jsem'],
   project: ['projekt'],
