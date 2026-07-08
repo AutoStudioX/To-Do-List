@@ -1,0 +1,115 @@
+import React from 'react'
+import { Pencil, Trash2, Calendar, Folder } from 'lucide-react'
+import { Task } from '@/lib/types'
+
+const priorityBorder: Record<string, string> = {
+  High: '#e53e3e',
+  Medium: '#f59e0b',
+  Low: '#10b981',
+}
+const statusConfig: Record<string, { dot: string; label: string }> = {
+  'Todo': { dot: '#9ca3af', label: 'Todo' },
+  'In Progress': { dot: '#3b82f6', label: 'In Progress' },
+  'Done': { dot: '#10b981', label: 'Done' },
+}
+
+interface Props {
+  task: Task
+  expanded: boolean
+  showDivider: boolean
+  onToggleDone: (task: Task) => void
+  onToggleExpand: (id: string) => void
+  onEdit: (task: Task) => void
+  onDelete: (id: string) => void
+  rowRef?: (el: HTMLDivElement | null) => void
+}
+
+function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExpand, onEdit, onDelete, rowRef }: Props) {
+  const isOverdue = t.status !== 'Done' && !!t.deadline && new Date(t.deadline) < new Date(new Date().toDateString())
+
+  return (
+    <div ref={rowRef}>
+      {showDivider && <div style={{ borderTop: '1px solid var(--muted)', margin: '8px 0', opacity: 0.5 }} />}
+      <div
+        className="task-row"
+        style={{
+          background: isOverdue ? '#fff5f5' : 'var(--card)',
+          border: `1px solid ${isOverdue ? '#fca5a5' : 'var(--border)'}`,
+          borderRadius: 12,
+          display: 'flex',
+          overflow: 'hidden',
+          marginBottom: 10,
+        }}
+      >
+        {/* Priority border */}
+        <div style={{ width: 5, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityBorder[t.priorita], flexShrink: 0 }} />
+
+        {/* Content + actions */}
+        <div style={{ flex: 1, padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Row 1: checkbox + title + action buttons */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, minWidth: 0, flex: 1 }}>
+              <input
+                type="checkbox"
+                checked={t.status === 'Done'}
+                onClick={e => e.stopPropagation()}
+                onChange={() => onToggleDone(t)}
+                style={{ width: 15, height: 15, marginTop: 3, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}
+              />
+              <div
+                onClick={() => onToggleExpand(t.id)}
+                style={{
+                  fontSize: 15, fontWeight: 600, lineHeight: 1.3, cursor: 'pointer', touchAction: 'manipulation',
+                  color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)',
+                  textDecoration: t.status === 'Done' ? 'line-through' : 'none',
+                  whiteSpace: expanded ? 'normal' : 'nowrap',
+                  overflow: expanded ? 'visible' : 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {t.nazev}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={e => { e.stopPropagation(); onEdit(t) }}
+                style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center', touchAction: 'manipulation' }}
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(t.id) }}
+                style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center', touchAction: 'manipulation' }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+          {/* Row 2: meta */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityBorder[t.priorita], flexShrink: 0, display: 'inline-block' }} />
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
+              <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
+            </div>
+            {t.deadline && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
+                <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}
+              </span>
+            )}
+            {t.projekt && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
+                <Folder size={11} /> {t.projekt}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default React.memo(TaskRowImpl)

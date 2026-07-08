@@ -1,5 +1,5 @@
 'use client'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Task, Projekt } from '@/lib/types'
 import Modal from '@/components/Modal'
@@ -7,23 +7,13 @@ import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { Plus, Trash2, Pencil, Calendar, Folder, Search, X } from 'lucide-react'
+import TaskRow from '@/components/TaskRow'
+import { Plus, Search, X } from 'lucide-react'
 
-const priorityBorder: Record<string, string> = {
-  High: '#e53e3e',
-  Medium: '#f59e0b',
-  Low: '#10b981',
-}
-const priorityDot: Record<string, string> = {
-  High: '#e53e3e',
-  Medium: '#f59e0b',
-  Low: '#10b981',
-}
-const statusConfig: Record<string, { dot: string; label: string }> = {
-  'Todo': { dot: '#9ca3af', label: 'Todo' },
-  'In Progress': { dot: '#3b82f6', label: 'In Progress' },
-  'Done': { dot: '#10b981', label: 'Done' },
-}
+// Below this many visible rows we skip the windowing machinery entirely — plain render is simpler and fast enough.
+const VIRTUALIZE_THRESHOLD = 15
+const ESTIMATED_ROW_HEIGHT = 96
+const OVERSCAN_PX = 600
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
@@ -44,7 +34,7 @@ export default function UkolyPage() {
   const [filterPriority, setFilterPriority] = useState('All')
   const [projektSearch, setProjektSearch] = useState('')
   const [saving, setSaving] = useState(false)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
   const [addingProjekt, setAddingProjekt] = useState(false)
   const [newProjektName, setNewProjektName] = useState('')
@@ -119,10 +109,10 @@ export default function UkolyPage() {
   }
 
   function openAdd() { setForm(emptyForm); setEditTask(null); setFormError(''); setModalOpen(true) }
-  function openEdit(t: Task) {
+  const openEdit = useCallback((t: Task) => {
     setForm({ nazev: t.nazev, priorita: t.priorita, deadline: t.deadline || '', status: t.status, projekt: t.projekt || '' })
     setEditTask(t); setModalOpen(true)
-  }
+  }, [])
 
   async function save() {
     if (!form.nazev.trim()) { setFormError('Název je povinný'); return }
@@ -141,22 +131,26 @@ export default function UkolyPage() {
     showToast(editTask ? 'Úkol upraven' : 'Úkol přidán')
   }
 
-  async function deleteTask(id: string) {
+  const deleteTask = useCallback(async (id: string) => {
     if (!await confirm('Smazat úkol?')) return
     await createClient().from('ukoly').delete().eq('id', id)
     load()
     showToast('Úkol smazán')
-  }
+  }, [confirm, load, showToast])
 
-  async function toggleTask(task: Task) {
+  const toggleTask = useCallback(async (task: Task) => {
     const newStatus = task.status === 'Done' ? 'Todo' : 'Done'
     await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
-  }
+  }, [])
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id)
+  }, [])
 
   const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
   const projektSearchTrim = projektSearch.trim().toLowerCase()
-  const filtered = tasks
+  const filtered = useMemo(() => tasks
     .filter(t =>
       (filterStatus === 'All' || t.status === filterStatus) &&
       (filterPriority === 'All' || t.priorita === filterPriority) &&
@@ -171,8 +165,67 @@ export default function UkolyPage() {
       const aD = a.deadline ? new Date(a.deadline).getTime() : Infinity
       const bD = b.deadline ? new Date(b.deadline).getTime() : Infinity
       return aD - bD
-    })
+    }), [tasks, filterStatus, filterPriority, projektSearchTrim])
   const openCount = tasks.filter(t => t.status !== 'Done').length
+
+  // Lightweight windowed rendering for long lists — only mounts rows near the viewport.
+  // Row heights are measured after render (they vary with wrapped/expanded titles) and
+  // cached per task id, so the spacer math stays accurate as the user scrolls/expands.
+  const listContainerRef = useRef<HTMLDivElement>(null)
+  const rowHeightsRef = useRef<Map<string, number>>(new Map())
+  const [scrollTick, setScrollTick] = useState(0)
+  const virtualize = filtered.length > VIRTUALIZE_THRESHOLD
+
+  useEffect(() => {
+    if (!virtualize) return
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => setScrollTick(x => x + 1))
+    }
+    // The page's real scroll container is an ancestor (.main-content), not window — scroll
+    // events don't bubble, so listen on the capture phase to catch them from any ancestor.
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    onScroll()
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll, { capture: true } as EventListenerOptions)
+    }
+  }, [virtualize])
+
+  const measureRow = useCallback((id: string) => (el: HTMLDivElement | null) => {
+    if (!el) return
+    const h = el.getBoundingClientRect().height
+    if (h > 0 && rowHeightsRef.current.get(id) !== h) {
+      rowHeightsRef.current.set(id, h)
+      setScrollTick(x => x + 1)
+    }
+  }, [])
+
+  const virtualRange = useMemo(() => {
+    if (!virtualize) return { start: 0, end: filtered.length, offsetTop: 0, offsetBottom: 0 }
+    const el = listContainerRef.current
+    const scrollY = el ? -el.getBoundingClientRect().top : 0
+    const viewportH = typeof window !== 'undefined' ? window.innerHeight : 900
+    const heights = rowHeightsRef.current
+
+    let acc = 0
+    let start = filtered.length
+    let end = filtered.length
+    for (let i = 0; i < filtered.length; i++) {
+      const h = heights.get(filtered[i].id) ?? ESTIMATED_ROW_HEIGHT
+      if (start === filtered.length && acc + h >= scrollY - OVERSCAN_PX) start = i
+      if (acc >= scrollY + viewportH + OVERSCAN_PX) { end = i; break }
+      acc += h
+    }
+    const total = filtered.reduce((s, t) => s + (heights.get(t.id) ?? ESTIMATED_ROW_HEIGHT), 0)
+    let offsetTop = 0
+    for (let i = 0; i < start; i++) offsetTop += heights.get(filtered[i].id) ?? ESTIMATED_ROW_HEIGHT
+    let offsetBottom = 0
+    for (let i = end; i < filtered.length; i++) offsetBottom += heights.get(filtered[i].id) ?? ESTIMATED_ROW_HEIGHT
+    return { start, end, offsetTop, offsetBottom, total }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtualize, filtered, scrollTick])
 
   const topProjekty = (() => {
     const counts = new Map<string, number>()
@@ -189,6 +242,7 @@ export default function UkolyPage() {
   const pillBase: React.CSSProperties = {
     padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500,
     cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.15s', outline: 'none',
+    touchAction: 'manipulation',
   }
 
   return (
@@ -199,7 +253,7 @@ export default function UkolyPage() {
           <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Úkoly</h1>
           <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>{openCount} otevřených</span>
         </div>
-        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)', touchAction: 'manipulation' }}>
           <Plus size={16} /> Přidat úkol
         </button>
       </div>
@@ -257,10 +311,10 @@ export default function UkolyPage() {
             value={projektSearch}
             onChange={e => setProjektSearch(e.target.value)}
             placeholder="Hledat projekt..."
-            style={{ ...inputStyle, padding: '7px 30px', fontSize: 13, borderRadius: 20 }}
+            style={{ ...inputStyle, padding: '7px 30px', fontSize: 13, borderRadius: 20, touchAction: 'manipulation' }}
           />
           {projektSearch && (
-            <button onClick={() => setProjektSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, display: 'flex' }}>
+            <button onClick={() => setProjektSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, display: 'flex', touchAction: 'manipulation' }}>
               <X size={14} />
             </button>
           )}
@@ -294,70 +348,26 @@ export default function UkolyPage() {
       ) : filtered.length === 0 ? (
         <div style={{ color: 'var(--muted)', padding: 32, textAlign: 'center', background: 'var(--card)', borderRadius: 14, border: '1px solid var(--border)' }}>Žádné úkoly</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.flatMap((t, i) => {
+        <div ref={listContainerRef}>
+          {virtualize && virtualRange.offsetTop > 0 && <div style={{ height: virtualRange.offsetTop }} />}
+          {filtered.slice(virtualRange.start, virtualize ? virtualRange.end : filtered.length).map((t, idx) => {
+            const i = virtualRange.start + idx
             const isDivider = t.status === 'Done' && i > 0 && filtered[i - 1].status !== 'Done'
-            const isOverdue = t.status !== 'Done' && t.deadline && new Date(t.deadline) < new Date(new Date().toDateString())
-            const card = <div key={t.id}
-              onMouseEnter={() => setHoveredId(t.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{
-                background: isOverdue ? '#fff5f5' : 'var(--card)',
-                border: `1px solid ${isOverdue ? '#fca5a5' : 'var(--border)'}`,
-                borderRadius: 12,
-                display: 'flex',
-                overflow: 'hidden',
-                boxShadow: hoveredId === t.id ? '0 8px 24px rgba(0,0,0,0.14)' : '0 2px 8px rgba(0,0,0,0.06)',
-                transform: hoveredId === t.id ? 'translateY(-2px)' : 'translateY(0)',
-                transition: 'box-shadow 0.18s, transform 0.18s',
-              }}
-            >
-              {/* Priority border */}
-              <div style={{ width: 5, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityBorder[t.priorita], flexShrink: 0 }} />
-
-              {/* Content + actions */}
-              <div style={{ flex: 1, padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Row 1: checkbox + title + action buttons */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, minWidth: 0 }}>
-                    <input type="checkbox" checked={t.status === 'Done'} onChange={() => toggleTask(t)}
-                      style={{ width: 15, height: 15, marginTop: 3, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
-                    <div style={{ fontSize: 15, fontWeight: 600, color: t.status === 'Done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'Done' ? 'line-through' : 'none', lineHeight: 1.3 }}>{t.nazev}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => openEdit(t)} style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center' }}>
-                      <Pencil size={13} />
-                    </button>
-                    <button onClick={() => deleteTask(t.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center' }}>
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-                {/* Row 2: meta */}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: priorityDot[t.priorita], flexShrink: 0, display: 'inline-block' }} />
-                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{t.priorita}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusConfig[t.status].dot, flexShrink: 0, display: 'inline-block' }} />
-                    <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
-                  </div>
-                  {t.deadline && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
-                      <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}
-                    </span>
-                  )}
-                  {t.projekt && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)' }}>
-                      <Folder size={11} /> {t.projekt}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            return isDivider ? [<div key={`div-${t.id}`} style={{ borderTop: '1px solid var(--muted)', margin: '8px 0', opacity: 0.5 }} />, card] : [card]
+            return (
+              <TaskRow
+                key={t.id}
+                task={t}
+                expanded={expandedId === t.id}
+                showDivider={isDivider}
+                onToggleDone={toggleTask}
+                onToggleExpand={toggleExpand}
+                onEdit={openEdit}
+                onDelete={deleteTask}
+                rowRef={virtualize ? measureRow(t.id) : undefined}
+              />
+            )
           })}
+          {virtualize && virtualRange.offsetBottom > 0 && <div style={{ height: virtualRange.offsetBottom }} />}
         </div>
       )}
 
@@ -416,6 +426,13 @@ export default function UkolyPage() {
           </div>
         </div>
       </Modal>
+
+      <style>{`
+        @media (hover: hover) {
+          .task-row:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.14); transform: translateY(-2px); }
+        }
+        .task-row { box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: box-shadow 0.18s, transform 0.18s; }
+      `}</style>
     </div>
   )
 }
