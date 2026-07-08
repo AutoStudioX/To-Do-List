@@ -34,7 +34,7 @@ interface SpeechRecognitionEvent {
   results: { length: number; [index: number]: SpeechRecognitionResult }
 }
 
-type VoiceAction = { action: string; data: Record<string, unknown> }
+type ToolCall = { id: string; name: string; input: Record<string, unknown> }
 
 const SILENCE_TIMEOUT_MS = 5000
 const SILENCE_CHECK_INTERVAL_MS = 250
@@ -54,42 +54,39 @@ function isTaskNameValid(nazev: unknown): boolean {
   return true
 }
 
-function validateAction(a: VoiceAction): string | null {
-  const d = a.data || {}
-  if (a.action === 'add_ukol') {
+// Only add_task gets the strict false-positive validation; the others just need their required fields.
+function validateToolCall(t: ToolCall): string | null {
+  const d = t.input || {}
+  if (t.name === 'add_task') {
     if (!isTaskNameValid(d.nazev)) return `Neplatný název úkolu: "${d.nazev ?? ''}"`
     if (d.priorita !== undefined && d.priorita !== null && !['High', 'Medium', 'Low'].includes(d.priorita as string)) {
       return `Neplatná priorita: "${d.priorita}"`
     }
+  } else if (t.name === 'add_income') {
+    if (!d.klient || !d.castka) return 'Chybí klient nebo částka u příjmu'
+  } else if (t.name === 'add_expense') {
+    if (!d.nazev || !d.castka) return 'Chybí název nebo částka u výdaje'
+  } else if (t.name === 'add_goal') {
+    if (!d.nazev) return 'Chybí název cíle'
   }
   return null
 }
 
-function describeAction(a: VoiceAction): string {
-  const d = a.data || {}
-  switch (a.action) {
-    case 'add_ukol':
+function describeToolCall(t: ToolCall): string {
+  const d = t.input || {}
+  switch (t.name) {
+    case 'add_task':
       return `Přidat úkol: "${d.nazev}", priorita ${d.priorita || 'Medium'}${d.deadline ? `, deadline ${d.deadline}` : ''}${d.projekt ? `, projekt ${d.projekt}` : ''}`
-    case 'add_prijem':
-      return `Přidat příjem: ${d.klient || d.nazev} — ${d.castka} Kč`
-    case 'add_vydaj':
-      return `Přidat výdaj: ${d.nazev} — ${d.castka} Kč`
-    case 'add_dluh':
-      return `Přidat dluh: ${d.komu_kdo} — ${d.castka} Kč (${d.smer === 'moje' ? 'dlužím já' : 'dluží mi'})`
-    case 'add_fixni':
-      return `Přidat fixní náklad: ${d.nazev} — ${d.castka} Kč`
+    case 'add_income':
+      return `Přidat příjem: ${d.klient} — ${d.castka} Kč${d.typ === 'mesicni' ? ' (měsíční)' : ''}`
+    case 'add_expense':
+      return `Přidat výdaj: ${d.nazev} — ${d.castka} Kč${d.kategorie ? ` (${d.kategorie})` : ''}`
     case 'add_goal':
-      return `Přidat goal: "${d.nazev}"${d.deadline ? `, deadline ${d.deadline}` : ''}`
-    case 'update_ukol':
-      return `Upravit úkol${d.status ? ` → status ${d.status}` : ''}${d.priorita ? `, priorita ${d.priorita}` : ''}${d.nazev ? `, název "${d.nazev}"` : ''}`
-    case 'update_goal':
-      return `Upravit goal${d.progress !== undefined ? ` → progress ${d.progress}%` : ''}${d.status ? `, status ${d.status}` : ''}`
-    case 'delete_transakce':
-      return 'Smazat transakci'
-    case 'delete_vydaje_month':
-      return `Smazat výdaje za ${d.month}/${d.year}`
+      return `Přidat cíl: "${d.nazev}"${d.deadline ? `, deadline ${d.deadline}` : ''}${d.target_value ? `, cíl ${d.target_value}` : ''}`
+    case 'get_summary':
+      return 'Zobrazit přehled'
     default:
-      return a.action
+      return t.name
   }
 }
 
@@ -98,7 +95,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const [transcript, setTranscript] = useState('')
   const [interim, setInterim] = useState('')
   const [response, setResponse] = useState('')
-  const [pendingActions, setPendingActions] = useState<VoiceAction[] | null>(null)
+  const [pendingCalls, setPendingCalls] = useState<ToolCall[] | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const finalTranscriptRef = useRef('')
@@ -152,152 +149,112 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     }
   }
 
-  async function writeToSupabase(action: string, data: Record<string, unknown>, userId: string): Promise<string | null> {
+  // Executes one of the 5 agent tools against Supabase. get_summary is handled separately (read-only, client-side).
+  async function executeTool(t: ToolCall, userId: string): Promise<string | null> {
     const supabase = createClient()
-    if (action === 'add_ukol') {
-      if (!data.nazev) return 'Chybí název úkolu'
+    const d = t.input || {}
+    if (t.name === 'add_task') {
       const { error } = await supabase.from('ukoly').insert({
         user_id: userId,
-        nazev: data.nazev,
-        priorita: data.priorita || 'Medium',
-        deadline: data.deadline || null,
-        projekt: data.projekt || null,
+        nazev: d.nazev,
+        priorita: d.priorita || 'Medium',
+        deadline: d.deadline || null,
+        projekt: d.projekt || null,
         status: 'Todo',
       })
       if (error) return error.message
-    } else if (action === 'add_prijem') {
-      const nazev = data.klient || data.nazev
-      if (!nazev || !data.castka) return 'Chybí klient nebo částka'
+    } else if (t.name === 'add_income') {
       const { error } = await supabase.from('transakce').insert({
         user_id: userId,
-        nazev,
-        klient: nazev,
-        castka: data.castka,
-        datum: data.datum || todayISO(),
+        nazev: d.klient,
+        klient: d.klient,
+        castka: d.castka,
+        datum: d.datum || todayISO(),
         typ: 'prijem',
-        opakovani: data.opakovani || 'jednorazovy',
-        status: data.status || 'ceka',
+        opakovani: d.typ || 'jednorazovy',
+        status: 'ceka',
       })
       if (error) return error.message
-    } else if (action === 'add_vydaj') {
-      if (!data.nazev || !data.castka) return 'Chybí název nebo částka'
+    } else if (t.name === 'add_expense') {
       const { error } = await supabase.from('transakce').insert({
         user_id: userId,
-        nazev: data.nazev,
-        castka: data.castka,
-        datum: data.datum || todayISO(),
+        nazev: d.nazev,
+        castka: d.castka,
+        datum: d.datum || todayISO(),
         typ: 'vydaj',
-        kategorie: data.kategorie || 'Ostatní',
+        kategorie: d.kategorie || 'Ostatní',
         opakovani: 'jednorazovy',
       })
       if (error) return error.message
-    } else if (action === 'add_goal') {
-      if (!data.nazev) return 'Chybí název goalu'
+    } else if (t.name === 'add_goal') {
       const { error } = await supabase.from('goaly').insert({
         user_id: userId,
-        nazev: data.nazev,
-        deadline: data.deadline || null,
-        popis: data.popis || null,
+        nazev: d.nazev,
+        deadline: d.deadline || null,
+        popis: null,
         progress: 0,
         status: 'active',
-        typ: 'manual',
+        typ: d.target_value ? 'number' : 'manual',
+        target_value: d.target_value || null,
+        current_value: d.target_value ? 0 : null,
       })
-      if (error) return error.message
-    } else if (action === 'delete_transakce') {
-      if (!data.id) return 'Nenašel jsem transakci ke smazání'
-      const { error } = await supabase.from('transakce').delete().eq('id', data.id)
-      if (error) return error.message
-    } else if (action === 'delete_vydaje_month') {
-      const year = data.year || new Date().getFullYear()
-      const month = Number(data.month || (new Date().getMonth() + 1))
-      const from = `${year}-${String(month).padStart(2, '0')}-01`
-      const lastDay = new Date(Number(year), month, 0).getDate()
-      const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
-      const { error } = await supabase.from('transakce').delete()
-        .eq('user_id', userId).eq('typ', 'vydaj')
-        .gte('datum', from).lte('datum', to)
-      if (error) return error.message
-    } else if (action === 'update_ukol') {
-      if (!data.id) return 'Nenašel jsem úkol k aktualizaci'
-      const updates: Record<string, unknown> = {}
-      if (data.status) updates.status = data.status
-      if (data.priorita) updates.priorita = data.priorita
-      if (data.deadline !== undefined) updates.deadline = data.deadline
-      if (data.nazev) updates.nazev = data.nazev
-      if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
-      const { error } = await supabase.from('ukoly').update(updates).eq('id', data.id)
-      if (error) return error.message
-    } else if (action === 'add_fixni') {
-      if (!data.nazev || !data.castka) return 'Chybí název nebo částka'
-      const { error } = await supabase.from('transakce').insert({
-        user_id: userId,
-        nazev: data.nazev,
-        castka: data.castka,
-        typ: 'fixni_naklad',
-        opakovani: data.opakovani || 'mesicni',
-        datum: todayISO(),
-      })
-      if (error) return error.message
-    } else if (action === 'add_dluh') {
-      if (!data.komu_kdo || !data.castka) return 'Chybí jméno nebo částka'
-      const { error } = await supabase.from('transakce').insert({
-        user_id: userId,
-        nazev: data.komu_kdo,
-        castka: data.castka,
-        datum: data.datum || todayISO(),
-        typ: 'dluh',
-        smer: data.smer || 'mne',
-        status: 'nesplaceno',
-        opakovani: 'jednorazovy',
-        poznamka: data.popis || null,
-      })
-      if (error) return error.message
-    } else if (action === 'update_goal') {
-      if (!data.id) return 'Nenašel jsem goal k aktualizaci'
-      const updates: Record<string, unknown> = {}
-      if (data.progress !== undefined) updates.progress = Math.min(100, Math.max(0, Number(data.progress)))
-      if (data.status) updates.status = data.status
-      if (data.nazev) updates.nazev = data.nazev
-      if (data.deadline !== undefined) updates.deadline = data.deadline
-      if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
-      const { error } = await supabase.from('goaly').update(updates).eq('id', data.id)
       if (error) return error.message
     }
     return null
   }
 
+  async function fetchSummary(userId: string): Promise<string> {
+    const supabase = createClient()
+    const [{ data: ukoly }, { data: transakce }, { data: goaly }] = await Promise.all([
+      supabase.from('ukoly').select('status').eq('user_id', userId),
+      supabase.from('transakce').select('castka, typ').eq('user_id', userId),
+      supabase.from('goaly').select('nazev, progress, status').eq('user_id', userId),
+    ])
+    const openTasks = (ukoly || []).filter((t: { status: string }) => t.status !== 'Done').length
+    const totalIncome = (transakce || [])
+      .filter((t: { typ: string }) => t.typ === 'prijem')
+      .reduce((s: number, t: { castka: number }) => s + Number(t.castka || 0), 0)
+    const activeGoals = (goaly || []).filter((g: { status: string }) => g.status === 'active')
+    const goalsText = activeGoals.length > 0
+      ? activeGoals.map((g: { nazev: string; progress: number }) => `${g.nazev} (${g.progress}%)`).join(', ')
+      : 'žádné aktivní cíle'
+    return `Otevřených úkolů: ${openTasks}. Celkové příjmy: ${totalIncome.toLocaleString('cs-CZ')} Kč. Cíle: ${goalsText}.`
+  }
+
   async function processTranscript(text: string) {
     setStatus('thinking')
     try {
-      const supabaseCtx = createClient()
-      const { data: { session: s } } = await supabaseCtx.auth.getSession()
-      let context = {}
-      if (s?.user) {
-        const [{ data: ukoly }, { data: transakce }, { data: goaly }] = await Promise.all([
-          supabaseCtx.from('ukoly').select('id, nazev, status, priorita').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(100),
-          supabaseCtx.from('transakce').select('id, nazev, klient, castka, typ, datum').eq('user_id', s.user.id).order('created_at', { ascending: false }).limit(50),
-          supabaseCtx.from('goaly').select('id, nazev, progress, status').eq('user_id', s.user.id).eq('status', 'active'),
-        ])
-        context = { ukoly: ukoly || [], transakce: transakce || [], goaly: goaly || [] }
-      }
-
       const res = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, context }),
+        body: JSON.stringify({ text }),
       })
       const json = await res.json()
-      const actions: VoiceAction[] = json.actions || []
-      const realActions = actions.filter(a => a.action !== 'unknown')
+      const toolCalls: ToolCall[] = json.toolCalls || []
 
-      if (realActions.length === 0) {
+      if (toolCalls.length === 0) {
         setResponse(json.response || 'Nerozuměl jsem.')
         setPanelOpen(true)
         setStatus('idle')
         return
       }
 
-      const validationErrors = realActions.map(validateAction).filter((e): e is string => !!e)
+      // get_summary is read-only — answer immediately, no confirmation needed
+      const summaryCalls = toolCalls.filter(t => t.name === 'get_summary')
+      const mutatingCalls = toolCalls.filter(t => t.name !== 'get_summary')
+
+      if (summaryCalls.length > 0 && mutatingCalls.length === 0) {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) { setResponse('Nejsi přihlášen.'); setStatus('error'); setPanelOpen(true); return }
+        const summary = await fetchSummary(session.user.id)
+        setResponse(summary)
+        setPanelOpen(true)
+        setStatus('idle')
+        return
+      }
+
+      const validationErrors = mutatingCalls.map(validateToolCall).filter((e): e is string => !!e)
       if (validationErrors.length > 0) {
         setResponse('Neplatný příkaz — nic jsem nevytvořil: ' + validationErrors.join(', '))
         setPanelOpen(true)
@@ -305,7 +262,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         return
       }
 
-      setPendingActions(realActions)
+      setPendingCalls(mutatingCalls)
       setResponse(json.response || '')
       setPanelOpen(true)
       setStatus('confirm')
@@ -317,24 +274,26 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   async function confirmActions() {
-    if (!pendingActions) return
+    if (!pendingCalls) return
     setStatus('saving')
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) {
-      setPendingActions(null)
+      setPendingCalls(null)
       setStatus('error')
       setResponse('Nejsi přihlášen.')
       return
     }
     const errors: string[] = []
-    for (const a of pendingActions) {
-      const err = await writeToSupabase(a.action, a.data, session.user.id)
+    const added: string[] = []
+    for (const t of pendingCalls) {
+      const err = await executeTool(t, session.user.id)
       if (err) errors.push(err)
+      else added.push(describeToolCall(t))
     }
 
     // Full reset — each voice command is independent, no leftover state for next one
-    setPendingActions(null)
+    setPendingCalls(null)
     setTranscript('')
     setInterim('')
     finalTranscriptRef.current = ''
@@ -345,14 +304,14 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       return
     }
 
-    setResponse('Hotovo.')
+    setResponse('Přidáno: ' + added.join('; '))
     setStatus('idle')
     onSuccess?.()
     window.dispatchEvent(new CustomEvent('voice-data-changed'))
   }
 
   function cancelActions() {
-    setPendingActions(null)
+    setPendingCalls(null)
     setTranscript('')
     setInterim('')
     setResponse('')
@@ -378,7 +337,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     setTranscript('')
     setInterim('')
     setResponse('')
-    setPendingActions(null)
+    setPendingCalls(null)
     finalTranscriptRef.current = ''
 
     const recognition = new SpeechRecognition()
@@ -494,12 +453,12 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                 </div>
               )}
               {/* Confirm step */}
-              {status === 'confirm' && pendingActions && (
+              {status === 'confirm' && pendingCalls && (
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Chceš provést:</div>
-                  {pendingActions.map((a, i) => (
+                  {pendingCalls.map((t, i) => (
                     <div key={i} style={{ fontSize: 12.5, color: 'var(--text)', marginBottom: 4, wordBreak: 'break-word' }}>
-                      • {describeAction(a)}
+                      • {describeToolCall(t)}
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -512,7 +471,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                   </div>
                 </div>
               )}
-              {/* Response from AI (after save, or unknown/error) */}
+              {/* Response text (get_summary answer, save confirmation, or unknown/error) */}
               {status !== 'confirm' && response && (
                 <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>
                   {response}

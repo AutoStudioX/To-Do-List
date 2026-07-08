@@ -3,90 +3,97 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+const SYSTEM_PROMPT = 'Jsi osobní asistent. Parsuj hlasové příkazy a zavolej správný nástroj. Vždy odpovídej v češtině.'
+
 const today = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+const tools: Anthropic.Tool[] = [
+  {
+    name: 'add_task',
+    description: 'Přidá nový úkol do seznamu úkolů uživatele (tabulka ukoly). Použij jen pokud uživatel jasně popisuje konkrétní, smysluplný úkol — ne obecné fráze.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        nazev: { type: 'string', description: 'Konkrétní název úkolu, celá smysluplná fráze (ne jen "úkol" nebo "priorita")' },
+        priorita: { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Priorita úkolu, pokud není řečena použij Medium' },
+        deadline: { type: ['string', 'null'], description: 'Termín ve formátu YYYY-MM-DD, nebo null pokud nezadán' },
+        projekt: { type: ['string', 'null'], description: 'Název projektu, nebo null' },
+      },
+      required: ['nazev'],
+    },
+  },
+  {
+    name: 'add_income',
+    description: 'Přidá příjem (transakci typu příjem) uživatele.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        castka: { type: 'number', description: 'Částka v Kč' },
+        klient: { type: 'string', description: 'Jméno klienta nebo zdroj příjmu' },
+        datum: { type: ['string', 'null'], description: 'Datum YYYY-MM-DD, nebo null pro dnešní datum' },
+        typ: { type: 'string', enum: ['jednorazovy', 'mesicni'], description: 'Typ příjmu, pokud není řečeno použij jednorazovy' },
+      },
+      required: ['castka', 'klient'],
+    },
+  },
+  {
+    name: 'add_expense',
+    description: 'Přidá výdaj (transakci typu výdaj) uživatele.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        castka: { type: 'number', description: 'Částka v Kč' },
+        nazev: { type: 'string', description: 'Název / popis výdaje' },
+        datum: { type: ['string', 'null'], description: 'Datum YYYY-MM-DD, nebo null pro dnešní datum' },
+        kategorie: { type: ['string', 'null'], description: 'Kategorie výdaje, nebo null pro "Ostatní"' },
+      },
+      required: ['castka', 'nazev'],
+    },
+  },
+  {
+    name: 'add_goal',
+    description: 'Přidá nový cíl (goal) uživatele.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        nazev: { type: 'string', description: 'Název cíle' },
+        deadline: { type: ['string', 'null'], description: 'Termín YYYY-MM-DD, nebo null' },
+        target_value: { type: ['number', 'null'], description: 'Cílová číselná hodnota (např. částka), nebo null pro čistě manuální cíl bez čísla' },
+      },
+      required: ['nazev'],
+    },
+  },
+  {
+    name: 'get_summary',
+    description: 'Vrátí aktuální přehled uživatele: počet otevřených úkolů, celkové příjmy, progress cílů. Použij při dotazech typu "jak na tom jsem", "shrň mi to", "kolik mám otevřených úkolů".',
+    input_schema: { type: 'object', properties: {} },
+  },
+]
+
 export async function POST(req: NextRequest) {
-  const { text, context } = await req.json()
+  const { text } = await req.json()
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
-  const contextBlock = context ? `
-Existující úkoly uživatele (pro úpravy):
-${JSON.stringify(context.ukoly || [], null, 2)}
-
-Existující goaly uživatele (pro aktualizaci progressu):
-${JSON.stringify(context.goaly || [], null, 2)}
-
-Existující transakce uživatele (pro mazání — posledních 50):
-${JSON.stringify(context.transakce || [], null, 2)}
-` : ''
-
-  const prompt = `Jsi asistent pro osobní produktivitu. Uživatel ti řekl: "${text}"
-
-Dnešní datum: ${today()}
-${contextBlock}
-
-Analyzuj příkaz. Může obsahovat VÍCE akcí najednou. Vrať JSON (bez markdown) v tomto formátu:
-{
-  "actions": [
-    { "action": "...", "data": { ... } },
-    ...
-  ],
-  "response": "Krátká česká potvrzovací zpráva co vše jsi udělal"
-}
-
-Možné akce:
-- add_ukol: { nazev, priorita ("High"|"Medium"|"Low"), deadline (YYYY-MM-DD nebo null), projekt (nebo null) }
-- add_prijem: { klient, castka (číslo), datum (YYYY-MM-DD), opakovani ("jednorazovy"|"mesicni"), status ("ceka"|"zaplaceno") }
-- add_vydaj: { nazev, castka (číslo), datum (YYYY-MM-DD), kategorie (nebo "Ostatní") }
-- add_goal: { nazev, deadline (YYYY-MM-DD nebo null), popis (nebo null) }
-- add_dluh: { komu_kdo, castka (číslo), smer ("moje"=já dlužím | "mne"=dluží mi), datum (YYYY-MM-DD), popis (nebo null) }
-- add_fixni: { nazev, castka (číslo), opakovani ("mesicni"|"rocni") }
-- update_ukol: { id (UUID z kontextu), status ("Done"|"In Progress"|"Todo"|null), priorita (nebo null), deadline (nebo null) }
-- update_goal: { id (UUID z kontextu goalů — najdi nejpodobnější název), progress (0-100, číslo), status ("active"|"completed"|null) }
-- delete_transakce: { id (UUID z kontextu transakcí — vyber nejpodobnější název/klienta) }
-- delete_vydaje_month: { year: YYYY, month: MM }
-- unknown: { reason: "proč nevím" }
-
-PRAVIDLA:
-- "smaž úkol X" nebo "hotovo X" → update_ukol status Done (nikdy nemaž)
-- Nikdy neprováděj hromadné mazání bez filtru (měsíc/rok/jméno)
-- "nastav progress goalu X na 50" nebo "goal X je na 50 procentech" → update_goal s progress: 50
-- "dokončil jsem goal X" nebo "goal X je hotový" → update_goal s status: "completed"
-- Slova jako "změn", "uprav", "nastav", "dej zpátky", "přesuň" → VŽDY update_ukol nebo update_goal, NIKDY add_ukol nebo add_goal
-- Pokud si nejsi 100% jistý který konkrétní úkol/goal uživatel myslí → vrať unknown, NESNAŽ SE HÁDAT ani vybírat nejpodobnější
-- Pokud část příkazu nerozumíš nebo si nejsi jistý → vrať unknown s důvodem, NEDĚLEJ nic navíc
-- add_ukol.nazev NESMÍ být obecná fráze ("nový úkol", "úkol", "priorita") ani fragment kratší než 3 slova — pokud přepis obsahuje jen takový fragment (např. útržek řeči zachycený rozpoznávačem), vrať unknown místo add_ukol
-- add_ukol.priorita musí být přesně "High", "Medium" nebo "Low" (nebo vynechaná pole → default Medium), nikdy jiná hodnota
-- Každý požadavek zpracuj nezávisle na základě aktuálního přepisu a poskytnutého kontextu — nedomýšlej si nic, co v přepisu není
-
-Příklady:
-- "přidej příjem od Honzy 5000 a úkol zavolat mu" → 2 akce: add_prijem + add_ukol
-- "přidej výdaj za oběd 200 a dluh od Petra 1000" → 2 akce: add_vydaj + add_dluh
-- "hotovo zavolat klientovi a přidej úkol poslat fakturu" → update_ukol Done + add_ukol
-- "smaž příjem od Honzy" nebo "odstraň transakci Netflix" → delete_transakce (najdi nejpodobnější v kontextu transakcí)
-- "goal naučit se španělsky je na 30 procentech" → update_goal progress: 30
-
-Vrať pouze JSON, žádný jiný text.`
-
   const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
+    system: SYSTEM_PROMPT,
+    tools,
+    messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
   })
 
-  const raw = (message.content[0] as { type: string; text: string }).text.trim()
-    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-  try {
-    const parsed = JSON.parse(raw)
-    // Support both old single-action format and new multi-action format
-    if (!parsed.actions && parsed.action) {
-      parsed.actions = [{ action: parsed.action, data: parsed.data }]
-    }
-    return NextResponse.json(parsed)
-  } catch {
-    return NextResponse.json({ actions: [{ action: 'unknown', data: {} }], response: `Nerozuměl jsem: ${raw.slice(0, 100)}` })
-  }
+  const toolCalls = message.content
+    .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+    .map(b => ({ id: b.id, name: b.name, input: b.input as Record<string, unknown> }))
+
+  const text_ = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join(' ')
+    .trim()
+
+  return NextResponse.json({ toolCalls, response: text_ })
 }
