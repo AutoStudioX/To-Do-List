@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Task, Goal, Transaction } from '@/lib/types'
+import { Task, Goal, Transaction, Projekt } from '@/lib/types'
 import Modal from '@/components/Modal'
 import Select from '@/components/Select'
 import { Toast, useToast } from '@/components/Toast'
@@ -22,6 +22,9 @@ export default function PrehledPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [projekty, setProjekty] = useState<Projekt[]>([])
+  const [addingProjekt, setAddingProjekt] = useState(false)
+  const [newProjektName, setNewProjektName] = useState('')
   const [menu, setMenu] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -47,15 +50,36 @@ export default function PrehledPage() {
       if (!user) return
       setUserEmail(user.email ?? null)
       await seedRecurring(supabase, user.id)
-      const [tr, gr, txr] = await Promise.all([
+      const [tr, gr, txr, pr] = await Promise.all([
         supabase.from('ukoly').select('*').eq('user_id', user.id),
         supabase.from('goaly').select('*').eq('user_id', user.id),
         supabase.from('transakce').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('projekty').select('*').eq('user_id', user.id).order('nazev', { ascending: true }),
       ])
       setTasks(tr.data || [])
       setGoals(gr.data || [])
       setTransactions(txr.data || [])
+      setProjekty(pr.data || [])
     } catch { }
+  }
+
+  async function addProjekt() {
+    const nazev = newProjektName.trim()
+    if (!nazev) return
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) return
+    if (projekty.some(p => p.nazev.toLowerCase() === nazev.toLowerCase())) {
+      setTaskForm(f => ({ ...f, projekt: projekty.find(p => p.nazev.toLowerCase() === nazev.toLowerCase())!.nazev }))
+      setNewProjektName(''); setAddingProjekt(false)
+      return
+    }
+    const { data, error } = await supabase.from('projekty').insert({ user_id: user.id, nazev }).select().single()
+    if (error) { showToast('Chyba: ' + error.message); return }
+    setProjekty(prev => [...prev, data].sort((a, b) => a.nazev.localeCompare(b.nazev)))
+    setTaskForm(f => ({ ...f, projekt: data.nazev }))
+    setNewProjektName(''); setAddingProjekt(false)
   }
 
   useEffect(() => {
@@ -471,7 +495,7 @@ export default function PrehledPage() {
       </Modal>
 
       {/* Task modal */}
-      <Modal isOpen={addModal === 'ukol'} onClose={() => { setAddModal(null); setFormErrors({}) }} title="Nový úkol">
+      <Modal isOpen={addModal === 'ukol'} onClose={() => { setAddModal(null); setFormErrors({}); setAddingProjekt(false); setNewProjektName('') }} title="Nový úkol">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Název</label>
@@ -485,7 +509,36 @@ export default function PrehledPage() {
           <div><label style={labelStyle}>Status</label>
             <Select value={taskForm.status} onChange={val => setTaskForm({ ...taskForm, status: val })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
           </div>
-          <div><label style={labelStyle}>Projekt</label><input style={inputStyle} value={taskForm.projekt} onChange={e => setTaskForm({ ...taskForm, projekt: e.target.value })} /></div>
+          <div>
+            <label style={labelStyle}>Projekt</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <Select
+                  value={taskForm.projekt || ''}
+                  onChange={val => setTaskForm({ ...taskForm, projekt: val })}
+                  options={[{ value: '', label: '(žádný)' }, ...projekty.map(p => ({ value: p.nazev, label: p.nazev }))]}
+                />
+              </div>
+              <button type="button" onClick={() => setAddingProjekt(a => !a)} style={{ background: 'var(--border)', border: 'none', borderRadius: 8, padding: '10px 12px', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Plus size={14} /> Přidat projekt
+              </button>
+            </div>
+            {addingProjekt && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input
+                  style={inputStyle}
+                  placeholder="Název nového projektu"
+                  value={newProjektName}
+                  onChange={e => setNewProjektName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProjekt() } }}
+                  autoFocus
+                />
+                <button type="button" onClick={addProjekt} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  Uložit
+                </button>
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
             <button onClick={saveTask} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
