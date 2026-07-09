@@ -80,6 +80,18 @@ export default function UkolyPage() {
           cleanProjekty = [...cleanProjekty, ...(inserted || [])]
         }
       }
+
+      // Prune: a project only exists as long as at least one task uses it.
+      // Any projekt row not referenced by a task gets deleted from the table.
+      const usedNames = new Set(
+        ((taskData || []) as Task[]).map(t => (t.projekt || '').toLowerCase()).filter(Boolean)
+      )
+      const orphanIds = cleanProjekty.filter(p => !usedNames.has(p.nazev.toLowerCase())).map(p => p.id)
+      if (orphanIds.length > 0) {
+        await supabase.from('projekty').delete().in('id', orphanIds)
+        cleanProjekty = cleanProjekty.filter(p => usedNames.has(p.nazev.toLowerCase()))
+      }
+
       setProjekty(cleanProjekty.sort((a, b) => a.nazev.localeCompare(b.nazev)))
     } catch { } finally { setLoading(false) }
   }, [])
