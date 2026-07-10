@@ -29,8 +29,8 @@ export default function PillGroup<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             style={{
-              flex: '1 1 auto',
-              minWidth: 'fit-content',
+              flex: '1 1 0',
+              minWidth: 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
