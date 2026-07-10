@@ -256,6 +256,10 @@ const tools: Anthropic.Tool[] = [
 ]
 
 export async function POST(req: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'Chybí ANTHROPIC_API_KEY na serveru.' }, { status: 500 })
+  }
+
   const { text } = await req.json()
   if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 })
 
@@ -264,13 +268,24 @@ export async function POST(req: NextRequest) {
   console.log(`[voice] routing categories=[${matchedCategories.join(',')}] tools=[${routedNames.join(',')}]`)
 
   const model = 'claude-haiku-4-5-20251001'
-  const message = await client.messages.create({
-    model,
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    tools: routedTools,
-    messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
-  })
+  let message: Anthropic.Message
+  try {
+    message = await client.messages.create({
+      model,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      tools: routedTools,
+      messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
+    })
+  } catch (e) {
+    // Surface the real reason (out of credits, rate limit, bad key, …) instead of a generic 500 HTML page.
+    const err = e as { status?: number; message?: string }
+    console.error(`[voice] Anthropic error status=${err.status} message=${err.message}`)
+    return NextResponse.json(
+      { error: `Chyba API (${err.status ?? '?'}): ${err.message ?? 'neznámá chyba'}` },
+      { status: 502 },
+    )
+  }
 
   const inputTokens = message.usage.input_tokens
   const outputTokens = message.usage.output_tokens

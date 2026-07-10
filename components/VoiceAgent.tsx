@@ -415,7 +415,13 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      const json = await res.json()
+      const json = await res.json().catch(() => ({ error: `Server vrátil ${res.status}` }))
+      if (!res.ok || json.error) {
+        setResponse('Chyba: ' + (json.error || `Server vrátil ${res.status}`))
+        setPanelOpen(true)
+        setStatus('error')
+        return
+      }
       const toolCalls: ToolCall[] = json.toolCalls || []
 
       if (json.usage) {
