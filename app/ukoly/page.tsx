@@ -24,7 +24,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
-const emptyForm = { nazev: '', priorita: 'Medium' as Task['priorita'], deadline: todayISO(), status: 'Todo' as Task['status'], projekt: '' }
+const emptyForm = { nazev: '', priorita: 'High' as Task['priorita'], deadline: todayISO(), status: 'Todo' as Task['status'], projekt: '' }
 
 export default function UkolyPage() {
   const [tasks, setTasks] = useState<Task[]>([])

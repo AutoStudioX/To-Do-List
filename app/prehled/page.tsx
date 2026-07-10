@@ -42,7 +42,7 @@ export default function PrehledPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { toast, showToast, hideToast } = useToast()
   const [txForm, setTxForm] = useState({ nazev: '', klient: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka', kategorie: '', opakovani: 'jednorazovy', smer: 'moje', poznamka: '' })
-  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'Medium', deadline: todayISO(), status: 'Todo', projekt: '' })
+  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'High', deadline: todayISO(), status: 'Todo', projekt: '' })
   const [goalForm, setGoalForm] = useState({ nazev: '', deadline: todayISO(), popis: '', typ: 'manual' as 'manual' | 'number' | 'income', progress: 0, current_value: '', target_value: '', status: 'active' as 'active' | 'completed' })
 
   async function load() {
@@ -140,7 +140,7 @@ export default function PrehledPage() {
     }).select().single()
     if (data) setTasks(prev => [data, ...prev])
     setSaving(false); setAddModal(null); setFormErrors({})
-    setTaskForm({ nazev: '', priorita: 'Medium', deadline: todayISO(), status: 'Todo', projekt: '' })
+    setTaskForm({ nazev: '', priorita: 'High', deadline: todayISO(), status: 'Todo', projekt: '' })
     showToast('Úkol přidán')
   }
 
