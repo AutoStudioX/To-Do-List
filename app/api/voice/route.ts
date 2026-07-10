@@ -17,7 +17,7 @@ Název úkolu (add_task) a název výdaje (add_expense) vždy začni velkým pí
 
 Pokud uživatel zmíní čas (v 8 hodin, na 9:30, v půl čtvrté), přidej tento čas do názvu úkolu ve formátu "v HH:MM" a nastav deadline na správné datum. Čas bez data = dnes, "zítra" = zítřejší datum. Česká zlomková vyjádření: "v půl čtvrté"=15:30, "ve čtvrt na devět"=08:15, "tři čtvrtě na devět"=08:45, "v osm ráno"=08:00, "v osm večer"=20:00.
 
-Pokud se rozhodneš akci provést, VŽDY zavolej odpovídající nástroj — nikdy nepiš, že je něco hotové nebo přidané, aniž bys zároveň zavolal nástroj. Text piš v přítomném čase ("Přidávám úkol..."), ne v minulém.`
+Pokud se rozhodneš akci provést, VŽDY zavolej odpovídající nástroj — nikdy nepiš, že je něco hotové nebo přidané, aniž bys zároveň zavolal nástroj. Když voláš nástroj, NEPIŠ žádný doprovodný text — jen zavolej nástroj (potvrzení zobrazí aplikace sama). Text napiš jen když nevoláš žádný nástroj (žádost o upřesnění).`
 
 const today = () => {
   const d = new Date()
@@ -272,9 +272,11 @@ export async function POST(req: NextRequest) {
   try {
     message = await client.messages.create({
       model,
-      max_tokens: 1024,
+      max_tokens: 512,
       system: SYSTEM_PROMPT,
       tools: routedTools,
+      // One tool per command — no parallel deliberation, fewer output tokens, lower latency.
+      tool_choice: { type: 'auto', disable_parallel_tool_use: true },
       messages: [{ role: 'user', content: `Dnešní datum: ${today()}\n\nUživatel řekl: "${text}"` }],
     })
   } catch (e) {
