@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
 import PillGroup from '@/components/PillGroup'
+import { txTypColors, txStatusColors, smerColors, opakovaniColors } from '@/lib/badgeColors'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -372,7 +373,7 @@ export default function FinancePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!editTx && activeTab === 'vse' && (
             <div><label style={labelStyle}>Typ</label>
-              <PillGroup value={form.typ} onChange={val => { const typ = val as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'dluh', label: 'Dluh' }, { value: 'fixni_naklad', label: 'Fixní náklad' }]} />
+              <PillGroup value={form.typ} onChange={val => { const typ = val as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem', color: txTypColors.prijem }, { value: 'vydaj', label: 'Výdaj', color: txTypColors.vydaj }, { value: 'dluh', label: 'Dluh', color: txTypColors.dluh }, { value: 'fixni_naklad', label: 'Fixní náklad', color: txTypColors.fixni_naklad }]} />
             </div>
           )}
 
@@ -411,28 +412,28 @@ export default function FinancePage() {
 
           {(form.typ === 'prijem' || form.typ === 'vydaj') && (
             <div><label style={labelStyle}>Opakování</label>
-              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový', color: opakovaniColors.jednorazovy }, { value: 'mesicni', label: 'Měsíční', color: opakovaniColors.mesicni }, { value: 'rocni', label: 'Roční', color: opakovaniColors.rocni }]} />
             </div>
           )}
           {form.typ === 'fixni_naklad' && (
             <div><label style={labelStyle}>Opakování</label>
-              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'mesicni', label: 'Měsíční', color: opakovaniColors.mesicni }, { value: 'rocni', label: 'Roční', color: opakovaniColors.rocni }]} />
             </div>
           )}
 
           {form.typ === 'prijem' && (
             <div><label style={labelStyle}>Status</label>
-              <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
+              <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno', color: txStatusColors.zaplaceno }, { value: 'ceka', label: 'Čeká', color: txStatusColors.ceka }, { value: 'dluh', label: 'Dluh (dluží mi)', color: txStatusColors.dluh }]} />
             </div>
           )}
 
           {form.typ === 'dluh' && (
             <>
               <div><label style={labelStyle}>Typ dluhu</label>
-                <PillGroup value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dlužím já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
+                <PillGroup value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dlužím já (komu)', color: smerColors.moje }, { value: 'mne', label: 'Dluží mi (kdo)', color: smerColors.mne }]} />
               </div>
               <div><label style={labelStyle}>Status</label>
-                <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
+                <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno', color: txStatusColors.nesplaceno }, { value: 'splaceno', label: 'Splaceno', color: txStatusColors.splaceno }]} />
               </div>
             </>
           )}

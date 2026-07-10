@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Goal, Milestone, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
 import PillGroup from '@/components/PillGroup'
+import { goalStatusColors } from '@/lib/badgeColors'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -327,7 +328,7 @@ export default function GoalyPage() {
 
           <div>
             <label style={labelStyle}>Status</label>
-            <PillGroup value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
+            <PillGroup value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val })} options={[{ value: 'active', label: 'Aktivní', color: goalStatusColors.active }, { value: 'completed', label: 'Splněno', color: goalStatusColors.completed }]} />
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
