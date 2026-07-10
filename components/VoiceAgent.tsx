@@ -19,7 +19,7 @@ interface SpeechRecognitionInstance {
   continuous: boolean
   onstart: (() => void) | null
   onresult: ((e: SpeechRecognitionEvent) => void) | null
-  onerror: (() => void) | null
+  onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
   start: () => void
   stop: () => void
@@ -39,6 +39,11 @@ type ToolCall = { id: string; name: string; input: Record<string, unknown> }
 const SILENCE_TIMEOUT_MS = 2000
 const SILENCE_CHECK_INTERVAL_MS = 250
 const SILENCE_RMS_THRESHOLD = 0.02
+
+// Mobile browsers can't hold getUserMedia (our silence watcher) at the same time as
+// SpeechRecognition without the recognition erroring out, and they don't support
+// continuous recognition well. Detect mobile and use a simpler single-utterance flow there.
+const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
 const GENERIC_TASK_NAMES = new Set([
   'nový úkol', 'novy ukol', 'úkol', 'ukol', 'priorita', 'priority', 'task', 'todo', 'new task', 'novy task',
@@ -542,14 +547,17 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
     recognition.lang = 'cs-CZ'
     recognition.interimResults = true
     recognition.maxAlternatives = 1
-    recognition.continuous = true
+    // Mobile handles single-utterance far more reliably than continuous mode.
+    recognition.continuous = !isMobile
     recognitionRef.current = recognition
 
     recognition.onstart = () => {
       setStatus('listening')
       setPanelOpen(true)
       lastSoundAtRef.current = Date.now()
-      startSilenceWatch(() => { recognitionRef.current?.stop() })
+      // The getUserMedia silence watcher conflicts with recognition's own mic on mobile.
+      // Desktop uses it for the 2s-silence auto-stop; mobile ends on its own after a pause.
+      if (!isMobile) startSilenceWatch(() => { recognitionRef.current?.stop() })
     }
 
     recognition.onresult = (e) => {
@@ -564,10 +572,22 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       lastSoundAtRef.current = Date.now()
     }
 
-    recognition.onerror = () => {
+    recognition.onerror = (e) => {
       stopSilenceWatch()
+      const code = e?.error || ''
+      // no-speech / aborted are normal (user paused or stopped) — just go idle, no scary error.
+      if (code === 'no-speech' || code === 'aborted') {
+        setStatus('idle')
+        return
+      }
+      const messages: Record<string, string> = {
+        'not-allowed': 'Přístup k mikrofonu byl zamítnut. Povol ho v nastavení prohlížeče.',
+        'service-not-allowed': 'Přístup k mikrofonu byl zamítnut. Povol ho v nastavení prohlížeče.',
+        'audio-capture': 'Mikrofon není dostupný.',
+        'network': 'Chyba sítě při rozpoznávání. Zkus to znovu.',
+      }
       setStatus('error')
-      setResponse('Chyba při rozpoznávání hlasu.')
+      setResponse(messages[code] || `Chyba rozpoznávání${code ? ` (${code})` : ''}. Zkus to znovu.`)
     }
 
     recognition.onend = () => {
@@ -597,7 +617,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
   const labels: Record<Status, string> = {
     idle: 'Mluvit',
-    listening: 'Poslouchám... (2s ticho = stop)',
+    listening: isMobile ? 'Poslouchám...' : 'Poslouchám... (2s ticho = stop)',
     thinking: 'Zpracovávám...',
     confirm: 'Potvrď akci',
     saving: 'Ukládám...',
@@ -687,7 +707,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
               )}
               {/* Idle hint while listening */}
               {status === 'listening' && !interim && !transcript && (
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Poslouchám, mluv... (ticho 2s = automatický stop)</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{isMobile ? 'Poslouchám, mluv...' : 'Poslouchám, mluv... (ticho 2s = automatický stop)'}</div>
               )}
             </div>
             <button
