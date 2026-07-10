@@ -637,7 +637,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
           width: 40, height: 40, borderRadius: 10, border: 'none',
           cursor: busy ? 'default' : 'pointer',
           background: colors[status], display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: status === 'listening' ? '0 0 0 6px rgba(16,185,129,0.2)' : '0 4px 14px rgba(229,62,62,0.35)',
+          boxShadow: status === 'listening' ? 'none' : '0 4px 14px rgba(229,62,62,0.35)',
+          animation: status === 'listening' ? 'pulseRing 1.4s ease-out infinite' : undefined,
           transition: 'all 0.2s', flexShrink: 0,
         }}
       >
@@ -658,6 +659,20 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Listening indicator — animated waveform + label */}
+              {status === 'listening' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 20 }}>
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <span key={i} style={{
+                        width: 3, height: 6, borderRadius: 2, background: '#10b981',
+                        animation: `wave 1s ease-in-out ${i * 0.12}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>Naslouchám...</span>
+                </div>
+              )}
               {/* Live interim — what you're saying right now */}
               {status === 'listening' && interim && (
                 <div style={{ fontSize: 13, color: '#10b981', fontStyle: 'italic', marginBottom: 4, wordBreak: 'break-word' }}>
@@ -720,7 +735,18 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         </div>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes pulseRing {
+          0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5) }
+          70% { box-shadow: 0 0 0 12px rgba(16,185,129,0) }
+          100% { box-shadow: 0 0 0 0 rgba(16,185,129,0) }
+        }
+        @keyframes wave {
+          0%, 100% { height: 6px }
+          50% { height: 20px }
+        }
+      `}</style>
     </>
   )
 }

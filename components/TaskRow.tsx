@@ -33,8 +33,8 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
       <div
         className="task-row"
         style={{
-          background: isOverdue ? '#fff5f5' : 'var(--card)',
-          border: `1px solid ${isOverdue ? '#fca5a5' : 'var(--border)'}`,
+          background: isOverdue ? 'var(--overdue-bg)' : 'var(--card)',
+          border: `1px solid ${isOverdue ? 'var(--overdue-border)' : 'var(--border)'}`,
           borderRadius: 12,
           display: 'flex',
           overflow: 'hidden',

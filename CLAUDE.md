@@ -204,3 +204,10 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 - **Prefer button groups over dropdowns.** For any field with 2-6 options, use inline pill buttons (`components/PillGroup.tsx`) instead of a `<Select>` dropdown — it's faster and easier for clients. Only use `<Select>` for many options (7+) or dynamic lists (e.g. project/day pickers). Apply this to all future forms and modals.
 - **Always pre-select a sensible default** when a form/modal opens (e.g. task priority defaults to `High`, status to `Todo`).
 - Pill selected-state colors reuse the existing badge palette from `lib/badgeColors.ts` — don't invent new colors; match the corresponding status/priority/type badge.
+
+## Behavior Notes / Fixes
+
+- **Completing a task never deletes it.** The checkbox only flips `status` (`Todo`↔`Done`). Completed tasks must stay visible under the `Done` and `Vše` (All) filters. Do not add a filter that hides `Done` tasks globally (a previous `hideDoneFromPill` flag caused completed tasks to vanish from every tab — removed).
+- **Task search covers title AND project** (`app/ukoly` search box, placeholder `Hledat úkol nebo projekt...`) — match against `nazev` and `projekt`.
+- **Theme-aware overdue rows.** Overdue task cards use `--overdue-bg` / `--overdue-border` CSS vars (light pink in light mode, translucent red in dark mode). Never hardcode `#fff5f5` for backgrounds behind `var(--text)` — it's white-on-pink and unreadable in dark mode.
+- **Voice agent feedback.** While recording (`status === 'listening'`) the mic button shows a pulsing ring (`pulseRing` keyframe) and the panel shows an animated waveform + `Naslouchám...` label, plus live interim transcript.

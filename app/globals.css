@@ -16,6 +16,8 @@
   --nav-hover: #f3f4f6;
   --sidebar-bg: #ffffff;
   --sidebar-border: #e5e7eb;
+  --overdue-bg: #fff5f5;
+  --overdue-border: #fca5a5;
   --shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.05);
 }
 
@@ -35,6 +37,8 @@ html.dark {
   --nav-hover: #2a2a2a;
   --sidebar-bg: #1a1a1a;
   --sidebar-border: #2a2a2a;
+  --overdue-bg: rgba(229,62,62,0.14);
+  --overdue-border: rgba(229,62,62,0.5);
   --shadow: none;
 }
 
