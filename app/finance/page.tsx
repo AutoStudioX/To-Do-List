@@ -9,6 +9,7 @@ import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { seedRecurring } from '@/lib/seedRecurring'
+import { useLiveData } from '@/lib/useLiveData'
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -74,6 +75,7 @@ export default function FinancePage() {
     window.addEventListener('voice-data-changed', load)
     return () => window.removeEventListener('voice-data-changed', load)
   }, [load])
+  useLiveData(['transakce'], load)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)

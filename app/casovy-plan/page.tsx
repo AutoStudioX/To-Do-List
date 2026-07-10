@@ -6,6 +6,7 @@ import Modal from '@/components/Modal'
 import Select from '@/components/Select'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { useLiveData } from '@/lib/useLiveData'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const DAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
@@ -50,6 +51,7 @@ export default function CasovyPlanPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useLiveData(['casovy_plan'], load)
 
   function openAdd(den?: number, hour?: number) {
     setForm({

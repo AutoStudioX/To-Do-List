@@ -7,6 +7,7 @@ import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { useLiveData } from '@/lib/useLiveData'
 import { Plus, Trash2, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
@@ -39,6 +40,7 @@ export default function DluhyPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useLiveData(['transakce'], load)
 
   function openAdd() {
     setEditDebt(null)

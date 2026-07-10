@@ -7,6 +7,7 @@ import Select from '@/components/Select'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { useLiveData } from '@/lib/useLiveData'
 import { Plus, Trash2, Pencil, Check, Sliders, Calculator, Zap } from 'lucide-react'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
@@ -72,6 +73,7 @@ export default function GoalyPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useLiveData(['goaly', 'milniky', 'transakce'], load)
 
   function openAddGoal() {
     setGoalForm({ nazev: '', deadline: todayISO(), popis: '', progress: 0, status: 'active', typ: 'manual', current_value: '', target_value: '' })

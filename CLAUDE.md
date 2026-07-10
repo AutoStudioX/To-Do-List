@@ -161,6 +161,19 @@ create policy "Users can manage own casovy_plan" on casovy_plan for all using (a
 create policy "Users can manage own dluhy" on dluhy for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
+## Realtime (cross-device live sync)
+
+`lib/useLiveData.ts` refetches on tab focus + a light poll, and also
+subscribes to Supabase Realtime for near-instant updates across devices.
+Realtime only fires once the tables are added to the `supabase_realtime`
+publication. Run once in the Supabase SQL Editor:
+
+```sql
+alter publication supabase_realtime add table ukoly, projekty, goaly, milniky, transakce, casovy_plan;
+```
+
+Without this the app still syncs (focus refetch + poll), just not instantly.
+
 ## PWA Setup
 
 - `public/manifest.json` - web app manifest (dark theme, standalone display)

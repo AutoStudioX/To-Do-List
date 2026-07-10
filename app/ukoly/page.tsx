@@ -8,6 +8,7 @@ import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import TaskRow from '@/components/TaskRow'
+import { useLiveData } from '@/lib/useLiveData'
 import { Plus, Search, X } from 'lucide-react'
 
 // Below this many visible rows we skip the windowing machinery entirely — plain render is simpler and fast enough.
@@ -101,6 +102,7 @@ export default function UkolyPage() {
     window.addEventListener('voice-data-changed', load)
     return () => window.removeEventListener('voice-data-changed', load)
   }, [load])
+  useLiveData(['ukoly', 'projekty'], load)
 
   async function addProjekt() {
     const nazev = newProjektName.trim()

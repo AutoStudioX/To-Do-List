@@ -10,6 +10,7 @@ import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
 import Link from 'next/link'
 import { seedRecurring } from '@/lib/seedRecurring'
+import { useLiveData } from '@/lib/useLiveData'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(n)
@@ -87,6 +88,7 @@ export default function PrehledPage() {
     window.addEventListener('voice-data-changed', load)
     return () => window.removeEventListener('voice-data-changed', load)
   }, [])
+  useLiveData(['ukoly', 'goaly', 'transakce', 'projekty'], load)
 
   async function checkTask(task: Task) {
     const newStatus = task.status === 'Done' ? 'Todo' : 'Done'
