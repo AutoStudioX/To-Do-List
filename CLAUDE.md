@@ -198,3 +198,9 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 - Always pass `user_id: user.id` on inserts
 - Currency format: `new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(amount)`
 - Colors consistent with CSS variables above
+
+## UI Principles
+
+- **Prefer button groups over dropdowns.** For any field with 2-6 options, use inline pill buttons (`components/PillGroup.tsx`) instead of a `<Select>` dropdown — it's faster and easier for clients. Only use `<Select>` for many options (7+) or dynamic lists (e.g. project/day pickers). Apply this to all future forms and modals.
+- **Always pre-select a sensible default** when a form/modal opens (e.g. task priority defaults to `High`, status to `Todo`).
+- Pill selected-state colors reuse the existing badge palette from `lib/badgeColors.ts` — don't invent new colors; match the corresponding status/priority/type badge.
