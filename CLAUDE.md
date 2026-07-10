@@ -169,8 +169,12 @@ Realtime only fires once the tables are added to the `supabase_realtime`
 publication. Run once in the Supabase SQL Editor:
 
 ```sql
-alter publication supabase_realtime add table ukoly, projekty, goaly, milniky, transakce, casovy_plan;
+alter publication supabase_realtime add table public.ukoly, public.projekty, public.goaly, public.milniky, public.transakce, public.casovy_plan;
 ```
+
+If a table errors as "does not exist", add them one at a time and drop the
+missing one, or use the Dashboard: Database → Replication → toggle each table
+under the `supabase_realtime` publication.
 
 Without this the app still syncs (focus refetch + poll), just not instantly.
 
