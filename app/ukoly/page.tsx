@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Task, Projekt } from '@/lib/types'
 import Modal from '@/components/Modal'
 import Select from '@/components/Select'
+import PillGroup from '@/components/PillGroup'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -398,11 +399,11 @@ export default function UkolyPage() {
             {formError && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formError}</div>}
           </div>
           <div><label style={labelStyle}>Priorita</label>
-            <Select value={form.priorita} onChange={val => setForm({ ...form, priorita: val as Task['priorita'] })} options={[{ value: 'High', label: 'High' }, { value: 'Medium', label: 'Medium' }, { value: 'Low', label: 'Low' }]} />
+            <PillGroup value={form.priorita} onChange={val => setForm({ ...form, priorita: val })} options={[{ value: 'Low', label: 'Low' }, { value: 'Medium', label: 'Medium' }, { value: 'High', label: 'High' }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} /></div>
           <div><label style={labelStyle}>Status</label>
-            <Select value={form.status} onChange={val => setForm({ ...form, status: val as Task['status'] })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
+            <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
           </div>
           <div>
             <label style={labelStyle}>Projekt</label>

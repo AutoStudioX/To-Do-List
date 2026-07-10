@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Goal, Milestone, Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import Select from '@/components/Select'
+import PillGroup from '@/components/PillGroup'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -269,21 +269,15 @@ export default function GoalyPage() {
 
           <div>
             <label style={labelStyle}>Typ sledování pokroku</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {(['manual', 'number', 'income'] as const).map(t => (
-                <button key={t} type="button" onClick={() => setGoalForm({ ...goalForm, typ: t })} style={{
-                  padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: `2px solid ${goalForm.typ === t ? '#e53e3e' : 'var(--border)'}`,
-                  background: goalForm.typ === t ? '#e53e3e22' : 'transparent',
-                  color: goalForm.typ === t ? '#e53e3e' : 'var(--muted)',
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    {t === 'manual' ? <Sliders size={12} /> : t === 'number' ? <Calculator size={12} /> : <Zap size={12} />}
-                    {t === 'manual' ? 'Manuální %' : t === 'number' ? 'Číselný cíl' : 'Příjmy'}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <PillGroup
+              value={goalForm.typ}
+              onChange={t => setGoalForm({ ...goalForm, typ: t })}
+              options={[
+                { value: 'manual', label: 'Manuální %', icon: <Sliders size={14} /> },
+                { value: 'number', label: 'Číselný cíl', icon: <Calculator size={14} /> },
+                { value: 'income', label: 'Příjmy', icon: <Zap size={14} /> },
+              ]}
+            />
           </div>
 
           {goalForm.typ === 'manual' && (
@@ -333,7 +327,7 @@ export default function GoalyPage() {
 
           <div>
             <label style={labelStyle}>Status</label>
-            <Select value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val as Goal['status'] })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
+            <PillGroup value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

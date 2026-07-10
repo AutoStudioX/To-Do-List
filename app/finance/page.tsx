@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import Select from '@/components/Select'
+import PillGroup from '@/components/PillGroup'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -372,7 +372,7 @@ export default function FinancePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!editTx && activeTab === 'vse' && (
             <div><label style={labelStyle}>Typ</label>
-              <Select value={form.typ} onChange={val => { const typ = val as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'fixni_naklad', label: 'Fixní náklad' }, { value: 'dluh', label: 'Dluh' }]} />
+              <PillGroup value={form.typ} onChange={val => { const typ = val as Transaction['typ']; setForm({ ...form, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'dluh', label: 'Dluh' }, { value: 'fixni_naklad', label: 'Fixní náklad' }]} />
             </div>
           )}
 
@@ -411,28 +411,28 @@ export default function FinancePage() {
 
           {(form.typ === 'prijem' || form.typ === 'vydaj') && (
             <div><label style={labelStyle}>Opakování</label>
-              <Select value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
             </div>
           )}
           {form.typ === 'fixni_naklad' && (
             <div><label style={labelStyle}>Opakování</label>
-              <Select value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+              <PillGroup value={form.opakovani} onChange={val => setForm({ ...form, opakovani: val })} options={[{ value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
             </div>
           )}
 
           {form.typ === 'prijem' && (
             <div><label style={labelStyle}>Status</label>
-              <Select value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
+              <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
             </div>
           )}
 
           {form.typ === 'dluh' && (
             <>
               <div><label style={labelStyle}>Typ dluhu</label>
-                <Select value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dlužím já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
+                <PillGroup value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dlužím já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
               </div>
               <div><label style={labelStyle}>Status</label>
-                <Select value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
+                <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
               </div>
             </>
           )}

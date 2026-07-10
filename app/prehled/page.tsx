@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Task, Goal, Transaction, Projekt } from '@/lib/types'
 import Modal from '@/components/Modal'
 import Select from '@/components/Select'
+import PillGroup from '@/components/PillGroup'
 import { Toast, useToast } from '@/components/Toast'
 import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check, Sliders, Zap, Calculator } from 'lucide-react'
 import CircleProgress from '@/components/CircleProgress'
@@ -434,7 +435,7 @@ export default function PrehledPage() {
       <Modal isOpen={addModal === 'finance'} onClose={() => setAddModal(null)} title="Nová transakce">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Typ</label>
-            <Select value={txForm.typ} onChange={val => { const typ = val as Transaction['typ']; setTxForm({ ...txForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'fixni_naklad', label: 'Fixní náklad' }, { value: 'dluh', label: 'Dluh' }]} />
+            <PillGroup value={txForm.typ} onChange={val => { const typ = val as Transaction['typ']; setTxForm({ ...txForm, typ, status: typ === 'prijem' ? 'ceka' : typ === 'dluh' ? 'nesplaceno' : '', smer: typ === 'dluh' ? 'moje' : '' }) }} options={[{ value: 'prijem', label: 'Příjem' }, { value: 'vydaj', label: 'Výdaj' }, { value: 'dluh', label: 'Dluh' }, { value: 'fixni_naklad', label: 'Fixní náklad' }]} />
           </div>
           {txForm.typ === 'prijem' && (
             <div>
@@ -469,21 +470,21 @@ export default function PrehledPage() {
           )}
           {(txForm.typ === 'prijem' || txForm.typ === 'vydaj') && (
             <div><label style={labelStyle}>Opakování</label>
-              <Select value={txForm.opakovani} onChange={val => setTxForm({ ...txForm, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
+              <PillGroup value={txForm.opakovani} onChange={val => setTxForm({ ...txForm, opakovani: val })} options={[{ value: 'jednorazovy', label: 'Jednorázový' }, { value: 'mesicni', label: 'Měsíční' }, { value: 'rocni', label: 'Roční' }]} />
             </div>
           )}
           {txForm.typ === 'prijem' && (
             <div><label style={labelStyle}>Status</label>
-              <Select value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
+              <PillGroup value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'zaplaceno', label: 'Zaplaceno' }, { value: 'ceka', label: 'Čeká' }, { value: 'dluh', label: 'Dluh (dluží mi)' }]} />
             </div>
           )}
           {txForm.typ === 'dluh' && (
             <>
               <div><label style={labelStyle}>Typ dluhu</label>
-                <Select value={txForm.smer} onChange={val => setTxForm({ ...txForm, smer: val })} options={[{ value: 'moje', label: 'Dluhu já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
+                <PillGroup value={txForm.smer} onChange={val => setTxForm({ ...txForm, smer: val })} options={[{ value: 'moje', label: 'Dluhu já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
               </div>
               <div><label style={labelStyle}>Status</label>
-                <Select value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
+                <PillGroup value={txForm.status} onChange={val => setTxForm({ ...txForm, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
               </div>
             </>
           )}
@@ -505,11 +506,11 @@ export default function PrehledPage() {
             {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
           </div>
           <div><label style={labelStyle}>Priorita</label>
-            <Select value={taskForm.priorita} onChange={val => setTaskForm({ ...taskForm, priorita: val })} options={[{ value: 'High', label: 'High' }, { value: 'Medium', label: 'Medium' }, { value: 'Low', label: 'Low' }]} />
+            <PillGroup value={taskForm.priorita} onChange={val => setTaskForm({ ...taskForm, priorita: val })} options={[{ value: 'Low', label: 'Low' }, { value: 'Medium', label: 'Medium' }, { value: 'High', label: 'High' }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={taskForm.deadline} onChange={v => setTaskForm({ ...taskForm, deadline: v })} /></div>
           <div><label style={labelStyle}>Status</label>
-            <Select value={taskForm.status} onChange={val => setTaskForm({ ...taskForm, status: val })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
+            <PillGroup value={taskForm.status} onChange={val => setTaskForm({ ...taskForm, status: val })} options={[{ value: 'Todo', label: 'Todo' }, { value: 'In Progress', label: 'In Progress' }, { value: 'Done', label: 'Done' }]} />
           </div>
           <div>
             <label style={labelStyle}>Projekt</label>
@@ -616,7 +617,7 @@ export default function PrehledPage() {
           )}
           <div>
             <label style={labelStyle}>Status</label>
-            <Select value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val as 'active' | 'completed' })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
+            <PillGroup value={goalForm.status} onChange={val => setGoalForm({ ...goalForm, status: val as 'active' | 'completed' })} options={[{ value: 'active', label: 'Aktivní' }, { value: 'completed', label: 'Splněno' }]} />
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>

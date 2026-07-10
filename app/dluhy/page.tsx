@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Transaction } from '@/lib/types'
 import Modal from '@/components/Modal'
-import Select from '@/components/Select'
+import PillGroup from '@/components/PillGroup'
 import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
@@ -172,7 +172,7 @@ export default function DluhyPage() {
       <Modal isOpen={modal} onClose={() => { setModal(false); setEditDebt(null); setFormErrors({}) }} title={editDebt ? 'Upravit dluh' : 'Přidat dluh'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={labelStyle}>Typ</label>
-            <Select value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dluhu já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
+            <PillGroup value={form.smer} onChange={val => setForm({ ...form, smer: val })} options={[{ value: 'moje', label: 'Dluhu já (komu)' }, { value: 'mne', label: 'Dluží mi (kdo)' }]} />
           </div>
           <div>
             <label style={labelStyle}>
@@ -191,7 +191,7 @@ export default function DluhyPage() {
           <div><label style={labelStyle}>Datum</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
 
           <div><label style={labelStyle}>Status</label>
-            <Select value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
+            <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'nesplaceno', label: 'Nesplaceno' }, { value: 'splaceno', label: 'Splaceno' }]} />
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => { setModal(false); setEditDebt(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
