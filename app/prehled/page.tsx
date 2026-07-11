@@ -271,7 +271,7 @@ export default function PrehledPage() {
       </div>
 
       {/* Rings */}
-      <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flexShrink: 0 }}>
+      <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
         <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} />
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -366,8 +366,10 @@ export default function PrehledPage() {
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: isOverdue ? 'rgba(229,62,62,0.06)' : 'transparent', borderRadius: 6, overflow: 'hidden' }}>
                 <div style={{ width: 4, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityColor[t.priorita], flexShrink: 0 }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, padding: '8px 10px' }}>
-                <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
-                  style={{ width: 15, height: 15, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0 }} />
+                <label style={{ minWidth: 44, minHeight: 44, marginLeft: -10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}>
+                  <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
+                    style={{ width: 24, height: 24, accentColor: '#e53e3e', cursor: 'pointer' }} />
+                </label>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
                   {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}

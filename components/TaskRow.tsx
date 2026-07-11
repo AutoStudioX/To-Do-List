@@ -48,14 +48,18 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
         <div style={{ flex: 1, padding: '12px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Row 1: checkbox + title + action buttons */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, minWidth: 0, flex: 1 }}>
-              <input
-                type="checkbox"
-                checked={t.status === 'Done'}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, minWidth: 0, flex: 1 }}>
+              <label
                 onClick={e => e.stopPropagation()}
-                onChange={() => onToggleDone(t)}
-                style={{ width: 15, height: 15, marginTop: 3, accentColor: '#e53e3e', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}
-              />
+                style={{ minWidth: 44, minHeight: 44, marginLeft: -10, marginTop: -10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={t.status === 'Done'}
+                  onChange={() => onToggleDone(t)}
+                  style={{ width: 24, height: 24, accentColor: '#e53e3e', cursor: 'pointer', touchAction: 'manipulation' }}
+                />
+              </label>
               <div
                 onClick={() => onToggleExpand(t.id)}
                 style={{
@@ -70,18 +74,20 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
                 {t.nazev}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
               <button
                 onClick={e => { e.stopPropagation(); onEdit(t) }}
-                style={{ background: 'var(--border)', border: 'none', borderRadius: 7, color: 'var(--text)', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center', touchAction: 'manipulation' }}
+                aria-label="Upravit"
+                style={{ minWidth: 44, minHeight: 44, background: 'var(--border)', border: 'none', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
               >
-                <Pencil size={13} />
+                <Pencil size={16} />
               </button>
               <button
                 onClick={e => { e.stopPropagation(); onDelete(t.id) }}
-                style={{ background: '#fee2e2', border: 'none', borderRadius: 7, color: '#e53e3e', cursor: 'pointer', padding: '5px 7px', display: 'flex', alignItems: 'center', touchAction: 'manipulation' }}
+                aria-label="Smazat"
+                style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
               >
-                <Trash2 size={13} />
+                <Trash2 size={16} />
               </button>
             </div>
           </div>

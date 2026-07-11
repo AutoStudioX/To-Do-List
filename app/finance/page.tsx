@@ -358,9 +358,9 @@ export default function FinancePage() {
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => openEdit(t)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2 }}><Pencil size={14} /></button>
-                    <button onClick={() => deleteTx(t.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button onClick={() => openEdit(t)} aria-label="Upravit" style={{ minWidth: 44, minHeight: 44, background: 'var(--hover-bg)', border: 'none', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Pencil size={16} /></button>
+                    <button onClick={() => deleteTx(t.id)} aria-label="Smazat" style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>

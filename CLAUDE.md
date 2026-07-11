@@ -203,6 +203,9 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 - **Prefer button groups over dropdowns.** For any field with 2-6 options, use inline pill buttons (`components/PillGroup.tsx`) instead of a `<Select>` dropdown — it's faster and easier for clients. Only use `<Select>` for many options (7+) or dynamic lists (e.g. project/day pickers). Apply this to all future forms and modals.
 - **Always pre-select a sensible default** when a form/modal opens (e.g. task priority defaults to `High`, status to `Todo`).
 - Pill selected-state colors reuse the existing badge palette from `lib/badgeColors.ts` — don't invent new colors; match the corresponding status/priority/type badge.
+- **Minimum 44×44px tap targets on touch UI.** Every interactive icon button (edit/delete pencils & trashes) and checkbox must have at least a 44×44px hit area, even if the visible icon is smaller — wrap small controls (e.g. a 24px checkbox) in a 44px `<label>`/container with negative margins so layout isn't pushed around. Space adjacent destructive/edit buttons at least `gap: 12` apart to prevent mis-taps. Icons themselves should be ≥16px and checkboxes ≥24px.
+- **Never force a fixed multi-column row that can overflow at 375px.** Card/ring/stat grids must stack or wrap on mobile (gate the column count on `isMobile`, and use `minmax(0, 1fr)` columns so cells can shrink instead of clipping). The Přehled rings use `repeat(2, minmax(0,1fr))` on mobile, `repeat(3, minmax(0,1fr))` on desktop.
+- **Route names are Czech; keep redirects for any renamed/English path.** The goals page lives at `/goaly`; `/goals` (and `/goals/:path*`) permanently redirect to it via `next.config.ts` so bookmarked/external links don't 404. Add a similar redirect whenever a route is renamed.
 
 ## Behavior Notes / Fixes
 
