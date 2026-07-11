@@ -1,7 +1,40 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient as createServerSupabase } from '@/lib/supabase/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+// Per-user rate limiting + daily cap on the Anthropic-backed voice endpoint so a
+// single logged-in user can't drain API credits. Best-effort in-memory store:
+// on serverless it's per-instance and resets on cold start, which is acceptable
+// as a guardrail for a small personal app (Supabase RLS is the real data barrier).
+const RATE_WINDOW_MS = 60_000   // sliding window length
+const RATE_MAX_IN_WINDOW = 10   // max requests per user per window
+const DAILY_CAP = 200           // max requests per user per calendar day (UTC)
+
+type UserUsage = { hits: number[]; day: string; dayCount: number }
+const usageByUser = new Map<string, UserUsage>()
+
+// Returns an error message if the user is over a limit, otherwise null (and records the hit).
+function checkRateLimit(userId: string): string | null {
+  const now = Date.now()
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
+  let u = usageByUser.get(userId)
+  if (!u || u.day !== today) {
+    u = { hits: [], day: today, dayCount: 0 }
+    usageByUser.set(userId, u)
+  }
+  if (u.dayCount >= DAILY_CAP) {
+    return `Denní limit hlasových příkazů vyčerpán (${DAILY_CAP}). Zkus to zítra.`
+  }
+  u.hits = u.hits.filter(t => now - t < RATE_WINDOW_MS)
+  if (u.hits.length >= RATE_MAX_IN_WINDOW) {
+    return 'Příliš mnoho požadavků za sebou. Počkej chvíli a zkus to znovu.'
+  }
+  u.hits.push(now)
+  u.dayCount++
+  return null
+}
 
 const SYSTEM_PROMPT = `Jsi asistent pro úkoly, finance, cíle a projekty. Odpovídej pouze česky.
 
@@ -258,6 +291,19 @@ const tools: Anthropic.Tool[] = [
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'Chybí ANTHROPIC_API_KEY na serveru.' }, { status: 500 })
+  }
+
+  // Defense-in-depth: verify the session server-side, don't rely solely on the
+  // middleware matcher to gate this route.
+  const supabase = await createServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Nepřihlášen.' }, { status: 401 })
+  }
+
+  const limitError = checkRateLimit(user.id)
+  if (limitError) {
+    return NextResponse.json({ error: limitError }, { status: 429 })
   }
 
   const { text } = await req.json()

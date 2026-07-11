@@ -139,26 +139,25 @@ create table dluhy (
 );
 
 -- Enable RLS
+-- NOTE: `transakce` is the real finance table (income, expenses, debts, fixed
+-- costs are all rows in it, discriminated by `typ`). The old split tables
+-- prijmy/vydaje/fixni_naklady/dluhy are NOT used by the app — do not recreate
+-- or add RLS for them. Verified live in Supabase: every table below has RLS
+-- enabled with the owner-only policy.
 alter table ukoly enable row level security;
 alter table projekty enable row level security;
 alter table goaly enable row level security;
 alter table milniky enable row level security;
-alter table prijmy enable row level security;
-alter table vydaje enable row level security;
-alter table fixni_naklady enable row level security;
+alter table transakce enable row level security;
 alter table casovy_plan enable row level security;
-alter table dluhy enable row level security;
 
 -- Policies
 create policy "Users can manage own ukoly" on ukoly for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own projekty" on projekty for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own goaly" on goaly for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own milniky" on milniky for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Users can manage own prijmy" on prijmy for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Users can manage own vydaje" on vydaje for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Users can manage own fixni_naklady" on fixni_naklady for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Users can manage own transakce" on transakce for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can manage own casovy_plan" on casovy_plan for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Users can manage own dluhy" on dluhy for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
 ## Realtime (cross-device live sync)
@@ -212,4 +211,5 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 - **Theme-aware overdue rows.** Overdue task cards use `--overdue-bg` / `--overdue-border` CSS vars (light pink in light mode, translucent red in dark mode). Never hardcode `#fff5f5` for backgrounds behind `var(--text)` — it's white-on-pink and unreadable in dark mode.
 - **Voice agent feedback.** While recording (`status === 'listening'`) the mic button shows a pulsing ring (`pulseRing` keyframe) and the panel shows an animated waveform + `Naslouchám...` label, plus live interim transcript.
 - **Voice panel never shows an empty box.** After recognition ends with no speech (`onend`/`onerror` → `status === 'idle'` while `panelOpen` stays true), the panel would otherwise be blank. The idle state must always render a prompt (`Klikni na mikrofon a mluv`). Keep an explicit branch for `status === 'idle' && !response && !transcript && !pendingCalls`.
+- **`/api/voice` is hardened.** The route verifies the Supabase session itself (`supabase.auth.getUser()`) as defense-in-depth — not only via the middleware matcher — and enforces a per-user in-memory rate limit (10 req/60s) plus a daily cap (200/day, UTC) so no logged-in user can drain Anthropic credits. In-memory is per-instance/best-effort (resets on cold start); fine as a guardrail for a personal app.
 - **Manual-% goals: steps are a checklist only.** For `typ === 'manual'` goals, progress comes from the slider (`goal.progress`), NOT from checking milestones. When such a goal has steps, show the note that ticking steps doesn't change the % (they're independent). Don't wire milestone completion into manual-% progress.
