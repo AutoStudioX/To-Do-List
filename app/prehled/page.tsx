@@ -190,7 +190,7 @@ export default function PrehledPage() {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     })
 
-  const ringSize = isMobile ? 76 : 120
+  const ringSize = isMobile ? 70 : 120
   const singleGoal = goals.length === 1 ? goals[0] : null
   const pendingIncome = prijmy.filter(t => t.status === 'ceka').reduce((s, t) => s + Number(t.castka), 0)
   const myDebt = transactions.filter(t => t.typ === 'dluh' && t.smer === 'moje' && t.status === 'nesplaceno').reduce((s, t) => s + Number(t.castka), 0)
@@ -271,11 +271,11 @@ export default function PrehledPage() {
       </div>
 
       {/* Rings */}
-      <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
-        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} />
-        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} />
+      <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
+        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} hideBar={isMobile} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} />
+          <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} hideBar={isMobile} />
           {userEmail === 'larisaprodanets2055@gmail.com' && (
             <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>Zavolej mi jestli používáš appku 😜</div>
           )}

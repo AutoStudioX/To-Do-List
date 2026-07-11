@@ -100,7 +100,8 @@ a:hover {
   /* Přehled grids */
   .bottom-grid { grid-template-columns: 1fr !important; }
   .rings-grid { gap: 8px !important; padding: 12px 8px !important; }
-  .rings-grid > div > div:last-child { display: none; } /* hide progress bar under ring on mobile */
+  /* Progress bar under each ring is hidden on mobile via the CircleProgress
+     `hideBar` prop (works for the wrapped Finance ring too). */
 
   /* Modal → bottom sheet */
   .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
@@ -137,7 +138,10 @@ a:hover {
   .table-scroll { overflow-x: hidden !important; }
   .finance-table { table-layout: fixed !important; width: 100% !important; }
   .finance-table td, .finance-table th { padding: 10px 6px !important; overflow: hidden; word-break: break-word; }
-  .finance-table td:last-child, .finance-table th:last-child { width: 56px; }
+  /* Action column is always the last column — force it visible even on tabs
+     (e.g. fixní náklady, 5 cols) where it would otherwise be caught by the
+     nth-child(5) hide rule below. */
+  .finance-table td:last-child, .finance-table th:last-child { width: 56px; display: table-cell !important; }
   /* Stack the 44px edit/delete buttons vertically so both stay fully visible
      and tappable inside the narrow action column (no horizontal overflow/clip). */
   .tx-actions { flex-direction: column !important; gap: 8px !important; align-items: center; }
