@@ -724,6 +724,12 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
               {status === 'listening' && !interim && !transcript && (
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>{isMobile ? 'Poslouchám, mluv...' : 'Poslouchám, mluv... (ticho 2s = automatický stop)'}</div>
               )}
+              {/* Idle empty-state — panel open but not listening (e.g. no speech was picked up). */}
+              {status === 'idle' && !response && !transcript && !pendingCalls && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'var(--muted)' }}>
+                  <Mic size={14} /> Klikni na mikrofon a mluv
+                </div>
+              )}
             </div>
             <button
               onClick={() => { if (status === 'confirm') cancelActions(); setPanelOpen(false) }}

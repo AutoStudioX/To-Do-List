@@ -224,7 +224,12 @@ export default function GoalyPage() {
               </div>
 
               <div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }}>Kroky ({goalMs.filter(m => m.done).length}/{goalMs.length})</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: goalMs.length > 0 && typ === 'manual' ? 4 : 8, fontWeight: 500 }}>Kroky ({goalMs.filter(m => m.done).length}/{goalMs.length})</div>
+                {typ === 'manual' && goalMs.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic', marginBottom: 8 }}>
+                    Kroky jsou jen kontrolní seznam — pokrok % nastavuješ ručně posuvníkem, odškrtávání se do něj nezapočítává.
+                  </div>
+                )}
                 {goalMs.map(m => (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                     <button onClick={() => toggleMilestone(m)} style={{
