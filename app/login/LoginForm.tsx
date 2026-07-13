@@ -1,5 +1,5 @@
 'use client'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { loginAction, type LoginState } from './actions'
 
@@ -19,6 +19,9 @@ function SubmitButton() {
 
 export default function LoginForm() {
   const [state, formAction] = useActionState<LoginState, FormData>(loginAction, {})
+  // Controlled so a failed submit keeps the email (React 19 auto-resets uncontrolled
+  // fields after a form action — we want that for the password, not the email).
+  const [email, setEmail] = useState('')
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -30,6 +33,8 @@ export default function LoginForm() {
           name="email"
           type="email"
           required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           autoComplete="email"
           className="h-8 w-full min-w-0 border bg-transparent px-2.5 py-1 text-sm outline-none transition-colors placeholder:text-[#9ca3af]"
           style={{ borderRadius: 16, borderColor: '#e6e6e6', color: '#0a0a0a' }}
