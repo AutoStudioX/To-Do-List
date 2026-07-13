@@ -191,6 +191,31 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 - Logout: sidebar button calls `supabase.auth.signOut()`
 - OAuth callback: `/auth/callback/route.ts`
 
+## Brute-force login protection
+
+Enforced **server-side inside GoTrue** via the **Password Verification Attempt** auth hook, so it can't be bypassed by calling the auth API directly. 5 wrong passwords for an account → locked **15 minutes** (auto-expires); a correct password resets the counter to 0. The hook returns HTTP 429 with `Příliš mnoho pokusů, zkuste to za 15 minut`, which GoTrue surfaces as the login error (`LoginForm` already renders `error.message` — no client-side lockout logic, and none would be trusted anyway).
+
+**Files:** `supabase/migrations/0001_login_lockout.sql` (table + hook + admin fns), `app/admin/page.tsx` (locked-accounts UI), `Sidebar.tsx` (Admin link, shown only when `is_admin()` returns true).
+
+**Tables (RLS on, no app-facing policies):**
+- `login_lockout(user_id, failed_attempts, locked_until, updated_at)` — written only by the hook (runs as `supabase_auth_admin`) and the `SECURITY DEFINER` admin functions. `revoke all` from anon/authenticated/public.
+- `app_admins(user_id)` — allow-list. Seed with `insert into public.app_admins(user_id) select id from auth.users where email = '…';`
+
+**Admin unlock:** logged-in admins see **Admin** in the sidebar → `/admin` lists currently-locked accounts (`admin_list_locked_accounts()`) with an **Odemknout** button (`admin_unlock_account(user_id)`). Both RPCs raise `not authorized` unless the caller is in `app_admins`.
+
+**Manual unlock via SQL** (if an admin is locked out before 15 min):
+```sql
+update public.login_lockout set failed_attempts = 0, locked_until = null
+  where user_id = (select id from auth.users where email = 'stuck@example.com');
+```
+
+**One-time setup — register the hook (all plans; "Hooks" is in Beta):**
+1. Run `supabase/migrations/0001_login_lockout.sql` in **SQL Editor** (uncomment the seed at the bottom with your email first, or run it separately).
+2. Dashboard → **Authentication → Hooks (Beta)** → **Password Verification Attempt** → **Enable** → select the Postgres function `public.hook_password_verification_attempt` → Save.
+   - Local dev equivalent (`supabase/config.toml`): `[auth.hook.password_verification_attempt]` `enabled = true`, `uri = "pg-functions://postgres/public/hook_password_verification_attempt"`.
+
+**Interaction with Supabase's built-in rate limits:** GoTrue already rate-limits **per IP** — `sign_in_sign_ups` = 30 sign-in/sign-up requests per 5 min per IP (default; Dashboard → Authentication → Rate Limits). That's IP-scoped and complementary: it throttles floods from one IP, while our hook locks a **specific account** after 5 failures regardless of IP. Both apply; neither replaces the other.
+
 ## Key Conventions
 
 - All data pages are 'use client' with useEffect + useState

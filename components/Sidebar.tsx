@@ -1,7 +1,8 @@
 'use client'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap, LockKeyhole } from 'lucide-react'
 import AutoStudioLogo from './AutoStudioLogo'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,6 +22,16 @@ export default function Sidebar({ isOpen, onClose }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    supabase.rpc('is_admin').then((res: { data: unknown }) => { if (active) setIsAdmin(res.data === true) })
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const items = isAdmin ? [...navItems, { href: '/admin', label: 'Admin', icon: LockKeyhole }] : navItems
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -43,7 +54,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
       </div>
 
       <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link key={href} href={href} onClick={onClose} style={{
