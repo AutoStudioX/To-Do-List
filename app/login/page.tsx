@@ -1,5 +1,5 @@
 import LoginForm from './LoginForm'
-import AutoStudioLogo from '@/components/AutoStudioLogo'
+import { Zap } from 'lucide-react'
 
 export default function LoginPage() {
   return (
@@ -31,7 +31,18 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <AutoStudioLogo />
+        {/* powered by AutoStudio — fixed colors (login bg is always white, so no theme vars) */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: '#e53e3e' }}>
+            <Zap className="h-5 w-5" style={{ fill: 'white', stroke: 'white', strokeWidth: 1.5 }} />
+          </div>
+          <div>
+            <p className="text-xs leading-tight" style={{ color: '#6b6b6b' }}>powered by</p>
+            <p className="text-lg font-bold leading-none">
+              <span style={{ color: '#0a0a0a' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
