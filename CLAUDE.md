@@ -193,33 +193,42 @@ Without this the app still syncs (focus refetch + poll), just not instantly.
 
 ## Brute-force login protection
 
-**Variant A (Free-plan compatible).** 5 wrong passwords for an account → locked **15 minutes** (auto-expires); a correct password resets the counter to 0. Message: `Příliš mnoho pokusů, zkuste to za 15 minut`.
+Runs inside a **Next.js server action** (`app/login/actions.ts`), which reads the request IP server-side and calls `SECURITY DEFINER` RPCs around `signInWithPassword`. `LoginForm` is a client form wired to the action via `useActionState` (no auth logic in the client). Two layers:
 
-⚠️ **Known limit — be honest about it.** This is enforced by `LoginForm` calling three `SECURITY DEFINER` RPCs around `signInWithPassword`, **not** inside GoTrue. A determined attacker who calls the GoTrue auth API directly (the anon key is public) **bypasses** it. The real backstop for that is Supabase's built-in **per-IP** rate limit (see below). The unbypassable version needs the **Password Verification Attempt** auth hook, which is **Team/Enterprise-plan only** — not available on Free. For this app the RPC + per-IP-limit combination is adequate.
+- **EMAIL lock** — 5 wrong passwords for an account → **15 min** lock (auto-expires); a correct login resets the counter. Message: `Příliš mnoho pokusů, zkuste to za 15 minut`. Attempts 1–4 show remaining (`Zbývají 3 pokusy.` / `Zbývá 1 pokus.`).
+- **IP block** — 10 wrong attempts from one IP → **permanent** block until cleared by SQL (§6 of the migration). Message: `Přístup z této sítě byl zablokován. Kontaktujte správce.`
 
-**Login flow (`app/login/LoginForm.tsx`):**
-1. `rpc('check_login_lockout', { p_email })` → `{ locked, minutes_left }`; if locked, show the message and stop (no auth attempt).
-2. `signInWithPassword`.
-3. On auth error → `rpc('record_failed_login', { p_email })`; if it returns `locked`, show the lockout message, else the normal error.
-4. On success → `rpc('reset_login_attempts', { p_email })`, then navigate.
+**The lock check runs BEFORE `signInWithPassword`**, so a locked account (or blocked IP) is rejected even with the correct password.
 
-All three RPCs normalise the email (`lower(trim())`), resolve it to a `user_id` via `auth.users`, and are `SECURITY DEFINER` so they bypass RLS. Granted to `anon` (login is pre-auth) + `authenticated`.
+**Server action flow (`app/login/actions.ts`):**
+1. `check_ip_block(ip)` → if blocked, reject.
+2. `check_login_lockout(email)` → if locked, reject (before sign-in).
+3. `signInWithPassword`.
+4. On error → `record_failed_login(email, ip)` → `{ email_locked, minutes_left, attempts_left, ip_blocked }`; show the matching message.
+5. On success → `reset_login_attempts(email, ip)`, then `redirect('/prehled')`.
+
+RPCs normalise the email, resolve it via `auth.users`, and are `SECURITY DEFINER` (bypass RLS), granted to `anon` (login is pre-auth) + `authenticated`.
+
+⚠️ **Known limit — be honest about it.** The server action still calls Supabase auth with the public anon flow; an attacker calling the GoTrue API directly **bypasses** these RPCs. Backstop = Supabase's built-in **per-IP** rate limit (`sign_in_sign_ups` = 30 / 5 min / IP; Dashboard → Authentication → Rate Limits). The unbypassable version needs the paid **Password Verification Attempt** hook (Team/Enterprise only). For this app the combination is adequate.
 
 **Tables (RLS on, no app-facing policies — access only via the SECURITY DEFINER functions):**
-- `login_lockout(user_id, failed_attempts, locked_until, updated_at)` — `revoke all` from anon/authenticated/public.
+- `login_lockout(user_id, failed_attempts, locked_until, updated_at)`
+- `ip_login_block(ip, failed_attempts, blocked, updated_at)`
 - `app_admins(user_id)` — admin allow-list. Seed: `insert into public.app_admins(user_id) select id from auth.users where lower(email) = lower('…');`
 
-**Admin unlock:** logged-in admins see **Admin** in the sidebar (gated by `is_admin()`) → `/admin` lists currently-locked accounts (`admin_list_locked_accounts()`) with an **Odemknout** button (`admin_unlock_account(user_id)`). Both raise `not authorized` unless the caller is in `app_admins`.
-
-**Manual unlock via SQL** (if an admin is locked out before 15 min):
+**Clear a permanent IP block (no UI — by design):**
+```sql
+delete from public.ip_login_block where ip = '203.0.113.7';   -- or: delete from public.ip_login_block;
+```
+**Early-unlock an email** (auto-expires in 15 min anyway): admins see **Admin** in the sidebar → `/admin` (`admin_list_locked_accounts()` + `admin_unlock_account()`), or via SQL:
 ```sql
 update public.login_lockout set failed_attempts = 0, locked_until = null
   where user_id = (select id from auth.users where lower(email) = lower('stuck@example.com'));
 ```
 
-**Setup:** run `supabase/migrations/0001_login_lockout.sql` in the SQL Editor, then seed yourself as admin (section 5 of the file). No dashboard hook to enable — variant A is pure SQL + client code.
+**Setup:** run `supabase/migrations/0001_login_lockout.sql` in the SQL Editor, then seed yourself as admin (§5). Pure SQL + server action — no dashboard hook.
 
-**Interaction with Supabase's built-in rate limits:** GoTrue rate-limits **per IP** — `sign_in_sign_ups` = 30 sign-in/sign-up requests per 5 min per IP (default; Dashboard → Authentication → Rate Limits). IP-scoped and complementary: it throttles floods from one IP; our RPCs lock a **specific account** after 5 failures regardless of IP. Both apply.
+**Verification:** the four lockout paths (5-fail email lock, locked+correct-password rejection, 15-min expiry, 10-fail permanent IP block) are verified against a real Postgres by loading the migration and driving the RPCs — see the commit that added this. The live `signInWithPassword` + real-credential path isn't machine-verifiable here (entering passwords is off-limits); test it manually after deploying the migration.
 
 ## Key Conventions
 
