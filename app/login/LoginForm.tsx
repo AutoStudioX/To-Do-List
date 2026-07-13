@@ -11,18 +11,32 @@ export default function LoginForm() {
   const router = useRouter()
   const supabase = createClient()
 
+  const LOCKED_MSG = 'Příliš mnoho pokusů, zkuste to za 15 minut'
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
+    const emailNorm = email.trim().toLowerCase()
     try {
+      // 1. Blocked before we even try to authenticate?
+      const { data: lock } = await supabase.rpc('check_login_lockout', { p_email: emailNorm })
+      if (lock?.locked) { setError(LOCKED_MSG); return }
+
+      // 2. Attempt sign-in.
       const { error } = await supabase.auth.signInWithPassword({ email, password })
+
       if (error) {
-        setError(error.message)
-      } else {
-        router.push('/prehled')
-        router.refresh()
+        // 3. Record the failure; if this tripped the lockout, show the lock message.
+        const { data: after } = await supabase.rpc('record_failed_login', { p_email: emailNorm })
+        setError(after?.locked ? LOCKED_MSG : error.message)
+        return
       }
+
+      // 4. Success → reset the counter, then continue.
+      await supabase.rpc('reset_login_attempts', { p_email: emailNorm })
+      router.push('/prehled')
+      router.refresh()
     } catch {
       setError('Nepodařilo se připojit k serveru. Zkontrolujte připojení k internetu.')
     } finally {
