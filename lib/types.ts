@@ -7,6 +7,7 @@ export interface Task {
   status: 'Todo' | 'In Progress' | 'Done'
   projekt: string | null
   created_at: string
+  dokonceno_at?: string | null
 }
 
 export interface Projekt {
