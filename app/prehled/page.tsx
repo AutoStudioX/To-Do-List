@@ -236,6 +236,12 @@ export default function PrehledPage() {
   const goalRingLabel = singleGoal ? singleGoal.nazev : 'Goaly splněny'
   const goalRingSublabel = singleGoal ? singleGoal.nazev : undefined
 
+  // Tasks ring is scoped to the last 7 days so it doesn't sit near 100% forever
+  // as completed tasks pile up. Only tasks created in the past week count.
+  const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const weekTasks = tasks.filter(t => t.created_at && new Date(t.created_at).getTime() >= weekAgoMs)
+  const weekTasksDone = weekTasks.filter(t => t.status === 'Done').length
+
   return (
     <div style={{ height: isMobile ? 'auto' : '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
@@ -272,7 +278,7 @@ export default function PrehledPage() {
 
       {/* Rings */}
       <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
-        <CircleProgress label="Úkoly splněny" value={tasks.filter(t => t.status === 'Done').length} max={Math.max(tasks.length, 1)} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+        <CircleProgress label="Úkoly za týden" value={weekTasksDone} max={Math.max(weekTasks.length, 1)} color="#e53e3e" size={ringSize} hideBar={isMobile} />
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} hideBar={isMobile} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} hideBar={isMobile} />
