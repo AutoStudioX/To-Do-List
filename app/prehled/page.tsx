@@ -236,11 +236,15 @@ export default function PrehledPage() {
   const goalRingLabel = singleGoal ? singleGoal.nazev : 'Goaly splněny'
   const goalRingSublabel = singleGoal ? singleGoal.nazev : undefined
 
-  // Tasks ring is scoped to the last 7 days so it doesn't sit near 100% forever
-  // as completed tasks pile up. Only tasks created in the past week count.
-  const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const weekTasks = tasks.filter(t => t.created_at && new Date(t.created_at).getTime() >= weekAgoMs)
+  // Tasks ring is scoped to the CURRENT calendar week (Mon–Sun) so it reflects
+  // this week's work instead of trending to ~100% forever. Monday 00:00 local.
+  const _now = new Date()
+  const _monday = new Date(_now)
+  _monday.setHours(0, 0, 0, 0)
+  _monday.setDate(_now.getDate() - ((_now.getDay() + 6) % 7))
+  const weekTasks = tasks.filter(t => t.created_at && new Date(t.created_at).getTime() >= _monday.getTime())
   const weekTasksDone = weekTasks.filter(t => t.status === 'Done').length
+  const weekTasksLeft = weekTasks.length - weekTasksDone
 
   return (
     <div style={{ height: isMobile ? 'auto' : '100%', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
@@ -278,7 +282,12 @@ export default function PrehledPage() {
 
       {/* Rings */}
       <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
-        <CircleProgress label="Úkoly za týden" value={weekTasksDone} max={Math.max(weekTasks.length, 1)} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <CircleProgress label="Úkoly tento týden" value={weekTasksDone} max={Math.max(weekTasks.length, 1)} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, textAlign: 'center' }}>
+            {weekTasksDone} hotovo · {weekTasksLeft} zbývá
+          </div>
+        </div>
         <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} hideBar={isMobile} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} hideBar={isMobile} />
