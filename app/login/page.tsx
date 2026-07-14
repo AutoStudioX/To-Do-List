@@ -1,7 +1,29 @@
 import LoginForm from './LoginForm'
 import { Zap } from 'lucide-react'
+import { headers } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 
-export default function LoginPage() {
+const LOCKED_MSG = 'Příliš mnoho pokusů, zkuste to za 15 minut'
+const IP_BLOCKED_MSG = 'Přístup z této sítě byl zablokován. Kontaktujte správce.'
+
+export default async function LoginPage() {
+  // Server-side lock check on page load — keyed on the request IP, so a fresh
+  // window / incognito tab on the same network also gets the disabled form.
+  const h = await headers()
+  const ip = (h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip')?.trim() || 'unknown')
+  let initialLocked = false
+  let initialMessage = ''
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.rpc('check_lock_state', { p_ip: ip })
+    if (data?.locked) {
+      initialLocked = true
+      initialMessage = data.ip_blocked ? IP_BLOCKED_MSG : LOCKED_MSG
+    }
+  } catch {
+    // If the RPC isn't available, fail open (form usable); the server action still enforces.
+  }
+
   return (
     <div className="flex min-h-screen flex-col" style={{ background: '#ffffff' }}>
 
@@ -27,7 +49,7 @@ export default function LoginPage() {
           </div>
           {/* CardContent */}
           <div className="px-4 pb-4">
-            <LoginForm />
+            <LoginForm initialLocked={initialLocked} initialMessage={initialMessage} />
           </div>
         </div>
 
