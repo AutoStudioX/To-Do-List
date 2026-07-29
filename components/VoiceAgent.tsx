@@ -234,6 +234,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         nazev: capitalize(d.nazev),
         priorita: d.priorita || 'High',
         deadline: d.deadline || todayISO(),
+        deadline_time: d.cas || null,
         projekt: d.projekt || null,
         status: 'Todo',
       })
@@ -306,6 +307,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       if (upd.status) updates.status = upd.status
       if (upd.priorita) updates.priorita = upd.priorita
       if (upd.deadline !== undefined) updates.deadline = upd.deadline
+      if (upd.cas !== undefined) updates.deadline_time = upd.cas
       if (upd.projekt !== undefined) updates.projekt = upd.projekt
       if (Object.keys(updates).length === 0) return 'Nic k aktualizaci'
       const { error } = await supabase.from('ukoly').update(updates).eq('id', match.id)

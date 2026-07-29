@@ -1,6 +1,7 @@
 import React from 'react'
 import { Pencil, Trash2, Calendar, Folder } from 'lucide-react'
 import { Task } from '@/lib/types'
+import { timeSuffix } from '@/lib/taskTime'
 
 const priorityBorder: Record<string, string> = {
   High: '#e53e3e',
@@ -103,7 +104,7 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
             </div>
             {t.deadline && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
-                <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}
+                <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}{timeSuffix(t.deadline_time)}
               </span>
             )}
             {t.projekt && (

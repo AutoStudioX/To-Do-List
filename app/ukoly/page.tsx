@@ -7,6 +7,8 @@ import Select from '@/components/Select'
 import PillGroup from '@/components/PillGroup'
 import { priorityColors, taskStatusColors } from '@/lib/badgeColors'
 import DatePicker from '@/components/DatePicker'
+import TimePicker from '@/components/TimePicker'
+import { deadlineSortKey } from '@/lib/taskTime'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import TaskRow from '@/components/TaskRow'
@@ -24,7 +26,7 @@ const inputStyle: React.CSSProperties = {
 }
 const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
-const emptyForm = { nazev: '', priorita: 'High' as Task['priorita'], deadline: todayISO(), status: 'Todo' as Task['status'], projekt: '' }
+const emptyForm = { nazev: '', priorita: 'High' as Task['priorita'], deadline: todayISO(), deadline_time: '', status: 'Todo' as Task['status'], projekt: '' }
 
 export default function UkolyPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -126,7 +128,7 @@ export default function UkolyPage() {
 
   function openAdd() { setForm(emptyForm); setEditTask(null); setFormError(''); setModalOpen(true) }
   const openEdit = useCallback((t: Task) => {
-    setForm({ nazev: t.nazev, priorita: t.priorita, deadline: t.deadline || '', status: t.status, projekt: t.projekt || '' })
+    setForm({ nazev: t.nazev, priorita: t.priorita, deadline: t.deadline || '', deadline_time: (t.deadline_time || '').slice(0, 5), status: t.status, projekt: t.projekt || '' })
     setEditTask(t); setModalOpen(true)
   }, [])
 
@@ -137,7 +139,7 @@ export default function UkolyPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
-    const payload = { nazev: form.nazev, priorita: form.priorita, deadline: form.deadline || null, status: form.status, projekt: form.projekt || null }
+    const payload = { nazev: form.nazev, priorita: form.priorita, deadline: form.deadline || null, deadline_time: form.deadline_time || null, status: form.status, projekt: form.projekt || null }
     if (editTask) {
       await supabase.from('ukoly').update(payload).eq('id', editTask.id)
     } else {
@@ -178,9 +180,9 @@ export default function UkolyPage() {
       if (aDone !== bDone) return aDone - bDone
       const pDiff = (priorityOrder[a.priorita] ?? 1) - (priorityOrder[b.priorita] ?? 1)
       if (pDiff !== 0) return pDiff
-      const aD = a.deadline ? new Date(a.deadline).getTime() : Infinity
-      const bD = b.deadline ? new Date(b.deadline).getTime() : Infinity
-      return aD - bD
+      const aK = deadlineSortKey(a.deadline, a.deadline_time)
+      const bK = deadlineSortKey(b.deadline, b.deadline_time)
+      return aK < bK ? -1 : aK > bK ? 1 : 0
     }), [tasks, filterStatus, filterPriority, projektSearchTrim])
   const openCount = tasks.filter(t => t.status !== 'Done').length
 
@@ -401,6 +403,7 @@ export default function UkolyPage() {
             <PillGroup value={form.priorita} onChange={val => setForm({ ...form, priorita: val })} options={[{ value: 'Low', label: 'Low', color: priorityColors.Low }, { value: 'Medium', label: 'Medium', color: priorityColors.Medium }, { value: 'High', label: 'High', color: priorityColors.High }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} /></div>
+          <div><label style={labelStyle}>Čas (volitelné)</label><TimePicker value={form.deadline_time} onChange={v => setForm({ ...form, deadline_time: v })} /></div>
           <div><label style={labelStyle}>Status</label>
             <PillGroup value={form.status} onChange={val => setForm({ ...form, status: val })} options={[{ value: 'Todo', label: 'Todo', color: taskStatusColors.Todo }, { value: 'In Progress', label: 'In Progress', color: taskStatusColors['In Progress'] }, { value: 'Done', label: 'Done', color: taskStatusColors.Done }]} />
           </div>

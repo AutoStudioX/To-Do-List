@@ -10,6 +10,8 @@ import { Toast, useToast } from '@/components/Toast'
 import { Plus, TrendingUp, TrendingDown, CheckSquare, Target, X, Check, Sliders, Zap, Calculator } from 'lucide-react'
 import CircleProgress from '@/components/CircleProgress'
 import DatePicker from '@/components/DatePicker'
+import TimePicker from '@/components/TimePicker'
+import { deadlineSortKey, timeSuffix } from '@/lib/taskTime'
 import Link from 'next/link'
 import { seedRecurring } from '@/lib/seedRecurring'
 import { useLiveData } from '@/lib/useLiveData'
@@ -42,7 +44,7 @@ export default function PrehledPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { toast, showToast, hideToast } = useToast()
   const [txForm, setTxForm] = useState({ nazev: '', klient: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem' as Transaction['typ'], status: 'ceka', kategorie: '', opakovani: 'jednorazovy', smer: 'moje', poznamka: '' })
-  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'High', deadline: todayISO(), status: 'Todo', projekt: '' })
+  const [taskForm, setTaskForm] = useState({ nazev: '', priorita: 'High', deadline: todayISO(), deadline_time: '', status: 'Todo', projekt: '' })
   const [goalForm, setGoalForm] = useState({ nazev: '', deadline: todayISO(), popis: '', typ: 'manual' as 'manual' | 'number' | 'income', progress: 0, current_value: '', target_value: '', status: 'active' as 'active' | 'completed' })
 
   async function load() {
@@ -136,11 +138,11 @@ export default function PrehledPage() {
     if (!user) { setSaving(false); return }
     const { data } = await supabase.from('ukoly').insert({
       nazev: taskForm.nazev, priorita: taskForm.priorita,
-      deadline: taskForm.deadline || null, status: taskForm.status, projekt: taskForm.projekt || null, user_id: user.id,
+      deadline: taskForm.deadline || null, deadline_time: taskForm.deadline_time || null, status: taskForm.status, projekt: taskForm.projekt || null, user_id: user.id,
     }).select().single()
     if (data) setTasks(prev => [data, ...prev])
     setSaving(false); setAddModal(null); setFormErrors({})
-    setTaskForm({ nazev: '', priorita: 'High', deadline: todayISO(), status: 'Todo', projekt: '' })
+    setTaskForm({ nazev: '', priorita: 'High', deadline: todayISO(), deadline_time: '', status: 'Todo', projekt: '' })
     showToast('Úkol přidán')
   }
 
@@ -187,7 +189,9 @@ export default function PrehledPage() {
       if (!a.deadline && !b.deadline) return 0
       if (!a.deadline) return 1
       if (!b.deadline) return -1
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      const aK = deadlineSortKey(a.deadline, a.deadline_time)
+      const bK = deadlineSortKey(b.deadline, b.deadline_time)
+      return aK < bK ? -1 : aK > bK ? 1 : 0
     })
 
   const ringSize = isMobile ? 70 : 120
@@ -390,7 +394,7 @@ export default function PrehledPage() {
                 </label>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
-                  {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}</div>}
+                  {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}{timeSuffix(t.deadline_time)}</div>}
                 </div>
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>{t.priorita}</span>
                 </div>
@@ -530,6 +534,7 @@ export default function PrehledPage() {
             <PillGroup value={taskForm.priorita} onChange={val => setTaskForm({ ...taskForm, priorita: val })} options={[{ value: 'Low', label: 'Low', color: priorityColors.Low }, { value: 'Medium', label: 'Medium', color: priorityColors.Medium }, { value: 'High', label: 'High', color: priorityColors.High }]} />
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={taskForm.deadline} onChange={v => setTaskForm({ ...taskForm, deadline: v })} /></div>
+          <div><label style={labelStyle}>Čas (volitelné)</label><TimePicker value={taskForm.deadline_time} onChange={v => setTaskForm({ ...taskForm, deadline_time: v })} /></div>
           <div><label style={labelStyle}>Status</label>
             <PillGroup value={taskForm.status} onChange={val => setTaskForm({ ...taskForm, status: val })} options={[{ value: 'Todo', label: 'Todo', color: taskStatusColors.Todo }, { value: 'In Progress', label: 'In Progress', color: taskStatusColors['In Progress'] }, { value: 'Done', label: 'Done', color: taskStatusColors.Done }]} />
           </div>

@@ -40,7 +40,7 @@ const SYSTEM_PROMPT = `Jsi asistent pro úkoly, finance, cíle a projekty. Odpov
 
 Zavolej přesně jeden nástroj podle záměru uživatele. Pokud je příkaz nejasný, obecný nebo kratší než 2 slova, nevolej nic a požádej o upřesnění. Jinak NIKDY se neptej na doplňující otázky — vždy zavolej nástroj hned s rozumnými výchozími hodnotami.
 
-Výchozí hodnoty pro nezmíněná volitelná pole (nikdy se na ně neptej): datum=dnes, typ příjmu/výdaje=jednorázový, status příjmu=zaplaceno, kategorie=Ostatní, čas úkolu=nepřidávej nic (jen pokud ho uživatel řekl). Pokud uživatel zmíní zdroj příjmu jen nepřímo (např. "za projekt X"), použij to jako klienta/zdroj.
+Výchozí hodnoty pro nezmíněná volitelná pole (nikdy se na ně neptej): datum=dnes, typ příjmu/výdaje=jednorázový, status příjmu=zaplaceno, kategorie=Ostatní, čas úkolu (cas)=null (jen pokud uživatel řekl konkrétní hodinu). Pokud uživatel zmíní zdroj příjmu jen nepřímo (např. "za projekt X"), použij to jako klienta/zdroj.
 
 U add_task (a jen tam): pokud není řečen deadline, nastav ho na dnešek; pokud není řečena priorita, nastav High. U add_goal deadline bez zmínky NECHÁVEJ null (cíle deadline nepotřebují).
 
@@ -48,7 +48,7 @@ U add_task (a jen tam): pokud není řečen deadline, nastav ho na dnešek; poku
 
 Název úkolu (add_task) a název výdaje (add_expense) vždy začni velkým písmenem.
 
-Pokud uživatel zmíní čas (v 8 hodin, na 9:30, v půl čtvrté), přidej tento čas do názvu úkolu ve formátu "v HH:MM" a nastav deadline na správné datum. Čas bez data = dnes, "zítra" = zítřejší datum. Česká zlomková vyjádření: "v půl čtvrté"=15:30, "ve čtvrt na devět"=08:15, "tři čtvrtě na devět"=08:45, "v osm ráno"=08:00, "v osm večer"=20:00.
+Pokud uživatel zmíní čas (v 8 hodin, na 9:30, v půl čtvrté), nastav pole "cas" na HH:MM (24h) a "deadline" na správné datum. Čas NEPŘIDÁVEJ do názvu. Čas bez data = dnes, "zítra" = zítřejší datum. Když čas neřekl, nech "cas" null. Česká zlomková vyjádření: "v půl čtvrté"=15:30, "ve čtvrt na devět"=08:15, "tři čtvrtě na devět"=08:45, "v osm ráno"=08:00, "v osm večer"=20:00.
 
 Pokud se rozhodneš akci provést, VŽDY zavolej odpovídající nástroj — nikdy nepiš, že je něco hotové nebo přidané, aniž bys zároveň zavolal nástroj. Když voláš nástroj, NEPIŠ žádný doprovodný text — jen zavolej nástroj (potvrzení zobrazí aplikace sama). Text napiš jen když nevoláš žádný nástroj (žádost o upřesnění).`
 
@@ -104,6 +104,7 @@ const tools: Anthropic.Tool[] = [
         nazev: { type: 'string', description: 'Konkrétní smysluplný název úkolu' },
         priorita: { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Priorita, default High' },
         deadline: { type: ['string', 'null'], description: 'Termín YYYY-MM-DD, default dnes' },
+        cas: { type: ['string', 'null'], description: 'Čas HH:MM (24h, lokální), jen pokud uživatel řekl konkrétní hodinu; jinak null' },
         projekt: { type: ['string', 'null'], description: 'Název projektu, nebo null' },
       },
       required: ['nazev'],
@@ -123,6 +124,7 @@ const tools: Anthropic.Tool[] = [
             status: { type: 'string', enum: ['Todo', 'In Progress', 'Done'] },
             priorita: { type: 'string', enum: ['High', 'Medium', 'Low'] },
             deadline: { type: ['string', 'null'] },
+            cas: { type: ['string', 'null'], description: 'Čas HH:MM (24h), nebo null pro odebrání času' },
             projekt: { type: ['string', 'null'] },
           },
         },

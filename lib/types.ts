@@ -4,6 +4,7 @@ export interface Task {
   nazev: string
   priorita: 'High' | 'Medium' | 'Low'
   deadline: string | null
+  deadline_time?: string | null
   status: 'Todo' | 'In Progress' | 'Done'
   projekt: string | null
   created_at: string
