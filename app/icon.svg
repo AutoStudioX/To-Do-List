@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#CC4444"/>
-  <g transform="translate(-53,132) scale(0.045,-0.045)">
-    <path fill="white" d="M2404 2439 c17 -14 26 -30 26 -49 0 -16 -25 -107 -55 -201 -30 -94
--55 -178 -55 -185 0 -12 41 -14 231 -14 l231 0 c29 0 58 -41 58 -101
-0 -37 -9 -49 -110 -157 -60 -64 -201 -210 -312 -325 -219 -223 -227 -229
--282 -186 -17 14 -26 30 -26 49 0 16 25 107 55 201 30 94 55 178 55 185 0 12
--41 14 -231 14 l-231 0 c-29 0 -58 41 -58 101 0 37 9 49 110 157 60
-64 201 210 312 325 219 223 227 229 282 186z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <circle cx="256" cy="256" r="256" fill="#e53e3e"/>
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="150,180 176,206 216,152"/>
+    <polyline points="150,264 176,290 216,236"/>
+    <polyline points="150,348 176,374 216,320"/>
+  </g>
+  <g fill="#ffffff">
+    <rect x="246" y="166" width="122" height="26" rx="13"/>
+    <rect x="246" y="250" width="122" height="26" rx="13"/>
+    <rect x="246" y="334" width="122" height="26" rx="13"/>
   </g>
 </svg>
