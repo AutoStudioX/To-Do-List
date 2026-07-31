@@ -5,10 +5,22 @@ export const WEIGHT_STEP = 2.5
 export const REP_STEP = 1
 
 // Next split by rotation Push → Pull → Legs → Push, based on the last workout.
-export function nextSplit(lastSplit: SplitType | null | undefined): SplitType {
+// Custom split names aren't in the rotation → fall through to Push as the suggestion.
+export function nextSplit(lastSplit: string | null | undefined): SplitType {
   if (!lastSplit) return 'Push'
-  const i = SPLITS.indexOf(lastSplit)
+  const i = SPLITS.indexOf(lastSplit as SplitType)
+  if (i === -1) return 'Push'
   return SPLITS[(i + 1) % SPLITS.length]
+}
+
+// Badge color for a split — the three defaults keep their colors, custom = purple.
+export function splitColor(s?: string | null): string {
+  switch (s) {
+    case 'Push': return '#e53e3e'
+    case 'Pull': return '#2563eb'
+    case 'Legs': return '#059669'
+    default: return '#7c3aed'
+  }
 }
 
 // "80 kg × 8, 80 × 7, 75 × 8" from a list of working sets (warm-ups excluded upstream).

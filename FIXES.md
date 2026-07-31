@@ -59,3 +59,9 @@ Migrace + RLS + „minule" logika: reálný lokální Postgres. UI na **375px v 
 Pro okamžitou realtime synchronizaci přidej tabulky do publikace:
 `alter publication supabase_realtime add table public.workouts, public.workout_sets, public.exercises;`
 (Bez toho appka syncuje přes poll/focus, jen ne okamžitě.)
+
+## Trénink — mazání tréninku + vlastní split (0006)
+- **Mazání tréninku**: v historii (`/trenink`) má každý řádek ikonu koše → confirm → smaže workout (série padnou přes `on delete cascade` z 0005). Řádek přestal být jeden velký `<button>` (nešlo vnořit další tlačítko) — teď je to `div` s klikací částí + samostatným košem (44px).
+- **Vlastní typ splitu**: čtvrtá pilulka „Vlastní" vedle Push/Pull/Legs → odkryje textové pole (název, max 40 znaků, např. „Full body", „Ruce", „Kardio"). Uloží se do `split_type` jako libovolný text.
+- Migrace **`0006_workout_custom_split.sql`**: `drop constraint workouts_split_type_check` (0005 to omezovalo jen na Push/Pull/Legs). SPUSTIT v SQL Editoru, jinak insert vlastního splitu selže.
+- `split_type` v `lib/types.ts` uvolněn na `string | null`. Barvy: `splitColor(s)` helper v `lib/gym.ts` — tři defaulty drží svou barvu, vlastní = fialová (#7c3aed). `nextSplit` vlastní názvy ignoruje (nabídne Push). Detail i home page používají helper.

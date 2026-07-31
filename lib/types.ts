@@ -26,7 +26,7 @@ export interface Workout {
   id: string
   user_id: string
   date: string
-  split_type: SplitType | null
+  split_type: string | null
   note: string | null
   duration_min: number | null
   created_at?: string

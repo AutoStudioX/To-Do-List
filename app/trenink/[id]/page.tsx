@@ -2,15 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Workout, WorkoutSet, Exercise, SplitType } from '@/lib/types'
+import type { Workout, WorkoutSet, Exercise } from '@/lib/types'
 import Modal from '@/components/Modal'
 import NumberStepper from '@/components/gym/NumberStepper'
 import ExercisePicker from '@/components/gym/ExercisePicker'
 import ExerciseChart from '@/components/gym/ExerciseChart'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight } from '@/lib/gym'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor } from '@/lib/gym'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame } from 'lucide-react'
-
-const splitColor: Record<SplitType, string> = { Push: '#e53e3e', Pull: '#2563eb', Legs: '#059669' }
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
@@ -193,7 +191,7 @@ export default function ActiveWorkoutPage() {
     <div style={{ maxWidth: 640, margin: '0 auto', paddingBottom: 96 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer' }}><ChevronLeft size={22} /></button>
-        {workout.split_type && <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: splitColor[workout.split_type], borderRadius: 8, padding: '5px 12px' }}>{workout.split_type}</span>}
+        {workout.split_type && <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: splitColor(workout.split_type), borderRadius: 8, padding: '5px 12px' }}>{workout.split_type}</span>}
         <div style={{ flex: 1, fontSize: 14, color: 'var(--muted)' }}>{new Date(workout.date).toLocaleDateString('cs-CZ')}</div>
         <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Hotovo</button>
       </div>
