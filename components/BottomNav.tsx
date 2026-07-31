@@ -1,12 +1,13 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, Dumbbell } from 'lucide-react'
 
 const navItems = [
   { href: '/prehled', label: 'Přehled', icon: LayoutDashboard },
   { href: '/finance', label: 'Finance', icon: TrendingUp },
   { href: '/ukoly', label: 'Úkoly', icon: CheckSquare },
+  { href: '/trenink', label: 'Trénink', icon: Dumbbell },
   { href: '/goaly', label: 'Goals', icon: Target },
 ]
 

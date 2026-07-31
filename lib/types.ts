@@ -11,6 +11,39 @@ export interface Task {
   dokonceno_at?: string | null
 }
 
+export type SplitType = 'Push' | 'Pull' | 'Legs'
+
+export interface Exercise {
+  id: string
+  user_id: string | null
+  name: string
+  muscle_group: string | null
+  is_custom: boolean
+  created_at?: string
+}
+
+export interface Workout {
+  id: string
+  user_id: string
+  date: string
+  split_type: SplitType | null
+  note: string | null
+  duration_min: number | null
+  created_at?: string
+}
+
+export interface WorkoutSet {
+  id: string
+  workout_id: string
+  exercise_id: string
+  order_index: number
+  weight_kg: number | null
+  reps: number | null
+  rpe: number | null
+  is_warmup: boolean
+  created_at?: string
+}
+
 export interface Projekt {
   id: string
   user_id: string

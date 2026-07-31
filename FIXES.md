@@ -33,3 +33,29 @@ Ověřeno na Postgresu: po migraci má legacy úkol `deadline_time = NULL` a na�
 - Migrace + no-tz-shift + backward compat: reálný lokální Postgres (TZ Europe/Prague) — legacy řádek beze změny, `08:00` čteno zpět jako `08:00`.
 - TimePicker UI: dočasný harness na login stránce (public), ovládnuto v prohlížeči — quick volby, vlastní čas 9:30, „Bez času", zvýraznění pilulek i zobrazení „… v H:MM" ověřeno; harness poté smazán. (Fix: doplněny `key` u mapovaných pilulek.)
 - Plné plochy `/ukoly` a `/prehled` jsou za přihlášením, které nebylo možné projít (login zamčený + zákaz zadávání hesel) — ověřeno tedy izolovaně komponentou + DB.
+
+## Trénink v posilovně (gym section)
+
+Nová sekce `/trenink` — rychlý zápis tréninku (cíl: série na 2 tapy).
+
+### Schéma (migrace `supabase/migrations/0005_gym.sql` — NUTNO spustit v Supabase)
+- `exercises` (katalog: `user_id` NULL = globální, `is_custom`; RLS: čti globální+svoje, zapisuj jen svoje) — seed 24 cviků (8 Push / 8 Pull / 8 Legs).
+- `workouts` (`date`, `split_type` Push/Pull/Legs, `note`, `duration_min`; RLS owner-only).
+- `workout_sets` (`weight_kg` **numeric** ne text, `reps` int, `rpe` int null, `is_warmup` bool, `order_index`; RLS přes vlastnictví workoutu). Ověřeno na Postgresu: RLS on, katalog=24, weight numeric, „minule" dotaz vrací working sety bez warm-upu.
+
+### UI
+- `/trenink`: „Nový trénink" → pill Push/Pull/Legs (předvybraný podle rotace z posledního tréninku) → založí workout. + historie (datum, split badge, počet sérií, délka).
+- `/trenink/[id]`: aktivní trénink. Po volbě splitu se **předvyplní cviky z posledního tréninku téhož splitu** (váhy/opakování jako šedé placeholdery). Řádek série: warm-up (plamínek) | váha × opakování | ✓. **Tap ✓ = potvrdí sérii jak je (2-tap průchod)** → insert. Tap na číslo → stepper (velká +/− 2,5 kg / 1 op. + přímé zadání). „+ Série" kopíruje poslední. Cviky lze přidat (ExercisePicker: katalog + vlastní), smazat, přeuspořádat (šipky). U cviku „minule: 80 kg × 8, 80 × 7, 75 × 8". Klik na název cviku → graf max. váhy v čase (ExerciseChart).
+- Komponenty: `components/gym/NumberStepper.tsx`, `ExercisePicker.tsx`, `ExerciseChart.tsx`. Helpery `lib/gym.ts`.
+- Navigace: „Trénink" (Dumbbell) přidán do BottomNav i Sidebar.
+
+### Pravidla dodržena
+44px tap targety, ovládání palcem, button groups místo dropdownů, jen lucide ikony (žádné emoji), mobile-first. Bez timerů / plánů / 1RM (dle „co nedělat").
+
+### Verifikace
+Migrace + RLS + „minule" logika: reálný lokální Postgres. UI na **375px v prohlížeči**: split pilulky, prefill šedě, ✓ potvrzení (řádek zezelená), stepper editor, „minule" formát, dolní nav s Tréninkem — ověřeno přes dočasnou veřejnou demo route (smazána). Plné `/trenink` je za přihlášením, které nešlo projít (login zamčený + zákaz hesel), proto ověřeno komponentami + DB.
+
+### Pozn.
+Pro okamžitou realtime synchronizaci přidej tabulky do publikace:
+`alter publication supabase_realtime add table public.workouts, public.workout_sets, public.exercises;`
+(Bez toho appka syncuje přes poll/focus, jen ne okamžitě.)

@@ -37,6 +37,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 | `/goaly` | Goal cards with milestones, progress bar, roadmap |
 | `/finance` | Income/expense/fixed costs, 6-month bar chart, 1M progress bar |
 | `/casovy-plan` | Weekly calendar grid (Mon-Sun, 06:00-22:00), colored time blocks |
+| `/trenink` | Gym: new workout (split Push/Pull/Legs, prefill from last same-split workout), 2-tap set logging, history + per-exercise max-weight chart |
 | `/dluhy` | Debts split into "mine" / "owed to me", toggle status |
 | `/login` | Email + password auth |
 
