@@ -75,3 +75,14 @@ Přepis vzhledu celé sekce dle nového designu. **Veškerá logika/handlery/DB 
 - Styl: inline (konzistence s appkou, žádné CSS soubory). Barvy přes CSS vars (theme-aware), akcent #E8192C, split barvy z `splitColor()`.
 - **Pozn.:** předchozí pravidlo „bez timerů/1RM" bylo na výslovnou žádost uživatele zrušeno (timer jen na tap, 1RM jako odhad).
 - Desktop: obsah vycentrovaný na max 720px (neroztahuje se). Ověřeno na 390px i 1440px přes dočasnou demo route (smazána); plné `/trenink` je za loginem, proto vizuál přes demo + logika typecheckem.
+
+## Trénink — zadávání (D2) podle designu
+Přepis `/trenink/[id]`. Logika a DB volání beze změny; přibyly jen odvozené (read-only) hodnoty.
+- **Desktop: tři sloupce `300 / 1fr / 340`** — (1) seznam cviků: číslo, název, `hotové / celkem série · minule …`, aktivní červeně podbarvený, dole `+ Přidat cvik`; (2) **jeden aktivní cvik** — série s indexem `W/1/2/3`, porovnávací odznaky, ✓; pod nimi **stepper panel** `SÉRIE N` + `VÁHA` / `OPAKOVÁNÍ` + plamínek + `✓ Potvrdit sérii` + `nebo klávesa Enter`; (3) `PAUZA`, `<cvik> · POKROK` (sparkline + `1RM est.` / `Objem dnes` / `Vs. minule`), `MINULÝ <split> · datum` se sériemi.
+- **Hlavička**: progress bar zaplnění sérií; na mobilu místo něj `název cviku` + `cvik 1/5 · N série hotové`.
+- **Mobil**: bloky stacknuté, **stepper panel přilepený dole** v palcové zóně (velké ±60px, `Potvrdit sérii` 64px), pauza jako řádek v obsahu.
+- **Přepínání cviků jedním tapem** (nad rámec designu, na přání): **přilepený vodorovný proužek chipů** pod hlavičkou — vždy viditelný, netřeba scrollovat nahoru.
+- **Prázdný stav** dle mobilní obrazovky 2: `Zatím žádný cvik` + náhled `MINULÝ <split> · datum` + **`⟳ Načíst minulý trénink`** + `+ Přidat cvik`.
+- **Pauza se NIKDY nespouští sama** — jen na tap (`Spustit pauzu` / `Spustit`), pak `+30 s` / `Přeskočit`.
+- Nové: `components/gym/ExerciseSparkline.tsx`. Smazáno: `components/gym/NumberStepper.tsx` (nahrazen steppery v panelu — žádný mrtvý kód).
+- Ověřeno na **1440px i 390px** proti designu na reálné komponentě (dočasný mock v `load()`, odstraněn); `next build` prochází.

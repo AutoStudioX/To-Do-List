@@ -4,19 +4,21 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, WorkoutSet, Exercise } from '@/lib/types'
 import Modal from '@/components/Modal'
-import NumberStepper from '@/components/gym/NumberStepper'
 import ExercisePicker from '@/components/gym/ExercisePicker'
 import ExerciseChart from '@/components/gym/ExerciseChart'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor } from '@/lib/gym'
-import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, X } from 'lucide-react'
+import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage } from '@/lib/gym'
+import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
+type Template = { date: string | null; groups: { exercise: Exercise; sets: WorkoutSet[] }[] }
 
 let keySeq = 0
 const newKey = () => `s${++keySeq}`
 
 const REST_DEFAULT = 90 // seconds; the rest timer NEVER auto-starts — user taps "Pauza".
+const MOBILE_PANEL_SPACE = 380 // room reserved under the content for the pinned stepper panel
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`
 
 // Comparison badge for a confirmed working set vs the same-index previous set.
@@ -33,18 +35,30 @@ function setBadge(weight: number, reps: number, prev: { weight_kg: number | null
   return null
 }
 
+const shortDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : ''
+
 export default function ActiveWorkoutPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const [workout, setWorkout] = useState<Workout | null>(null)
   const [catalog, setCatalog] = useState<Exercise[]>([])
   const [items, setItems] = useState<ActiveExercise[]>([])
+  const [tmpl, setTmpl] = useState<Template>({ date: null, groups: [] })
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<{ ex: number; set: number } | null>(null)
+  const [activeIdx, setActiveIdx] = useState(0)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chartExercise, setChartExercise] = useState<Exercise | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [rest, setRest] = useState<number | null>(null) // remaining seconds, null = off
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -67,11 +81,13 @@ export default function ActiveWorkoutPage() {
 
     // Template = the most recent OTHER workout of the same split.
     let template: WorkoutSet[] = []
+    let templateDate: string | null = null
     if (w.split_type) {
-      const { data: prevW } = await supabase.from('workouts').select('id').eq('user_id', user.id).eq('split_type', w.split_type).neq('id', id).order('date', { ascending: false }).order('created_at', { ascending: false }).limit(1)
-      const prevId = (prevW || [])[0]?.id
-      if (prevId) {
-        const { data: prevSets } = await supabase.from('workout_sets').select('*').eq('workout_id', prevId).order('order_index').order('created_at')
+      const { data: prevW } = await supabase.from('workouts').select('id, date').eq('user_id', user.id).eq('split_type', w.split_type).neq('id', id).order('date', { ascending: false }).order('created_at', { ascending: false }).limit(1)
+      const prev = (prevW || [])[0]
+      if (prev?.id) {
+        templateDate = prev.date ?? null
+        const { data: prevSets } = await supabase.from('workout_sets').select('*').eq('workout_id', prev.id).order('order_index').order('created_at')
         template = (prevSets || []) as WorkoutSet[]
       }
     }
@@ -87,19 +103,27 @@ export default function ActiveWorkoutPage() {
     for (const s of template) if (!order.includes(s.exercise_id)) order.push(s.exercise_id)
     for (const s of confirmed) if (!order.includes(s.exercise_id)) order.push(s.exercise_id)
 
+    // Keep the template around so the empty state can offer "Načíst minulý trénink".
+    const tmplOrder: string[] = []
+    for (const s of template) if (!tmplOrder.includes(s.exercise_id)) tmplOrder.push(s.exercise_id)
+    setTmpl({
+      date: templateDate,
+      groups: tmplOrder.map(exId => ({ exercise: exMap.get(exId)!, sets: tmplG.get(exId) || [] })).filter(g => g.exercise),
+    })
+
     const built: ActiveExercise[] = []
     for (const exId of order) {
       const ex = exMap.get(exId)
       if (!ex) continue
       const conf = confG.get(exId) || []
-      const tmpl = tmplG.get(exId) || []
+      const tmp = tmplG.get(exId) || []
       const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: true, prefilled: false }))
-      for (let i = conf.length; i < tmpl.length; i++) {
-        const t = tmpl[i]
+      for (let i = conf.length; i < tmp.length; i++) {
+        const t = tmp[i]
         sets.push({ key: newKey(), id: null, weight: Number(t.weight_kg ?? 0), reps: t.reps ?? 0, is_warmup: t.is_warmup, confirmed: false, prefilled: true })
       }
       if (sets.length === 0) sets.push({ key: newKey(), id: null, weight: 20, reps: 8, is_warmup: false, confirmed: false, prefilled: false })
-      built.push({ exercise: ex, previous: tmpl.filter(t => !t.is_warmup).map(t => ({ weight_kg: t.weight_kg, reps: t.reps })), sets })
+      built.push({ exercise: ex, previous: tmp.filter(t => !t.is_warmup).map(t => ({ weight_kg: t.weight_kg, reps: t.reps })), sets })
     }
     setItems(built)
     setLoading(false)
@@ -116,13 +140,27 @@ export default function ActiveWorkoutPage() {
     return () => clearInterval(t)
   }, [])
 
+  // The stepper panel always edits a real set: keep one unconfirmed set at the
+  // end of the active exercise. Bails out when one already exists.
+  useEffect(() => {
+    setItems(prev => {
+      const ex = prev[activeIdx]
+      if (!ex || ex.sets.some(s => !s.confirmed)) return prev
+      const last = ex.sets[ex.sets.length - 1]
+      const next = [...prev]
+      next[activeIdx] = { ...ex, sets: [...ex.sets, { key: newKey(), id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
+      return next
+    })
+  }, [activeIdx, items])
+
   const supabase = useMemo(() => createClient(), [])
 
   const patchSet = (ex: number, set: number, patch: Partial<ActiveSet>) =>
     setItems(prev => prev.map((it, i) => i !== ex ? it : { ...it, sets: it.sets.map((s, j) => j !== set ? s : { ...s, ...patch }) }))
 
   async function confirmSet(ex: number, set: number) {
-    const it = items[ex]; const s = it.sets[set]
+    const it = items[ex]; const s = it?.sets[set]
+    if (!it || !s) return
     const payload = { workout_id: id, exercise_id: it.exercise.id, order_index: ex, weight_kg: s.weight, reps: s.reps, is_warmup: s.is_warmup }
     if (s.confirmed && s.id) {
       await supabase.from('workout_sets').update(payload).eq('id', s.id)
@@ -131,14 +169,15 @@ export default function ActiveWorkoutPage() {
       const { data } = await supabase.from('workout_sets').insert(payload).select().single()
       patchSet(ex, set, { confirmed: true, prefilled: false, id: data?.id ?? null })
     }
-    setEditing(null)
+    setSelectedKey(null)
   }
 
   async function deleteSet(ex: number, set: number) {
-    const s = items[ex].sets[set]
+    const s = items[ex]?.sets[set]
+    if (!s) return
     if (s.confirmed && s.id) await supabase.from('workout_sets').delete().eq('id', s.id)
     setItems(prev => prev.map((it, i) => i !== ex ? it : { ...it, sets: it.sets.filter((_, j) => j !== set) }))
-    setEditing(null)
+    setSelectedKey(null)
   }
 
   function addSet(ex: number) {
@@ -150,7 +189,8 @@ export default function ActiveWorkoutPage() {
   }
 
   async function toggleWarmup(ex: number, set: number) {
-    const s = items[ex].sets[set]
+    const s = items[ex]?.sets[set]
+    if (!s) return
     const nv = !s.is_warmup
     patchSet(ex, set, { is_warmup: nv })
     if (s.confirmed && s.id) await supabase.from('workout_sets').update({ is_warmup: nv }).eq('id', s.id)
@@ -158,7 +198,8 @@ export default function ActiveWorkoutPage() {
 
   async function addExercise(ex: Exercise) {
     setPickerOpen(false)
-    if (items.some(it => it.exercise.id === ex.id)) return
+    const existing = items.findIndex(it => it.exercise.id === ex.id)
+    if (existing >= 0) { setActiveIdx(existing); return }
     // Prefill from this exercise's most recent previous set, if any.
     const { data: { session } } = await supabase.auth.getSession()
     let previous: { weight_kg: number | null; reps: number | null }[] = []
@@ -175,7 +216,11 @@ export default function ActiveWorkoutPage() {
       const working = rows.filter(r => !r.is_warmup)
       if (working.length) { seed = { weight: Number(working[0].weight_kg ?? 20), reps: working[0].reps ?? 8 }; previous = working.slice(0, 4).map(r => ({ weight_kg: r.weight_kg, reps: r.reps })) }
     }
-    setItems(prev => [...prev, { exercise: ex, previous, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }])
+    setItems(prev => {
+      const next = [...prev, { exercise: ex, previous, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }]
+      setActiveIdx(next.length - 1)
+      return next
+    })
   }
 
   async function addCustomExercise(name: string) {
@@ -185,17 +230,30 @@ export default function ActiveWorkoutPage() {
     if (data) { setCatalog(c => [...c, data as Exercise]); addExercise(data as Exercise) }
   }
 
+  // Rebuild the exercise list from the previous same-split workout (empty state).
+  function loadTemplate() {
+    if (!tmpl.groups.length) return
+    setItems(tmpl.groups.map(g => ({
+      exercise: g.exercise,
+      previous: g.sets.filter(s => !s.is_warmup).map(s => ({ weight_kg: s.weight_kg, reps: s.reps })),
+      sets: g.sets.map(s => ({ key: newKey(), id: null, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: false, prefilled: true })),
+    })))
+    setActiveIdx(0)
+  }
+
   async function removeExercise(ex: number) {
     const it = items[ex]
     const ids = it.sets.filter(s => s.confirmed && s.id).map(s => s.id as string)
     if (ids.length) await supabase.from('workout_sets').delete().in('id', ids)
     setItems(prev => prev.filter((_, i) => i !== ex))
+    setActiveIdx(i => Math.max(0, i > ex ? i - 1 : i === ex ? Math.min(i, items.length - 2) : i))
   }
 
   async function moveExercise(ex: number, dir: -1 | 1) {
     const to = ex + dir
     if (to < 0 || to >= items.length) return
     setItems(prev => { const a = [...prev]; const [m] = a.splice(ex, 1); a.splice(to, 0, m); return a })
+    setActiveIdx(i => (i === ex ? to : i === to ? ex : i))
     // best-effort persist order for confirmed sets
     const arr = [...items]; const [m] = arr.splice(ex, 1); arr.splice(to, 0, m)
     for (let i = 0; i < arr.length; i++) {
@@ -212,7 +270,20 @@ export default function ActiveWorkoutPage() {
     router.push('/trenink')
   }
 
-  // Derived counters for the header.
+  // ---------- derived ----------
+  const active = items[activeIdx]
+  const panelIdx = useMemo(() => {
+    if (!active) return -1
+    const sel = selectedKey ? active.sets.findIndex(s => s.key === selectedKey) : -1
+    return sel >= 0 ? sel : active.sets.findIndex(s => !s.confirmed)
+  }, [active, selectedKey])
+  const panelSet = panelIdx >= 0 ? active?.sets[panelIdx] : undefined
+  const panelSetNo = useMemo(() => {
+    if (!active || panelIdx < 0) return 1
+    return active.sets.slice(0, panelIdx + 1).filter(s => !s.is_warmup).length || 1
+  }, [active, panelIdx])
+  const panelPrev = active?.previous[Math.max(0, panelSetNo - 1)]
+
   const { doneSets, totalSets } = useMemo(() => {
     let done = 0, total = 0
     for (const it of items) for (const s of it.sets) {
@@ -223,108 +294,353 @@ export default function ActiveWorkoutPage() {
     return { doneSets: done, totalSets: total }
   }, [items])
 
-  const elapsedMin = workout?.created_at ? Math.floor((nowMs - new Date(workout.created_at).getTime()) / 60000) : 0
-  const elapsedSec = workout?.created_at ? Math.floor((nowMs - new Date(workout.created_at).getTime()) / 1000) % 60 : 0
+  const exStats = useMemo(() => {
+    if (!active) return null
+    const todaySets = active.sets.filter(s => s.confirmed && !s.is_warmup)
+    const todayVol = todaySets.reduce((sum, s) => sum + s.weight * s.reps, 0)
+    const prevVol = active.previous.reduce((sum, p) => sum + (Number(p.weight_kg) || 0) * (p.reps || 0), 0)
+    const oneRM = epley1RM(todaySets.map(s => ({ weight_kg: s.weight, reps: s.reps, is_warmup: false })))
+    const delta = prevVol > 0 && todayVol > 0 ? Math.round(((todayVol - prevVol) / prevVol) * 1000) / 10 : null
+    return { todayVol, oneRM, delta }
+  }, [active])
+
+  const elapsedSec = workout?.created_at ? Math.max(0, Math.floor((nowMs - new Date(workout.created_at).getTime()) / 1000)) : 0
+  const doneOnActive = active ? active.sets.filter(s => s.confirmed && !s.is_warmup).length : 0
+
+  // Enter confirms the panel set (design: "nebo klávesa Enter").
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.repeat) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (pickerOpen || chartExercise) return
+      if (panelIdx >= 0) { e.preventDefault(); confirmSet(activeIdx, panelIdx) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, panelIdx, items, pickerOpen, chartExercise])
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!workout) return <div style={{ color: 'var(--muted)', padding: 24 }}>Trénink nenalezen.</div>
 
-  return (
-    <div style={{ maxWidth: 720, margin: '0 auto', paddingBottom: rest != null ? 120 : 96 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', cursor: 'pointer' }}><ChevronLeft size={22} /></button>
-        {workout.split_type && <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(workout.split_type), borderRadius: 8, padding: '5px 12px', textTransform: 'uppercase' }}>{workout.split_type}</span>}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Dnes</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{mmss(elapsedMin * 60 + elapsedSec)} · {doneSets} z {totalSets} sérií</div>
+  const split = workout.split_type
+  const accent = splitColor(split)
+
+  // ---------- blocks ----------
+  const header = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', cursor: 'pointer', flexShrink: 0 }}><ChevronLeft size={22} /></button>
+      {split && <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: accent, borderRadius: 8, padding: '5px 10px', textTransform: 'uppercase', flexShrink: 0 }}>{split}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {isMobile && active ? active.exercise.name : 'Dnes'}
         </div>
-        <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Hotovo</button>
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+          {isMobile && active
+            ? `cvik ${activeIdx + 1}/${items.length} · ${doneOnActive} ${doneOnActive === 1 ? 'série hotová' : 'série hotové'}`
+            : `${mmss(elapsedSec)} · ${doneSets} z ${totalSets} sérií`}
+        </div>
       </div>
-
-      {items.length > 0 && (
-        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, margin: '0 0 10px' }}>CVIKY · {items.length}</div>
+      {!isMobile && (
+        <div style={{ width: 180, height: 6, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
+        </div>
       )}
+      <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{isMobile ? 'Hotovo' : 'Ukončit trénink'}</button>
+    </div>
+  )
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {items.map((it, exIdx) => {
-          let workingIdx = -1
+  const exerciseRow = (it: ActiveExercise, i: number) => {
+    const isActive = i === activeIdx
+    const done = it.sets.filter(s => s.confirmed && !s.is_warmup).length
+    const total = it.sets.filter(s => !s.is_warmup).length
+    const prev = it.previous[0]
+    return (
+      <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null) }} style={{
+        display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation',
+        padding: '10px 12px', borderRadius: 12, minHeight: 56, width: '100%',
+        border: `1px solid ${isActive ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
+        background: isActive ? 'rgba(232,25,44,0.10)' : 'var(--input-bg)',
+      }}>
+        <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, background: isActive ? '#E8192C' : 'var(--card)', color: isActive ? '#fff' : 'var(--muted)', border: isActive ? 'none' : '1px solid var(--border)' }}>{i + 1}</span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.exercise.name}</span>
+          <span style={{ display: 'block', fontSize: 12, color: isActive ? '#E8192C' : 'var(--muted)', marginTop: 1 }}>
+            {done} / {total} série{prev ? ` · minule ${prev.weight_kg == null ? 'vlastní' : fmtWeight(Number(prev.weight_kg))} × ${prev.reps ?? '?'}` : ''}
+          </span>
+        </span>
+      </button>
+    )
+  }
+
+  const exerciseListCol = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>CVIKY · {items.length}</div>
+      {items.map(exerciseRow)}
+      <button onClick={() => setPickerOpen(true)} style={{ minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Plus size={16} /> Přidat cvik</button>
+    </div>
+  )
+
+  // Mobile: pinned one-tap exercise switcher (not in the design, but required
+  // so switching never means scrolling back up).
+  const exerciseStrip = items.length > 0 && (
+    // top/paddingTop offset covers <main>'s own padding so rows don't peek above the strip
+    <div style={{ position: 'sticky', top: -16, zIndex: 20, background: 'var(--bg)', paddingTop: 16, paddingBottom: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+        {items.map((it, i) => {
+          const isActive = i === activeIdx
+          const done = it.sets.filter(s => s.confirmed && !s.is_warmup).length
+          const total = it.sets.filter(s => !s.is_warmup).length
           return (
-            <div key={it.exercise.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                <button onClick={() => setChartExercise(it.exercise)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0, flex: 1, display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span style={{ width: 26, height: 26, borderRadius: 8, background: '#E8192C', color: '#fff', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{exIdx + 1}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>{it.exercise.name} <BarChart3 size={14} color="var(--muted)" /></span>
-                    {it.previous.length > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginTop: 2 }}>minule: {formatPrevious(it.previous)}</span>}
-                  </span>
-                </button>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button onClick={() => moveExercise(exIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
-                  <button onClick={() => moveExercise(exIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
-                  <button onClick={() => removeExercise(exIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {it.sets.map((s, setIdx) => {
-                  const isEditing = editing && editing.ex === exIdx && editing.set === setIdx
-                  const grey = !s.confirmed && s.prefilled
-                  if (!s.is_warmup) workingIdx++
-                  const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, it.previous, workingIdx) : null
-                  const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
-                  return (
-                    <div key={s.key} style={{ border: `1px solid ${s.confirmed ? '#10b981' : 'var(--border)'}`, borderRadius: 12, background: s.confirmed ? 'rgba(16,185,129,0.06)' : 'transparent' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
-                        <button onClick={() => toggleWarmup(exIdx, setIdx)} aria-label="Rozehřívací série" title="Warm-up (nepočítá se)" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid var(--border)', background: s.is_warmup ? '#fef3c7' : 'var(--input-bg)', color: s.is_warmup ? '#d97706' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Flame size={16} /></button>
-                        <button onClick={() => setEditing(isEditing ? null : { ex: exIdx, set: setIdx })} style={{ flex: 1, minHeight: 44, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
-                          {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 700 }}>W</span>}
-                          {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
-                        </button>
-                        <button onClick={() => confirmSet(exIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation' }}><Check size={20} /></button>
-                      </div>
-                      {isEditing && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', padding: '0 8px 10px' }}>
-                          <NumberStepper label="Váha (kg)" value={s.weight} step={WEIGHT_STEP} allowDecimal onChange={v => patchSet(exIdx, setIdx, { weight: v })} />
-                          <NumberStepper label="Opakování" value={s.reps} step={REP_STEP} min={0} onChange={v => patchSet(exIdx, setIdx, { reps: v })} />
-                          <button onClick={() => deleteSet(exIdx, setIdx)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px solid rgba(232,25,44,0.4)', borderRadius: 10, color: '#E8192C', fontSize: 14, cursor: 'pointer' }}>Smazat sérii</button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button onClick={() => addSet(exIdx)} style={{ flex: 1, minHeight: 44, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>
-                <button onClick={() => setRest(REST_DEFAULT)} style={{ minHeight: 44, padding: '0 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, touchAction: 'manipulation' }}><Timer size={16} /> Pauza</button>
-              </div>
-            </div>
+            <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null) }} style={{
+              flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', gap: 7, padding: '0 12px', borderRadius: 999, cursor: 'pointer', touchAction: 'manipulation',
+              border: `1px solid ${isActive ? '#E8192C' : 'var(--border)'}`,
+              background: isActive ? 'rgba(232,25,44,0.12)' : 'var(--card)',
+            }}>
+              <span style={{ width: 22, height: 22, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, background: isActive ? '#E8192C' : 'var(--input-bg)', color: isActive ? '#fff' : 'var(--muted)' }}>{i + 1}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? '#E8192C' : 'var(--text)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.exercise.name}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{done}/{total}</span>
+            </button>
           )
         })}
       </div>
+    </div>
+  )
 
-      {items.length === 0 && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, textAlign: 'center', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Zatím žádný cvik</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Přidej cvik — u známých se předvyplní váhy z posledního tréninku téhož splitu.</div>
+  const iconBtn: React.CSSProperties = { minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }
+
+  const activeColumn = active && (
+    <div>
+      {/* Exercise title + actions */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active.exercise.name}</div>
+          {active.previous.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>minule: {formatPrevious(active.previous)}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button onClick={() => setChartExercise(active.exercise)} aria-label="Graf pokroku" style={iconBtn}><BarChart3 size={17} /></button>
+          <button onClick={() => moveExercise(activeIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
+          <button onClick={() => moveExercise(activeIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
+          <button onClick={() => removeExercise(activeIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
+        </div>
+      </div>
+
+      {/* Set rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {(() => {
+          let workingNo = 0
+          return active.sets.map((s, setIdx) => {
+            if (!s.is_warmup) workingNo++
+            const idxLabel = s.is_warmup ? 'W' : String(workingNo)
+            const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, active.previous, workingNo - 1) : null
+            const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
+            const isPanel = setIdx === panelIdx
+            const grey = !s.confirmed && s.prefilled
+            return (
+              <div key={s.key} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, minHeight: 54,
+                border: `1px solid ${s.confirmed ? 'rgba(16,185,129,0.32)' : isPanel ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
+                background: s.confirmed ? 'rgba(16,185,129,0.07)' : isPanel ? 'rgba(232,25,44,0.05)' : 'transparent',
+              }}>
+                <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, textAlign: 'center' }}>{idxLabel}</span>
+                <button onClick={() => setSelectedKey(s.key)} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
+                  {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
+                  {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
+                </button>
+                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}><Check size={20} /></button>
+              </div>
+            )
+          })
+        })()}
+      </div>
+
+      <button onClick={() => addSet(activeIdx)} style={{ marginTop: 10, minHeight: 44, width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>
+
+      {/* Rest row (mobile) — tap to start, never automatic */}
+      {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '10px 12px', borderRadius: 12, border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, background: 'var(--card)' }}>
+          <Timer size={18} color={rest == null ? 'var(--muted)' : rest === 0 ? '#10b981' : '#E8192C'} />
+          <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Pauza</span>
+          <span style={{ flex: 1, fontSize: 22, fontWeight: 800, color: rest === 0 ? '#10b981' : 'var(--text)', textAlign: 'center' }}>{rest == null ? '—' : rest === 0 ? 'Hotovo' : mmss(rest)}</span>
+          {rest == null ? (
+            <button onClick={() => setRest(REST_DEFAULT)} style={{ minHeight: 44, padding: '0 14px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Spustit</button>
+          ) : (
+            <>
+              <button onClick={() => setRest(r => (r == null ? 30 : r + 30))} style={{ minHeight: 44, padding: '0 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+30 s</button>
+              <button onClick={() => setRest(null)} style={{ minHeight: 44, padding: '0 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Přeskočit</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  const stepBtn: React.CSSProperties = { width: isMobile ? 60 : 52, height: isMobile ? 60 : 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer', touchAction: 'manipulation' }
+
+  const stepperRow = (label: string, value: string, dec: () => void, inc: () => void) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <button onClick={dec} aria-label={`${label} míň`} style={stepBtn}><Minus size={20} /></button>
+      <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', lineHeight: 1.15 }}>{value}</div>
+      </div>
+      <button onClick={inc} aria-label={`${label} víc`} style={stepBtn}><Plus size={20} /></button>
+    </div>
+  )
+
+  const stepperPanel = active && panelSet && (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: isMobile ? 22 : 16, padding: isMobile ? '14px 16px 16px' : 16, boxShadow: isMobile ? '0 -6px 24px rgba(0,0,0,0.18)' : 'var(--shadow)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#E8192C', letterSpacing: 0.4 }}>SÉRIE {panelSetNo}</span>
+        <span style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {panelPrev ? `minule: ${panelPrev.weight_kg == null ? 'vlastní' : fmtWeight(Number(panelPrev.weight_kg))} × ${panelPrev.reps ?? '?'}` : 'nová série'}{panelSet.prefilled ? ' · předvyplněno' : ''}
+        </span>
+      </div>
+      <div style={{ display: isMobile ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: isMobile ? undefined : '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        {stepperRow('Váha', `${fmtWeight(panelSet.weight)} kg`,
+          () => patchSet(activeIdx, panelIdx, { weight: Math.max(0, Math.round((panelSet.weight - WEIGHT_STEP) * 100) / 100) }),
+          () => patchSet(activeIdx, panelIdx, { weight: Math.round((panelSet.weight + WEIGHT_STEP) * 100) / 100 }))}
+        {stepperRow('Opakování', String(panelSet.reps),
+          () => patchSet(activeIdx, panelIdx, { reps: Math.max(0, panelSet.reps - REP_STEP) }),
+          () => patchSet(activeIdx, panelIdx, { reps: panelSet.reps + REP_STEP }))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={() => toggleWarmup(activeIdx, panelIdx)} aria-label="Rozehřívací série" title="Warm-up (nepočítá se)" style={{ width: isMobile ? 64 : 52, height: isMobile ? 64 : 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, border: `1px solid ${panelSet.is_warmup ? '#d97706' : 'var(--border)'}`, background: panelSet.is_warmup ? '#fef3c7' : 'var(--input-bg)', color: panelSet.is_warmup ? '#d97706' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Flame size={22} /></button>
+        <button onClick={() => confirmSet(activeIdx, panelIdx)} style={{ flex: 1, minHeight: isMobile ? 64 : 52, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: 17, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
+          <Check size={22} /> Potvrdit sérii
+        </button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+        <button onClick={() => deleteSet(activeIdx, panelIdx)} style={{ minHeight: 36, padding: '0 8px', background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>Smazat sérii</button>
+        {!isMobile && <span style={{ fontSize: 11, color: 'var(--muted)' }}>nebo klávesa <b style={{ color: 'var(--text)' }}>Enter</b></span>}
+      </div>
+    </div>
+  )
+
+  const sidePanel = active && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Rest — tap to start, never automatic */}
+      <div style={{ background: 'var(--card)', border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)', textAlign: 'center' }}>
+        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>PAUZA</div>
+        <div style={{ fontSize: 34, fontWeight: 800, color: rest === 0 ? '#10b981' : 'var(--text)', lineHeight: 1.2, margin: '2px 0 8px' }}>{rest == null ? '—' : rest === 0 ? 'Hotovo' : mmss(rest)}</div>
+        <div style={{ height: 5, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{ width: `${rest == null ? 0 : (rest / REST_DEFAULT) * 100}%`, height: '100%', background: rest === 0 ? '#10b981' : '#E8192C', transition: 'width 1s linear' }} />
+        </div>
+        {rest == null ? (
+          <button onClick={() => setRest(REST_DEFAULT)} style={{ width: '100%', minHeight: 44, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Timer size={16} /> Spustit pauzu</button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setRest(r => (r == null ? 30 : r + 30))} style={{ flex: 1, minHeight: 44, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>+30 s</button>
+            <button onClick={() => setRest(null)} style={{ flex: 1, minHeight: 44, background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, cursor: 'pointer' }}>Přeskočit</button>
+          </div>
+        )}
+      </div>
+
+      {/* Progress */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
+        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active.exercise.name.toUpperCase()} · POKROK</div>
+        <ExerciseSparkline exerciseId={active.exercise.id} />
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            { k: '1RM est.', v: exStats?.oneRM ? `${exStats.oneRM} kg` : '—', accent: false },
+            { k: 'Objem dnes', v: exStats?.todayVol ? fmtTonnage(exStats.todayVol) : '—', accent: false },
+            { k: 'Vs. minule', v: exStats?.delta == null ? '—' : `${exStats.delta >= 0 ? '+' : ''}${fmtWeight(exStats.delta)} %`, accent: (exStats?.delta ?? 0) > 0 },
+          ].map(r => (
+            <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: 'var(--muted)' }}>{r.k}</span>
+              <span style={{ fontWeight: 700, color: r.accent ? '#10b981' : 'var(--text)' }}>{r.v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Previous session for this exercise */}
+      {active.previous.length > 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
+          <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
+            MINULÝ {String(split || '').toUpperCase()}{tmpl.date ? ` · ${shortDate(tmpl.date)}` : ''}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {active.previous.map((p, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--muted)' }}>Série {i + 1}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{p.weight_kg == null ? 'vlastní' : `${fmtWeight(Number(p.weight_kg))} kg`} × {p.reps ?? '?'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const emptyState = (
+    <div style={{ maxWidth: 520, margin: '0 auto' }}>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '28px 20px', textAlign: 'center', boxShadow: 'var(--shadow)' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--input-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+          <Dumbbell size={28} color="var(--muted)" />
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Zatím žádný cvik</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+          {tmpl.groups.length
+            ? `Načti minulý ${split || 'trénink'}${tmpl.date ? ` (${shortDate(tmpl.date)})` : ''} se všemi váhami, nebo si vyber cvik ručně.`
+            : 'Přidej si první cvik — příště se ti předvyplní i s váhami.'}
+        </div>
+      </div>
+
+      {tmpl.groups.length > 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, marginTop: 12, boxShadow: 'var(--shadow)' }}>
+          <div style={{ fontSize: 11, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 10 }}>
+            MINULÝ {String(split || '').toUpperCase()}{tmpl.date ? ` · ${shortDate(tmpl.date)}` : ''}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {tmpl.groups.slice(0, 3).map(g => (
+              <div key={g.exercise.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+                <span style={{ color: 'var(--text)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.exercise.name}</span>
+                <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{formatPrevious(g.sets.filter(s => !s.is_warmup).slice(0, 2).map(s => ({ weight_kg: s.weight_kg, reps: s.reps })))}</span>
+              </div>
+            ))}
+            {tmpl.groups.length > 3 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>+ {tmpl.groups.length - 3} další cviky</div>}
+          </div>
         </div>
       )}
 
-      <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={18} /> Přidat cvik</button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+        {tmpl.groups.length > 0 && (
+          <button onClick={loadTemplate} style={{ width: '100%', minHeight: 56, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
+            <RotateCcw size={18} /> Načíst minulý trénink
+          </button>
+        )}
+        <button onClick={() => setPickerOpen(true)} style={{ width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}>
+          <Plus size={18} /> Přidat cvik
+        </button>
+      </div>
+    </div>
+  )
 
-      {/* Rest timer — appears only after the user taps "Pauza" (never auto-starts) */}
-      {rest != null && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(var(--bottom-nav-h, 64px))', zIndex: 90, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none' }}>
-          <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 696, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, borderRadius: 14, padding: '10px 12px', boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }}>
-            <Timer size={18} color={rest === 0 ? '#10b981' : '#E8192C'} />
-            <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>PAUZA</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: rest === 0 ? '#10b981' : 'var(--text)', minWidth: 62 }}>{rest === 0 ? 'Hotovo' : mmss(rest)}</span>
-            <div style={{ flex: 1 }} />
-            <button onClick={() => setRest(r => (r == null ? 30 : r + 30))} style={{ minHeight: 40, padding: '0 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+30 s</button>
-            <button onClick={() => setRest(null)} aria-label="Přeskočit pauzu" style={{ minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
+  return (
+    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length ? MOBILE_PANEL_SPACE : 24 }}>
+      {header}
+
+      {items.length === 0 ? emptyState : isMobile ? (
+        <>
+          {exerciseStrip}
+          {activeColumn}
+          <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={16} /> Přidat cvik</button>
+          {/* Stepper panel pinned in the thumb zone */}
+          <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'var(--gym-panel-bottom, 62px)', zIndex: 60, padding: '0 12px' }}>
+            {stepperPanel}
           </div>
+        </>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0,1fr) 340px', gap: 18, alignItems: 'start' }}>
+          {exerciseListCol}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {activeColumn}
+            {stepperPanel}
+          </div>
+          {sidePanel}
         </div>
       )}
 
@@ -337,5 +653,3 @@ export default function ActiveWorkoutPage() {
     </div>
   )
 }
-
-const iconBtn: React.CSSProperties = { minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer', touchAction: 'manipulation' }
