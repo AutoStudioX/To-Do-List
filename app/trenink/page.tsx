@@ -8,7 +8,9 @@ import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fm
 import { Plus, Dumbbell, ChevronRight, Trash2 } from 'lucide-react'
 
 type SetRow = { workout_id: string; exercise_id: string; weight_kg: number | null; reps: number | null; is_warmup: boolean; order_index: number }
-type Derived = { count: number; vol: number; summary: { name: string; set: string }[] }
+type Derived = { count: number; vol: number; summary: { name: string; set: string }[]; pr: boolean }
+
+const DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
 // "dnes" / "včera" / "29. 7."
 function relDate(iso: string): string {
@@ -16,8 +18,8 @@ function relDate(iso: string): string {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const diff = Math.round((today.getTime() - day.getTime()) / 86400000)
-  if (diff === 0) return 'dnes'
-  if (diff === 1) return 'včera'
+  if (diff === 0) return 'Dnes'
+  if (diff === 1) return 'Včera'
   return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })
 }
 
@@ -26,13 +28,20 @@ export default function TreninkPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [derived, setDerived] = useState<Record<string, Derived>>({})
   const [loading, setLoading] = useState(true)
-  const [picking, setPicking] = useState(false)
   const [split, setSplit] = useState<SplitType>('Push')
   const [customMode, setCustomMode] = useState(false)
   const [customName, setCustomName] = useState('')
   const [starting, setStarting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [filter, setFilter] = useState<'Vše' | SplitType>('Vše')
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -54,19 +63,25 @@ export default function TreninkPage() {
       for (const s of (sets || []) as SetRow[]) {
         const g = byWorkout.get(s.workout_id) || []; g.push(s); byWorkout.set(s.workout_id, g)
       }
-      const d: Record<string, Derived> = {}
+      // Per-split max volume → mark a workout as PR when it's the best session of its split.
+      const partial: Record<string, { count: number; vol: number; summary: { name: string; set: string }[] }> = {}
+      const splitMax = new Map<string, number>()
       for (const w of list) {
         const rows = byWorkout.get(w.id) || []
         const working = rows.filter(r => !r.is_warmup)
-        // top set per exercise, exercises ordered by order_index, first 3
         const perEx = new Map<string, SetRow[]>()
         for (const r of rows) { const g = perEx.get(r.exercise_id) || []; g.push(r); perEx.set(r.exercise_id, g) }
         const exOrder = [...perEx.entries()].sort((a, b) => (a[1][0]?.order_index ?? 0) - (b[1][0]?.order_index ?? 0))
-        const summary = exOrder.slice(0, 3).map(([exId, exSets]) => ({
-          name: names.get(exId) || 'Cvik',
-          set: fmtSet(topSet(exSets)),
-        })).filter(s => s.set)
-        d[w.id] = { count: working.length, vol: volume(rows), summary }
+        const summary = exOrder.slice(0, 3).map(([exId, exSets]) => ({ name: names.get(exId) || 'Cvik', set: fmtSet(topSet(exSets)) })).filter(s => s.set)
+        const vol = volume(rows)
+        partial[w.id] = { count: working.length, vol, summary }
+        const k = w.split_type || ''
+        splitMax.set(k, Math.max(splitMax.get(k) || 0, vol))
+      }
+      const d: Record<string, Derived> = {}
+      for (const w of list) {
+        const p = partial[w.id]
+        d[w.id] = { ...p, pr: p.vol > 0 && p.vol === splitMax.get(w.split_type || '') }
       }
       setDerived(d)
     } else {
@@ -90,6 +105,21 @@ export default function TreninkPage() {
       else if (t >= lastMon) { lastVol += dv?.vol || 0 }
     }
     return { count, vol, sets, delta: pctDelta(vol, lastVol) }
+  }, [workouts, derived])
+
+  // Per-day bars for the current week, colored by that day's split.
+  const weekBars = useMemo(() => {
+    const mon = startOfWeek(new Date()).getTime()
+    const days = DAYS.map(label => ({ label, vol: 0, split: null as string | null }))
+    for (const w of workouts) {
+      const t = new Date(w.date).getTime()
+      if (t < mon || t >= mon + 7 * 86400000) continue
+      const idx = (new Date(w.date).getDay() + 6) % 7
+      days[idx].vol += derived[w.id]?.vol || 0
+      days[idx].split = w.split_type
+    }
+    const max = Math.max(1, ...days.map(d => d.vol))
+    return days.map(d => ({ ...d, h: d.vol ? Math.max(0.16, d.vol / max) : 0 }))
   }, [workouts, derived])
 
   // Most recent workout of the currently-selected split → preview card.
@@ -128,104 +158,92 @@ export default function TreninkPage() {
 
   const shown = filter === 'Vše' ? workouts : workouts.filter(w => w.split_type === filter)
 
-  if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
-
-  return (
-    <div style={{ maxWidth: 720, margin: '0 auto', paddingBottom: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Dumbbell size={22} color="#fff" />
-        </div>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
-          {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date)}</div>}
-        </div>
+  // ---------- reusable blocks ----------
+  const newPanel = (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, boxShadow: 'var(--shadow)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>NOVÝ TRÉNINK</div>
+        {!customMode && <div style={{ fontSize: 12, color: 'var(--muted)' }}>na řadě je <span style={{ color: '#E8192C', fontWeight: 700 }}>{split}</span></div>}
       </div>
-
-      {/* Weekly stats */}
-      <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, margin: '0 0 8px' }}>TENTO TÝDEN</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8, marginBottom: 20 }}>
-        {[
-          { big: String(week.count), small: 'tréninky' },
-          { big: week.vol ? fmtTonnage(week.vol) : '0', small: week.delta != null ? `${week.delta >= 0 ? '+' : ''}${week.delta} % objem` : 'objem' },
-          { big: String(week.sets), small: 'sérií' },
-        ].map((s, i) => (
-          <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 12px', boxShadow: 'var(--shadow)' }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{s.big}</div>
-            <div style={{ fontSize: 11, color: i === 1 && week.delta != null && week.delta >= 0 ? '#10b981' : 'var(--muted)', marginTop: 5 }}>{s.small}</div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        {SPLITS.map(s => {
+          const active = !customMode && split === s
+          return (
+            <button key={s} type="button" onClick={() => { setCustomMode(false); setSplit(s) }} style={{
+              minHeight: 52, borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation',
+              border: `1px solid ${active ? splitColor(s) : 'var(--border)'}`,
+              background: active ? splitColor(s) : 'var(--input-bg)', color: active ? '#fff' : 'var(--text)',
+            }}>{s}</button>
+          )
+        })}
+        <button type="button" onClick={() => setCustomMode(true)} style={{
+          minHeight: 52, borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation',
+          border: `1px solid ${customMode ? splitColor(null) : 'var(--border)'}`,
+          background: customMode ? splitColor(null) : 'var(--input-bg)', color: customMode ? '#fff' : 'var(--text)',
+        }}>Jiný</button>
       </div>
-
-      {/* New workout */}
-      {!picking ? (
-        <button
-          onClick={() => setPicking(true)}
-          style={{ width: '100%', minHeight: 56, background: '#E8192C', color: '#fff', border: 'none', borderRadius: 14, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}
-        >
-          <Plus size={20} /> Nový trénink
-        </button>
-      ) : (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, boxShadow: 'var(--shadow)' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>TYP TRÉNINKU</div>
-            {!customMode && <div style={{ fontSize: 12, color: 'var(--muted)' }}>na řadě je <span style={{ color: '#E8192C', fontWeight: 700 }}>{split}</span></div>}
+      {customMode && (
+        <input
+          autoFocus
+          value={customName}
+          onChange={e => setCustomName(e.target.value)}
+          placeholder="Např. Full body, Ruce, Kardio…"
+          maxLength={40}
+          style={{ width: '100%', minHeight: 48, marginBottom: 12, padding: '0 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 15, boxSizing: 'border-box' }}
+        />
+      )}
+      {lastOfSplit && lastOfSplit.summary.length > 0 && (
+        <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
+            MINULÝ {String(lastOfSplit.workout.split_type || '').toUpperCase()} · {relDate(lastOfSplit.workout.date)}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            {SPLITS.map(s => {
-              const active = !customMode && split === s
-              return (
-                <button key={s} type="button" onClick={() => { setCustomMode(false); setSplit(s) }} style={{
-                  flex: 1, minHeight: 48, borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation',
-                  border: `1px solid ${active ? splitColor(s) : 'var(--border)'}`,
-                  background: active ? splitColor(s) : 'var(--input-bg)', color: active ? '#fff' : 'var(--text)',
-                }}>{s}</button>
-              )
-            })}
-            <button type="button" onClick={() => setCustomMode(true)} style={{
-              flex: 1, minHeight: 48, borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation',
-              border: `1px solid ${customMode ? splitColor(null) : 'var(--border)'}`,
-              background: customMode ? splitColor(null) : 'var(--input-bg)', color: customMode ? '#fff' : 'var(--text)',
-            }}>Jiný</button>
-          </div>
-          {customMode && (
-            <input
-              autoFocus
-              value={customName}
-              onChange={e => setCustomName(e.target.value)}
-              placeholder="Např. Full body, Ruce, Kardio…"
-              maxLength={40}
-              style={{ width: '100%', minHeight: 48, marginBottom: 14, padding: '0 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 15, boxSizing: 'border-box' }}
-            />
-          )}
-          {/* Preview of the last same-split workout */}
-          {lastOfSplit && lastOfSplit.summary.length > 0 && (
-            <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginBottom: 14 }}>
-              <div style={{ fontSize: 10, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
-                MINULÝ {String(lastOfSplit.workout.split_type || '').toUpperCase()} · {relDate(lastOfSplit.workout.date)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {lastOfSplit.summary.map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+                <span style={{ color: 'var(--text)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{s.set}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {lastOfSplit.summary.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-                    <span style={{ color: 'var(--text)', fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                    <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{s.set}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { setPicking(false); setCustomMode(false) }} style={{ flex: 1, minHeight: 48, background: 'transparent', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 15, cursor: 'pointer' }}>Zrušit</button>
-            <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ flex: 2, minHeight: 48, background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
-              {starting ? 'Zakládám…' : customMode ? 'Začít' : `Začít ${split}`}
-            </button>
+            ))}
           </div>
         </div>
       )}
+      <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ width: '100%', minHeight: 52, background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
+        <Plus size={20} /> {starting ? 'Zakládám…' : customMode ? 'Začít' : `Začít ${split}`}
+      </button>
+    </div>
+  )
 
-      {/* History */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '24px 0 10px' }}>
+  const weekCard = (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, boxShadow: 'var(--shadow)' }}>
+      <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 12 }}>TENTO TÝDEN</div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+        {[
+          { big: String(week.count), small: 'tréninky', accent: false },
+          { big: week.vol ? fmtTonnage(week.vol) : '0', small: week.delta != null ? `${week.delta >= 0 ? '+' : ''}${week.delta} % objem` : 'objem', accent: week.delta != null && week.delta >= 0 },
+          { big: String(week.sets), small: 'sérií', accent: false },
+        ].map((s, i) => (
+          <div key={i} style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{s.big}</div>
+            <div style={{ fontSize: 11, color: s.accent ? '#10b981' : 'var(--muted)', marginTop: 5 }}>{s.small}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 64 }}>
+        {weekBars.map((d, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: '100%', height: 48, display: 'flex', alignItems: 'flex-end' }}>
+              <div style={{ width: '100%', height: `${Math.max(6, d.h * 100)}%`, borderRadius: 5, background: d.split ? splitColor(d.split) : 'var(--border)', opacity: d.split ? 1 : 0.6 }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--muted)' }}>{d.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  const historyBlock = (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>HISTORIE</div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['Vše', ...SPLITS] as const).map(f => {
@@ -241,7 +259,6 @@ export default function TreninkPage() {
           })}
         </div>
       </div>
-
       {shown.length === 0 ? (
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Zatím žádné tréninky.</div>
       ) : (
@@ -250,19 +267,21 @@ export default function TreninkPage() {
             const d = derived[w.id]
             return (
               <div key={w.id} style={{ display: 'flex', alignItems: 'stretch', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
-                <button onClick={() => router.push(`/trenink/${w.id}`)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, background: 'transparent', border: 'none', padding: '12px 4px 12px 14px', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
+                <div style={{ width: 4, background: splitColor(w.split_type), flexShrink: 0 }} />
+                <button onClick={() => router.push(`/trenink/${w.id}`)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, background: 'transparent', border: 'none', padding: '12px 4px 12px 12px', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
                   {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '5px 9px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)}</span>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${w.duration_min} min` : ''}</span>
-                    </div>
-                    {d && d.summary.length > 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}
-                      </div>
+                  <div style={{ minWidth: isMobile ? 0 : 92, flex: isMobile ? 1 : undefined, flexShrink: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${w.duration_min} min` : ''}</span></div>
+                    {isMobile && d && d.summary.length > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}</div>
                     )}
                   </div>
+                  {!isMobile && d && d.summary.length > 0 && (
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}
+                    </div>
+                  )}
+                  {d?.pr && <span style={{ fontSize: 10, fontWeight: 800, color: '#E8192C', border: '1px solid rgba(232,25,44,0.4)', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>PR</span>}
                   <ChevronRight size={18} color="var(--muted)" style={{ flexShrink: 0 }} />
                 </button>
                 <button onClick={() => deleteWorkout(w.id)} disabled={deleting === w.id} aria-label="Smazat trénink" style={{ minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent', border: 'none', color: '#E8192C', cursor: 'pointer', opacity: deleting === w.id ? 0.5 : 1, touchAction: 'manipulation' }}>
@@ -271,6 +290,39 @@ export default function TreninkPage() {
               </div>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+
+  if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
+
+  return (
+    <div style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: 24 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Dumbbell size={22} color="#fff" />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
+          {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date).toLowerCase()}</div>}
+        </div>
+      </div>
+
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {weekCard}
+          {newPanel}
+          {historyBlock}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 400px) 1fr', gap: 20, alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {newPanel}
+            {weekCard}
+          </div>
+          {historyBlock}
         </div>
       )}
     </div>
