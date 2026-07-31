@@ -1,5 +1,5 @@
 'use client'
-export default function CircleProgress({ label, value, max, color = '#e53e3e', sublabel, size = 100, hideBar = false }: {
+export default function CircleProgress({ label, value, max, color = '#E8192C', sublabel, size = 100, hideBar = false }: {
   label: string; value: number; max: number; color?: string; sublabel?: string; size?: number; hideBar?: boolean
 }) {
   const pct = Math.min(100, Math.round((value / max) * 100))

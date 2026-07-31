@@ -80,7 +80,7 @@ export default function TreninkPage() {
       {!picking ? (
         <button
           onClick={() => setPicking(true)}
-          style={{ width: '100%', minHeight: 52, background: '#e53e3e', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(229,62,62,0.35)', touchAction: 'manipulation' }}
+          style={{ width: '100%', minHeight: 52, background: '#E8192C', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}
         >
           <Plus size={20} /> Nový trénink
         </button>
@@ -116,7 +116,7 @@ export default function TreninkPage() {
           )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => { setPicking(false); setCustomMode(false) }} style={{ flex: 1, minHeight: 48, background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 15, cursor: 'pointer' }}>Zrušit</button>
-            <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ flex: 2, minHeight: 48, background: '#e53e3e', border: 'none', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
+            <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ flex: 2, minHeight: 48, background: '#E8192C', border: 'none', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
               {starting ? 'Zakládám…' : 'Začít'}
             </button>
           </div>
@@ -138,7 +138,7 @@ export default function TreninkPage() {
                 </div>
                 <ChevronRight size={18} color="var(--muted)" />
               </button>
-              <button onClick={() => deleteWorkout(w.id)} disabled={deleting === w.id} aria-label="Smazat trénink" style={{ minWidth: 44, minHeight: 44, marginRight: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent', border: 'none', borderRadius: 10, color: '#e53e3e', cursor: 'pointer', opacity: deleting === w.id ? 0.5 : 1, touchAction: 'manipulation' }}>
+              <button onClick={() => deleteWorkout(w.id)} disabled={deleting === w.id} aria-label="Smazat trénink" style={{ minWidth: 44, minHeight: 44, marginRight: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'transparent', border: 'none', borderRadius: 10, color: '#E8192C', cursor: 'pointer', opacity: deleting === w.id ? 0.5 : 1, touchAction: 'manipulation' }}>
                 <Trash2 size={18} />
               </button>
             </div>

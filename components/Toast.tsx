@@ -20,7 +20,7 @@ export function Toast({ message, type, onClose }: ToastProps) {
     <div style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 99999,
       background: 'var(--card)',
-      border: `1px solid ${type === 'success' ? '#10b981' : '#e53e3e'}`,
+      border: `1px solid ${type === 'success' ? '#10b981' : '#E8192C'}`,
       borderRadius: 12, padding: '12px 16px',
       display: 'flex', alignItems: 'center', gap: 10,
       boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
@@ -29,7 +29,7 @@ export function Toast({ message, type, onClose }: ToastProps) {
     }}>
       {type === 'success'
         ? <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0 }} />
-        : <XCircle size={18} color="#e53e3e" style={{ flexShrink: 0 }} />
+        : <XCircle size={18} color="#E8192C" style={{ flexShrink: 0 }} />
       }
       <span style={{ fontSize: 14, color: 'var(--text)', flex: 1 }}>{message}</span>
       <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--muted)', display: 'flex' }}>

@@ -35,7 +35,7 @@ export default function ExercisePicker({
         <button
           type="button"
           onClick={() => onAddCustom(q.trim())}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: '#e53e3e', border: 'none', borderRadius: 10, padding: '0 14px', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, background: '#E8192C', border: 'none', borderRadius: 10, padding: '0 14px', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation' }}
         >
           <Plus size={16} /> Přidat „{q.trim()}"
         </button>

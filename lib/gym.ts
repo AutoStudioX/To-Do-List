@@ -16,7 +16,7 @@ export function nextSplit(lastSplit: string | null | undefined): SplitType {
 // Badge color for a split — the three defaults keep their colors, custom = purple.
 export function splitColor(s?: string | null): string {
   switch (s) {
-    case 'Push': return '#e53e3e'
+    case 'Push': return '#E8192C'
     case 'Pull': return '#2563eb'
     case 'Legs': return '#059669'
     default: return '#7c3aed'

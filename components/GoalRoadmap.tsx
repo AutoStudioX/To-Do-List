@@ -34,9 +34,9 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{goal.nazev}</span>
               <span style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                background: goal.status === 'completed' ? '#16a34a22' : 'rgba(229,62,62,0.1)',
-                color: goal.status === 'completed' ? '#16a34a' : '#e53e3e',
-                border: `1px solid ${goal.status === 'completed' ? '#16a34a44' : 'rgba(229,62,62,0.3)'}`,
+                background: goal.status === 'completed' ? '#16a34a22' : 'rgba(232, 25, 44,0.1)',
+                color: goal.status === 'completed' ? '#16a34a' : '#E8192C',
+                border: `1px solid ${goal.status === 'completed' ? '#16a34a44' : 'rgba(232, 25, 44,0.3)'}`,
               }}>
                 {goal.status === 'completed' ? 'Splněno' : 'Aktivní'}
               </span>
@@ -53,7 +53,7 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
               <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto', paddingBottom: 8 }}>
                 {goalMilestones.map((milestone, idx) => {
                   const isDone = milestone.done
-                  const dotColor = isDone ? '#10b981' : '#e53e3e'
+                  const dotColor = isDone ? '#10b981' : '#E8192C'
                   return (
                     <div key={milestone.id} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       {idx > 0 && (
@@ -88,7 +88,7 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                       <div style={{
                         width: 34, height: 34, borderRadius: '50%',
-                        background: goal.status === 'completed' ? '#10b981' : '#e53e3e',
+                        background: goal.status === 'completed' ? '#10b981' : '#E8192C',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 14, fontWeight: 700,
                         color: 'white',
@@ -96,7 +96,7 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
                         🎯
                       </div>
                       <div style={{ textAlign: 'center', maxWidth: 80 }}>
-                        <div style={{ fontSize: 11, color: '#e53e3e', fontWeight: 600 }}>Cíl</div>
+                        <div style={{ fontSize: 11, color: '#E8192C', fontWeight: 600 }}>Cíl</div>
                         <div style={{ fontSize: 10, color: 'var(--muted)' }}>
                           {new Date(goal.deadline).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </div>
@@ -113,7 +113,7 @@ export default function GoalRoadmap({ goals, milestones }: { goals: Goal[], mile
                 <span>{goal.progress}%</span>
               </div>
               <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
-                <div style={{ background: '#e53e3e', height: '100%', width: `${goal.progress}%`, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                <div style={{ background: '#E8192C', height: '100%', width: `${goal.progress}%`, borderRadius: 4, transition: 'width 0.5s ease' }} />
               </div>
             </div>
           </div>

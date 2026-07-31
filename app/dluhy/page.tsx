@@ -102,7 +102,7 @@ export default function DluhyPage() {
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 14,
-    fontWeight: active ? 600 : 400, background: active ? '#e53e3e' : 'transparent', color: active ? 'white' : 'var(--muted)',
+    fontWeight: active ? 600 : 400, background: active ? '#E8192C' : 'transparent', color: active ? 'white' : 'var(--muted)',
   })
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>
@@ -116,7 +116,7 @@ export default function DluhyPage() {
       <div className="bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: 'var(--shadow)' }}>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Dluhu já celkem (nesplaceno)</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#e53e3e' }}>{czk(myTotal)}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#E8192C' }}>{czk(myTotal)}</div>
         </div>
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: 'var(--shadow)' }}>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Dluží mi celkem (nesplaceno)</div>
@@ -129,7 +129,7 @@ export default function DluhyPage() {
           <button style={tabStyle(activeTab === 'moje')} onClick={() => setActiveTab('moje')}>Moje dluhy</button>
           <button style={tabStyle(activeTab === 'mne')} onClick={() => setActiveTab('mne')}>Dluží mně</button>
         </div>
-        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={openAdd} style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={16} /> Přidat dluh
         </button>
       </div>
@@ -147,11 +147,11 @@ export default function DluhyPage() {
             ) : shown.map(d => (
               <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{d.nazev}</td>
-                <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: d.smer === 'moje' ? '#e53e3e' : '#10b981' }}>{czk(Number(d.castka))}</td>
+                <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: d.smer === 'moje' ? '#E8192C' : '#10b981' }}>{czk(Number(d.castka))}</td>
                 <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{d.datum ? new Date(d.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                 <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{d.poznamka || '—'}</td>
                 <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: d.status === 'splaceno' ? '#d1fae5' : '#fee2e2', color: d.status === 'splaceno' ? '#059669' : '#e53e3e' }}>
+                  <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: d.status === 'splaceno' ? '#d1fae5' : '#fee2e2', color: d.status === 'splaceno' ? '#059669' : '#E8192C' }}>
                     {d.status === 'splaceno' ? 'Splaceno' : 'Nesplaceno'}
                   </span>
                 </td>
@@ -161,7 +161,7 @@ export default function DluhyPage() {
                     <button onClick={() => toggleStatus(d)} title={d.status === 'splaceno' ? 'Označit jako nesplaceno' : 'Označit jako splaceno'} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 4 }}>
                       {d.status === 'splaceno' ? <ToggleRight size={16} color="#10b981" /> : <ToggleLeft size={16} />}
                     </button>
-                    <button onClick={() => deleteDebt(d.id)} style={{ background: 'transparent', border: 'none', color: '#e53e3e', cursor: 'pointer', padding: 4 }}><Trash2 size={14} /></button>
+                    <button onClick={() => deleteDebt(d.id)} style={{ background: 'transparent', border: 'none', color: '#E8192C', cursor: 'pointer', padding: 4 }}><Trash2 size={14} /></button>
                   </div>
                 </td>
               </tr>
@@ -181,13 +181,13 @@ export default function DluhyPage() {
               <span style={{ color: 'var(--muted)', margin: '0 4px' }}>/</span>
               <span style={{ color: form.smer === 'mne' ? 'var(--text)' : 'var(--muted)' }}>Kdo mi dluží</span>
             </label>
-            <input placeholder={form.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...'} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} />
-            {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+            <input placeholder={form.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...'} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#E8192C' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} />
+            {formErrors.nazev && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.nazev}</div>}
           </div>
           <div>
             <label style={labelStyle}>Částka (Kč)</label>
-            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#e53e3e' : undefined }} value={form.castka} onChange={e => { setForm({ ...form, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
-            {formErrors.castka && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.castka}</div>}
+            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#E8192C' : undefined }} value={form.castka} onChange={e => { setForm({ ...form, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
+            {formErrors.castka && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.castka}</div>}
           </div>
           <div><label style={labelStyle}>Datum</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
 
@@ -196,7 +196,7 @@ export default function DluhyPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => { setModal(false); setEditDebt(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

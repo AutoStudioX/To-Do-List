@@ -27,7 +27,7 @@ export default function BottomNav() {
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
             textDecoration: 'none', padding: '4px 12px',
-            color: isActive ? '#e53e3e' : 'var(--muted)',
+            color: isActive ? '#E8192C' : 'var(--muted)',
           }}>
             <Icon size={22} />
             <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{label}</span>

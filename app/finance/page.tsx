@@ -25,7 +25,7 @@ function getMonthLabel(d: Date) {
 }
 
 function TypBadge({ typ }: { typ: Transaction['typ'] }) {
-  const cfg = { prijem: { label: 'Příjem', bg: '#d1fae5', color: '#059669' }, vydaj: { label: 'Výdaj', bg: '#fee2e2', color: '#e53e3e' }, fixni_naklad: { label: 'Fixní', bg: '#dbeafe', color: '#2563eb' }, dluh: { label: 'Dluh', bg: '#ede9fe', color: '#7c3aed' } }
+  const cfg = { prijem: { label: 'Příjem', bg: '#d1fae5', color: '#059669' }, vydaj: { label: 'Výdaj', bg: '#fee2e2', color: '#E8192C' }, fixni_naklad: { label: 'Fixní', bg: '#dbeafe', color: '#2563eb' }, dluh: { label: 'Dluh', bg: '#ede9fe', color: '#7c3aed' } }
   const c = cfg[typ]
   return <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color }}>{c.label}</span>
 }
@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: string }) {
     ceka: { label: 'Čeká', bg: '#fef3c7', color: '#d97706' },
     dluh: { label: 'Dluh', bg: '#ede9fe', color: '#7c3aed' },
     splaceno: { label: 'Splaceno', bg: '#d1fae5', color: '#059669' },
-    nesplaceno: { label: 'Nesplaceno', bg: '#fee2e2', color: '#e53e3e' },
+    nesplaceno: { label: 'Nesplaceno', bg: '#fee2e2', color: '#E8192C' },
   }
   const c = cfg[status] || { label: status, bg: '#f3f4f6', color: '#6b7280' }
   return <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color }}>{c.label}</span>
@@ -184,7 +184,7 @@ export default function FinancePage() {
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 14,
-    fontWeight: active ? 600 : 400, background: active ? '#e53e3e' : 'transparent',
+    fontWeight: active ? 600 : 400, background: active ? '#E8192C' : 'transparent',
     color: active ? 'white' : 'var(--muted)', transition: 'all 0.15s',
   })
 
@@ -219,8 +219,8 @@ export default function FinancePage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Příjmy tento měsíc', value: czk(monthIncomeTotal), color: '#10b981' },
-          { label: 'Výdaje tento měsíc', value: czk(monthExpenseTotal), color: '#e53e3e' },
-          { label: 'Čistý zisk', value: czk(profit), color: profit >= 0 ? '#10b981' : '#e53e3e' },
+          { label: 'Výdaje tento měsíc', value: czk(monthExpenseTotal), color: '#E8192C' },
+          { label: 'Čistý zisk', value: czk(profit), color: profit >= 0 ? '#10b981' : '#E8192C' },
         ].map((s, i) => (
           <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: 'var(--shadow)' }}>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>{s.label}</div>
@@ -235,7 +235,7 @@ export default function FinancePage() {
           <span style={{ color: 'var(--muted)' }}>{czk(lifetimeIncome)} / {czk(1000000)}</span>
         </div>
         <div style={{ background: 'var(--progress-track)', borderRadius: 6, height: 12, overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(90deg, #e53e3e, #f59e0b)', height: '100%', width: `${Math.min(100, (lifetimeIncome / 1000000) * 100)}%`, borderRadius: 6, transition: 'width 0.5s' }} />
+          <div style={{ background: 'linear-gradient(90deg, #E8192C, #f59e0b)', height: '100%', width: `${Math.min(100, (lifetimeIncome / 1000000) * 100)}%`, borderRadius: 6, transition: 'width 0.5s' }} />
         </div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, textAlign: 'right' }}>{Math.round((lifetimeIncome / 1000000) * 100)}% splněno</div>
       </div>
@@ -257,7 +257,7 @@ export default function FinancePage() {
             <Tooltip contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8 }} labelStyle={{ color: tooltipLabel }} formatter={(v) => czk(Number(v))} />
             <Bar dataKey="Čistý zisk" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, i) => (
-                <Cell key={i} fill={entry['Čistý zisk'] >= 0 ? '#10b981' : '#e53e3e'} />
+                <Cell key={i} fill={entry['Čistý zisk'] >= 0 ? '#10b981' : '#E8192C'} />
               ))}
             </Bar>
           </BarChart>
@@ -272,7 +272,7 @@ export default function FinancePage() {
             </button>
           ))}
         </div>
-        <button onClick={() => activeTab === 'vse' ? openAdd('prijem') : openAdd(addTypMap[activeTab]!)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+        <button onClick={() => activeTab === 'vse' ? openAdd('prijem') : openAdd(addTypMap[activeTab]!)} style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)' }}>
           <Plus size={16} /> Přidat {activeTab === 'vse' ? 'transakci' : addLabelMap[activeTab]}
         </button>
       </div>
@@ -295,11 +295,11 @@ export default function FinancePage() {
         const theirDebt = dluhy.filter(d => d.status !== 'splaceno' && (d.smer === 'mne' || (d.typ === 'prijem' && d.status === 'dluh'))).reduce((s, d) => s + Number(d.castka), 0)
 
         const stats: Record<Tab, React.ReactNode> = {
-          vse: <>{pill('Příjmy tento m.', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Výdaje tento m.', czk(monthExpenseTotal), '#e53e3e')}{divider}{pill('Čistý zisk', czk(profit), profit >= 0 ? '#10b981' : '#e53e3e')}</>,
+          vse: <>{pill('Příjmy tento m.', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Výdaje tento m.', czk(monthExpenseTotal), '#E8192C')}{divider}{pill('Čistý zisk', czk(profit), profit >= 0 ? '#10b981' : '#E8192C')}</>,
           prijmy: <>{pill('Tento m.', czk(monthIncomeTotal), '#10b981')}{divider}{pill('Čeká na platbu', czk(pendingIncome), '#f59e0b')}{divider}{pill('Celkem zaplaceno', czk(lifetimeIncome), '#10b981')}</>,
-          vydaje: <>{pill('Tento měsíc', czk(monthExpenses), '#e53e3e')}{divider}{pill('Celkem výdaje', czk(totalExpenses), '#e53e3e')}</>,
-          fixni: <>{pill('Měsíčně', czk(fixedMonthly), '#e53e3e')}{divider}{pill('Ročně', czk(fixedYearly), '#e53e3e')}{divider}{pill('Průměr / měsíc', czk(fixedTotal), '#e53e3e')}</>,
-          dluhy: <>{pill('Dlužím já', czk(myDebt), '#e53e3e')}{divider}{pill('Dluží mi', czk(theirDebt), '#10b981')}</>,
+          vydaje: <>{pill('Tento měsíc', czk(monthExpenses), '#E8192C')}{divider}{pill('Celkem výdaje', czk(totalExpenses), '#E8192C')}</>,
+          fixni: <>{pill('Měsíčně', czk(fixedMonthly), '#E8192C')}{divider}{pill('Ročně', czk(fixedYearly), '#E8192C')}{divider}{pill('Průměr / měsíc', czk(fixedTotal), '#E8192C')}</>,
+          dluhy: <>{pill('Dlužím já', czk(myDebt), '#E8192C')}{divider}{pill('Dluží mi', czk(theirDebt), '#10b981')}</>,
         }
 
         return (
@@ -322,7 +322,7 @@ export default function FinancePage() {
                 {activeTab === 'vse' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
                   <td style={{ padding: '12px 16px' }}><TypBadge typ={t.typ} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.typ === 'prijem' ? '#10b981' : '#E8192C' }}>{czk(Number(t.castka))}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
@@ -335,32 +335,32 @@ export default function FinancePage() {
                 </>}
                 {activeTab === 'vydaje' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#E8192C' }}>{czk(Number(t.castka))}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.kategorie || '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'mesicni' ? '#dbeafe' : '#f3f4f6', color: t.opakovani === 'mesicni' ? '#2563eb' : '#6b7280' }}>{t.opakovani === 'mesicni' ? 'Opakující se' : 'Jednorázový'}</span></td>
                 </>}
                 {activeTab === 'fixni' && <>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)' }}>{t.nazev}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#e53e3e' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#E8192C' }}>{czk(Number(t.castka))}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}><span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.opakovani === 'rocni' ? '#fef3c7' : '#dbeafe', color: t.opakovani === 'rocni' ? '#d97706' : '#2563eb' }}>{t.opakovani === 'rocni' ? 'Roční' : 'Měsíční'}</span></td>
                 </>}
                 {activeTab === 'dluhy' && <>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.smer === 'moje' ? '#fee2e2' : '#d1fae5', color: t.smer === 'moje' ? '#e53e3e' : '#059669', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                    <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: t.smer === 'moje' ? '#fee2e2' : '#d1fae5', color: t.smer === 'moje' ? '#E8192C' : '#059669', whiteSpace: 'nowrap', display: 'inline-block' }}>
                       {t.smer === 'moje' ? 'Dlužím já' : 'Dluží mi'}
                     </span>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.smer === 'moje' ? '#e53e3e' : '#10b981' }}>{czk(Number(t.castka))}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: t.smer === 'moje' ? '#E8192C' : '#10b981' }}>{czk(Number(t.castka))}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</td>
                   <td style={{ padding: '12px 16px' }}>{t.status ? <StatusBadge status={t.status} /> : '—'}</td>
                 </>}
                 <td style={{ padding: '12px 16px' }}>
                   <div className="tx-actions" style={{ display: 'flex', gap: 12 }}>
                     <button onClick={() => openEdit(t)} aria-label="Upravit" style={{ minWidth: 44, minHeight: 44, background: 'var(--hover-bg)', border: 'none', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Pencil size={16} /></button>
-                    <button onClick={() => deleteTx(t.id)} aria-label="Smazat" style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Trash2 size={16} /></button>
+                    <button onClick={() => deleteTx(t.id)} aria-label="Smazat" style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#E8192C', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>
@@ -380,8 +380,8 @@ export default function FinancePage() {
           {form.typ === 'prijem' && (
             <div>
               <label style={labelStyle}>Klient</label>
-              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#e53e3e' : undefined }} value={form.klient} onChange={e => { setForm({ ...form, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} />
-              {formErrors.klient && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.klient}</div>}
+              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#E8192C' : undefined }} value={form.klient} onChange={e => { setForm({ ...form, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} />
+              {formErrors.klient && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.klient}</div>}
             </div>
           )}
           {form.typ !== 'prijem' && (
@@ -393,15 +393,15 @@ export default function FinancePage() {
                   <span style={{ color: form.smer === 'mne' ? 'var(--text)' : 'var(--muted)' }}>Kdo mi dluží</span>
                 </>
               ) : 'Název'}</label>
-              <input placeholder={form.typ === 'dluh' ? (form.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} />
-              {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+              <input placeholder={form.typ === 'dluh' ? (form.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#E8192C' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} />
+              {formErrors.nazev && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.nazev}</div>}
             </div>
           )}
 
           <div>
             <label style={labelStyle}>Částka (Kč)</label>
-            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#e53e3e' : undefined }} value={form.castka} onChange={e => { setForm({ ...form, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
-            {formErrors.castka && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.castka}</div>}
+            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#E8192C' : undefined }} value={form.castka} onChange={e => { setForm({ ...form, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
+            {formErrors.castka && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.castka}</div>}
           </div>
 
           <div><label style={labelStyle}>{form.typ === 'fixni_naklad' ? 'Od kdy' : 'Datum'}</label><DatePicker value={form.datum} onChange={v => setForm({ ...form, datum: v })} /></div>
@@ -440,7 +440,7 @@ export default function FinancePage() {
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => { setModal(false); setEditTx(null) }} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

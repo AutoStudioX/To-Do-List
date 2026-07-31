@@ -609,7 +609,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   const colors: Record<Status, string> = {
-    idle: '#e53e3e',
+    idle: '#E8192C',
     listening: '#10b981',
     thinking: '#f59e0b',
     confirm: '#3b82f6',
@@ -639,7 +639,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
           width: 40, height: 40, borderRadius: 10, border: 'none',
           cursor: busy ? 'default' : 'pointer',
           background: colors[status], display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: status === 'listening' ? 'none' : '0 4px 14px rgba(229,62,62,0.35)',
+          boxShadow: status === 'listening' ? 'none' : '0 4px 14px rgba(232, 25, 44,0.35)',
           animation: status === 'listening' ? 'pulseRing 1.4s ease-out infinite' : undefined,
           transition: 'all 0.2s', flexShrink: 0,
         }}
@@ -711,7 +711,7 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
               )}
               {/* Response text (get_summary answer, save confirmation, or unknown/error) */}
               {status !== 'confirm' && response && (
-                <div style={{ fontSize: 13, color: status === 'error' ? '#e53e3e' : 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>
+                <div style={{ fontSize: 13, color: status === 'error' ? '#E8192C' : 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>
                   {response}
                 </div>
               )}

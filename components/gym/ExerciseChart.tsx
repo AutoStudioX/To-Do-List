@@ -47,7 +47,7 @@ export default function ExerciseChart({ exerciseId }: { exerciseId: string }) {
             <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted)' }} />
             <YAxis tick={{ fontSize: 11, fill: 'var(--muted)' }} width={40} />
             <Tooltip formatter={(v) => [`${fmtWeight(Number(v))} kg`, 'Max']} labelStyle={{ color: '#111' }} />
-            <Line type="monotone" dataKey="max" stroke="#e53e3e" strokeWidth={2.5} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="max" stroke="#E8192C" strokeWidth={2.5} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

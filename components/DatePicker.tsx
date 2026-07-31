@@ -169,10 +169,10 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
                   return (
                     <button key={i} type="button" onClick={() => selectDay(day)} style={{
                       borderRadius: 6, border: 'none', padding: '6px 2px', fontSize: 13, cursor: 'pointer',
-                      background: isSelected ? '#e53e3e' : 'transparent',
-                      color: isSelected ? 'white' : isToday ? '#e53e3e' : 'var(--text)',
+                      background: isSelected ? '#E8192C' : 'transparent',
+                      color: isSelected ? 'white' : isToday ? '#E8192C' : 'var(--text)',
                       fontWeight: isSelected || isToday ? 700 : 400,
-                      outline: isToday && !isSelected ? '1px solid #e53e3e44' : 'none',
+                      outline: isToday && !isSelected ? '1px solid #E8192C44' : 'none',
                     }}>
                       {day}
                     </button>
@@ -188,7 +188,7 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
               {MONTHS.map((m, i) => (
                 <button key={m} type="button" onClick={() => { setViewMonth(i); setMode('days') }} style={{
                   borderRadius: 6, border: 'none', padding: '8px 4px', fontSize: 12, cursor: 'pointer',
-                  background: i === viewMonth ? '#e53e3e' : 'transparent',
+                  background: i === viewMonth ? '#E8192C' : 'transparent',
                   color: i === viewMonth ? 'white' : 'var(--text)', fontWeight: i === viewMonth ? 700 : 400,
                 }}>
                   {m.slice(0, 3)}
@@ -203,7 +203,7 @@ export default function DatePicker({ value, onChange, style, placeholder = 'Vybe
               {yearRange.map(y => (
                 <button key={y} type="button" onClick={() => { setViewYear(y); setMode('days') }} style={{
                   borderRadius: 6, border: 'none', padding: '8px 4px', fontSize: 12, cursor: 'pointer',
-                  background: y === viewYear ? '#e53e3e' : 'transparent',
+                  background: y === viewYear ? '#E8192C' : 'transparent',
                   color: y === viewYear ? 'white' : 'var(--text)', fontWeight: y === viewYear ? 700 : 400,
                 }}>
                   {y}

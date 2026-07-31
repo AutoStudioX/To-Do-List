@@ -21,7 +21,7 @@ const czk = (n: number) => new Intl.NumberFormat('cs-CZ', { style: 'currency', c
 const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 14, outline: 'none' }
 const labelStyle: React.CSSProperties = { fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6, fontWeight: 500 }
 
-const priorityColor: Record<string, string> = { High: '#e53e3e', Medium: '#f59e0b', Low: '#10b981' }
+const priorityColor: Record<string, string> = { High: '#E8192C', Medium: '#f59e0b', Low: '#10b981' }
 
 export default function PrehledPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -261,7 +261,7 @@ export default function PrehledPage() {
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Přehled</h1>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setMenu(m => !m)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)' }}>
+          <button onClick={() => setMenu(m => !m)} style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)' }}>
             <Plus size={16} /> Přidat
           </button>
           {menu && (
@@ -290,12 +290,12 @@ export default function PrehledPage() {
       {/* Rings */}
       <div className="rings-grid" style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow)', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <CircleProgress label="Úkoly tento týden" value={weekDone} max={weekRingMax} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+          <CircleProgress label="Úkoly tento týden" value={weekDone} max={weekRingMax} color="#E8192C" size={ringSize} hideBar={isMobile} />
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, textAlign: 'center' }}>
             {weekDone} splněno tento týden · {notDone} zbývá
           </div>
         </div>
-        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#e53e3e" size={ringSize} hideBar={isMobile} />
+        <CircleProgress label={goalRingLabel} value={goalRingValue} max={goalRingMax} color="#E8192C" size={ringSize} hideBar={isMobile} />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <CircleProgress label="Finance — cíl 1M Kč" value={lifetimeIncome} max={1000000} color="#f59e0b" size={ringSize} hideBar={isMobile} />
           {userEmail === 'larisaprodanets2055@gmail.com' && (
@@ -319,22 +319,22 @@ export default function PrehledPage() {
               ? `${new Intl.NumberFormat('cs-CZ').format(monthIncome)} z ${new Intl.NumberFormat('cs-CZ').format(g.target_value ?? 0)}`
               : `${pct}%`
             return (
-              <div key={g.id} style={{ background: 'var(--card)', border: `1px solid ${isOpen ? '#e53e3e' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0, transition: 'border-color 0.15s' }}>
+              <div key={g.id} style={{ background: 'var(--card)', border: `1px solid ${isOpen ? '#E8192C' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--shadow)', flex: '1 1 180px', minWidth: 0, transition: 'border-color 0.15s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 5 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.nazev}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#e53e3e' }}>{valueLabel}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#E8192C' }}>{valueLabel}</span>
                     {typ !== 'income' && (
                       <button
                         onClick={() => { setQuickGoalId(isOpen ? null : g.id); setQuickValue('') }}
-                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#e53e3e' : 'var(--border)'}`, background: isOpen ? '#e53e3e' : 'transparent', color: isOpen ? 'white' : '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${isOpen ? '#E8192C' : 'var(--border)'}`, background: isOpen ? '#E8192C' : 'transparent', color: isOpen ? 'white' : '#E8192C', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, lineHeight: 1, fontWeight: 700 }}
                       >{isOpen ? <X size={13} /> : <Plus size={13} />}</button>
                     )}
                   </div>
                 </div>
                 {g.deadline && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>do {new Date(g.deadline).toLocaleDateString('cs-CZ')}</div>}
                 <div style={{ background: 'var(--progress-track)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: isOpen ? 8 : 0 }}>
-                  <div style={{ background: '#e53e3e', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
+                  <div style={{ background: '#E8192C', height: '100%', width: `${pct}%`, borderRadius: 4, transition: 'width 0.4s' }} />
                 </div>
                 {isOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -344,10 +344,10 @@ export default function PrehledPage() {
                           type="range" min={0} max={100}
                           value={quickValue || g.progress || 0}
                           onChange={e => setQuickValue(e.target.value)}
-                          style={{ flex: 1, accentColor: '#e53e3e' }}
+                          style={{ flex: 1, accentColor: '#E8192C' }}
                         />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#e53e3e', minWidth: 32, textAlign: 'right' }}>{quickValue || g.progress || 0}%</span>
-                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#E8192C', minWidth: 32, textAlign: 'right' }}>{quickValue || g.progress || 0}%</span>
+                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#E8192C', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -358,9 +358,9 @@ export default function PrehledPage() {
                           value={quickValue}
                           onChange={e => setQuickValue(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') saveQuickProgress(g); if (e.key === 'Escape') { setQuickGoalId(null); setQuickValue('') } }}
-                          style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #e53e3e', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                          style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid #E8192C', borderRadius: 6, padding: '5px 10px', color: 'var(--text)', fontSize: 12, outline: 'none' }}
                         />
-                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#e53e3e', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
+                        <button onClick={() => saveQuickProgress(g)} style={{ background: '#E8192C', border: 'none', borderRadius: 6, padding: '5px 10px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Check size={14} /></button>
                       </div>
                     )}
                   </div>
@@ -385,16 +385,16 @@ export default function PrehledPage() {
             ) : urgentTasks.map(t => {
               const isOverdue = t.status !== 'Done' && t.deadline && new Date(t.deadline) < new Date(new Date().toDateString())
               return (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: isOverdue ? 'rgba(229,62,62,0.06)' : 'transparent', borderRadius: 6, overflow: 'hidden' }}>
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: isOverdue ? 'rgba(232, 25, 44,0.06)' : 'transparent', borderRadius: 6, overflow: 'hidden' }}>
                 <div style={{ width: 4, alignSelf: 'stretch', background: t.status === 'Done' ? '#4b5563' : priorityColor[t.priorita], flexShrink: 0 }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, padding: '8px 10px' }}>
                 <label style={{ minWidth: 44, minHeight: 44, marginLeft: -10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}>
                   <input type="checkbox" checked={t.status === 'Done'} onChange={() => checkTask(t)}
-                    style={{ width: 24, height: 24, accentColor: '#e53e3e', cursor: 'pointer' }} />
+                    style={{ width: 24, height: 24, accentColor: '#E8192C', cursor: 'pointer' }} />
                 </label>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: t.status === 'Done' ? 'line-through' : 'none', opacity: t.status === 'Done' ? 0.5 : 1 }}>{t.nazev}</div>
-                  {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}{timeSuffix(t.deadline_time)}</div>}
+                  {t.deadline && <div style={{ fontSize: 13, color: isOverdue ? '#E8192C' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400, marginTop: 1 }}>{new Date(t.deadline).toLocaleDateString('cs-CZ')}{timeSuffix(t.deadline_time)}</div>}
                 </div>
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: priorityColor[t.priorita] + '22', color: priorityColor[t.priorita], fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>{t.priorita}</span>
                 </div>
@@ -420,10 +420,10 @@ export default function PrehledPage() {
             </div>
             <div style={{ background: '#fee2e222', border: '1px solid #fee2e2', borderRadius: 8, padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-                <TrendingDown size={12} color="#e53e3e" />
-                <span style={{ fontSize: 11, color: '#e53e3e', fontWeight: 500 }}>Výdaje / měsíc</span>
+                <TrendingDown size={12} color="#E8192C" />
+                <span style={{ fontSize: 11, color: '#E8192C', fontWeight: 500 }}>Výdaje / měsíc</span>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#e53e3e' }}>{czk(monthExpense)}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#E8192C' }}>{czk(monthExpense)}</div>
             </div>
             {userEmail !== 'larisaprodanets2055@gmail.com' && <>
               <div style={{ background: '#fef3c722', border: '1px solid #fef3c7', borderRadius: 8, padding: '8px 12px' }}>
@@ -447,7 +447,7 @@ export default function PrehledPage() {
                   <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500 }}>{t.nazev}</div>
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t.datum ? new Date(t.datum).toLocaleDateString('cs-CZ') : '—'}</div>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#e53e3e' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: t.typ === 'prijem' ? '#10b981' : '#E8192C' }}>
                   {t.typ === 'prijem' ? '+' : '-'}{czk(Number(t.castka))}
                 </div>
               </div>
@@ -465,8 +465,8 @@ export default function PrehledPage() {
           {txForm.typ === 'prijem' && (
             <div>
               <label style={labelStyle}>Klient</label>
-              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#e53e3e' : undefined }} value={txForm.klient} onChange={e => { setTxForm({ ...txForm, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} autoFocus />
-              {formErrors.klient && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.klient}</div>}
+              <input style={{ ...inputStyle, borderColor: formErrors.klient ? '#E8192C' : undefined }} value={txForm.klient} onChange={e => { setTxForm({ ...txForm, klient: e.target.value }); setFormErrors(p => ({ ...p, klient: '' })) }} autoFocus />
+              {formErrors.klient && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.klient}</div>}
             </div>
           )}
           {txForm.typ !== 'prijem' && (
@@ -478,14 +478,14 @@ export default function PrehledPage() {
                   <span style={{ color: txForm.smer === 'mne' ? 'var(--text)' : 'var(--muted)' }}>Kdo mi dluží</span>
                 </>
               ) : 'Název'}</label>
-              <input placeholder={txForm.typ === 'dluh' ? (txForm.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={txForm.nazev} onChange={e => { setTxForm({ ...txForm, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} autoFocus />
-              {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+              <input placeholder={txForm.typ === 'dluh' ? (txForm.smer === 'moje' ? 'např. Honza, Novák...' : 'např. Petr, firma...') : ''} style={{ ...inputStyle, borderColor: formErrors.nazev ? '#E8192C' : undefined }} value={txForm.nazev} onChange={e => { setTxForm({ ...txForm, nazev: e.target.value }); setFormErrors(p => ({ ...p, nazev: '' })) }} autoFocus />
+              {formErrors.nazev && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.nazev}</div>}
             </div>
           )}
           <div>
             <label style={labelStyle}>Částka (Kč)</label>
-            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#e53e3e' : undefined }} value={txForm.castka} onChange={e => { setTxForm({ ...txForm, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
-            {formErrors.castka && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.castka}</div>}
+            <input type="number" style={{ ...inputStyle, borderColor: formErrors.castka ? '#E8192C' : undefined }} value={txForm.castka} onChange={e => { setTxForm({ ...txForm, castka: e.target.value }); setFormErrors(p => ({ ...p, castka: '' })) }} />
+            {formErrors.castka && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.castka}</div>}
           </div>
           {txForm.typ !== 'fixni_naklad' && (
             <div><label style={labelStyle}>Datum</label><DatePicker value={txForm.datum} onChange={v => setTxForm({ ...txForm, datum: v })} /></div>
@@ -515,7 +515,7 @@ export default function PrehledPage() {
           )}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveTransaction} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveTransaction} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
@@ -527,8 +527,8 @@ export default function PrehledPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Název</label>
-            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={taskForm.nazev} onChange={e => { setTaskForm({ ...taskForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
-            {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#E8192C' : undefined }} value={taskForm.nazev} onChange={e => { setTaskForm({ ...taskForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
+            {formErrors.nazev && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.nazev}</div>}
           </div>
           <div><label style={labelStyle}>Priorita</label>
             <PillGroup value={taskForm.priorita} onChange={val => setTaskForm({ ...taskForm, priorita: val })} options={[{ value: 'Low', label: 'Low', color: priorityColors.Low }, { value: 'Medium', label: 'Medium', color: priorityColors.Medium }, { value: 'High', label: 'High', color: priorityColors.High }]} />
@@ -562,7 +562,7 @@ export default function PrehledPage() {
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProjekt() } }}
                   autoFocus
                 />
-                <button type="button" onClick={addProjekt} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <button type="button" onClick={addProjekt} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
                   Uložit
                 </button>
               </div>
@@ -570,7 +570,7 @@ export default function PrehledPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveTask} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveTask} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>
@@ -582,8 +582,8 @@ export default function PrehledPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Název</label>
-            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#e53e3e' : undefined }} value={goalForm.nazev} onChange={e => { setGoalForm({ ...goalForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
-            {formErrors.nazev && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formErrors.nazev}</div>}
+            <input style={{ ...inputStyle, borderColor: formErrors.nazev ? '#E8192C' : undefined }} value={goalForm.nazev} onChange={e => { setGoalForm({ ...goalForm, nazev: e.target.value }); setFormErrors({}) }} autoFocus />
+            {formErrors.nazev && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formErrors.nazev}</div>}
           </div>
           <div><label style={labelStyle}>Deadline</label><DatePicker value={goalForm.deadline} onChange={v => setGoalForm({ ...goalForm, deadline: v })} /></div>
           <div>
@@ -592,9 +592,9 @@ export default function PrehledPage() {
               {(['manual', 'number', 'income'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setGoalForm({ ...goalForm, typ: t })} style={{
                   padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: `2px solid ${goalForm.typ === t ? '#e53e3e' : 'var(--border)'}`,
-                  background: goalForm.typ === t ? '#e53e3e22' : 'transparent',
-                  color: goalForm.typ === t ? '#e53e3e' : 'var(--muted)',
+                  border: `2px solid ${goalForm.typ === t ? '#E8192C' : 'var(--border)'}`,
+                  background: goalForm.typ === t ? '#E8192C22' : 'transparent',
+                  color: goalForm.typ === t ? '#E8192C' : 'var(--muted)',
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     {t === 'manual' ? <Sliders size={12} /> : t === 'number' ? <Calculator size={12} /> : <Zap size={12} />}
@@ -607,7 +607,7 @@ export default function PrehledPage() {
           {goalForm.typ === 'manual' && (
             <div>
               <label style={labelStyle}>Pokrok: {goalForm.progress}%</label>
-              <input type="range" min={0} max={100} value={goalForm.progress} onChange={e => setGoalForm({ ...goalForm, progress: Number(e.target.value) })} style={{ width: '100%', accentColor: '#e53e3e' }} />
+              <input type="range" min={0} max={100} value={goalForm.progress} onChange={e => setGoalForm({ ...goalForm, progress: Number(e.target.value) })} style={{ width: '100%', accentColor: '#E8192C' }} />
             </div>
           )}
           {goalForm.typ === 'number' && (
@@ -622,11 +622,11 @@ export default function PrehledPage() {
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', fontSize: 12, color: 'var(--muted)', marginBottom: 6, gap: 4 }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{czk(Number(goalForm.current_value))}</span>
-                      <span style={{ color: '#e53e3e', fontWeight: 700, textAlign: 'center' }}>{pct}%</span>
+                      <span style={{ color: '#E8192C', fontWeight: 700, textAlign: 'center' }}>{pct}%</span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{czk(Number(goalForm.target_value))}</span>
                     </div>
                     <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: '#e53e3e', borderRadius: 4, transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', width: `${pct}%`, background: '#E8192C', borderRadius: 4, transition: 'width 0.3s' }} />
                     </div>
                   </div>
                 )
@@ -635,7 +635,7 @@ export default function PrehledPage() {
           )}
           {goalForm.typ === 'income' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ background: '#e53e3e11', border: '1px solid #e53e3e33', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#e53e3e' }}>
+              <div style={{ background: '#E8192C11', border: '1px solid #E8192C33', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#E8192C' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Zap size={13} /> Progress se počítá automaticky z příjmů tohoto měsíce</span>
               </div>
               <div><label style={labelStyle}>Cílová částka (Kč)</label><input type="number" style={inputStyle} placeholder="100 000" value={goalForm.target_value} onChange={e => setGoalForm({ ...goalForm, target_value: e.target.value })} /></div>
@@ -647,7 +647,7 @@ export default function PrehledPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button onClick={() => setAddModal(null)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={saveGoal} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={saveGoal} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

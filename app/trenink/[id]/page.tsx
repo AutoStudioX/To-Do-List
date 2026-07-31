@@ -207,7 +207,7 @@ export default function ActiveWorkoutPage() {
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <button onClick={() => moveExercise(exIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
                 <button onClick={() => moveExercise(exIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
-                <button onClick={() => removeExercise(exIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: '#fee2e2', color: '#e53e3e' }}><Trash2 size={16} /></button>
+                <button onClick={() => removeExercise(exIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: '#fee2e2', color: '#E8192C' }}><Trash2 size={16} /></button>
               </div>
             </div>
 
@@ -222,13 +222,13 @@ export default function ActiveWorkoutPage() {
                       <button onClick={() => setEditing(isEditing ? null : { ex: exIdx, set: setIdx })} style={{ flex: 1, minHeight: 44, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation' }}>
                         {fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}{s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', marginLeft: 6, fontWeight: 600 }}>W</span>}
                       </button>
-                      <button onClick={() => confirmSet(exIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#e53e3e', color: '#fff', cursor: 'pointer', touchAction: 'manipulation' }}><Check size={20} /></button>
+                      <button onClick={() => confirmSet(exIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation' }}><Check size={20} /></button>
                     </div>
                     {isEditing && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', padding: '0 8px 10px' }}>
                         <NumberStepper label="Váha (kg)" value={s.weight} step={WEIGHT_STEP} allowDecimal onChange={v => patchSet(exIdx, setIdx, { weight: v })} />
                         <NumberStepper label="Opakování" value={s.reps} step={REP_STEP} min={0} onChange={v => patchSet(exIdx, setIdx, { reps: v })} />
-                        <button onClick={() => deleteSet(exIdx, setIdx)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px solid #fca5a5', borderRadius: 10, color: '#e53e3e', fontSize: 14, cursor: 'pointer' }}>Smazat sérii</button>
+                        <button onClick={() => deleteSet(exIdx, setIdx)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px solid #fca5a5', borderRadius: 10, color: '#E8192C', fontSize: 14, cursor: 'pointer' }}>Smazat sérii</button>
                       </div>
                     )}
                   </div>

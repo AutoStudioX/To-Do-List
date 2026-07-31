@@ -79,7 +79,7 @@ export default function AdminPage() {
                 <button
                   onClick={() => unlock(acc)}
                   disabled={unlocking === acc.user_id}
-                  style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '0 16px', fontSize: 14, fontWeight: 600, cursor: unlocking === acc.user_id ? 'default' : 'pointer', opacity: unlocking === acc.user_id ? 0.6 : 1, touchAction: 'manipulation' }}
+                  style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 6, background: '#E8192C', color: 'white', border: 'none', borderRadius: 8, padding: '0 16px', fontSize: 14, fontWeight: 600, cursor: unlocking === acc.user_id ? 'default' : 'pointer', opacity: unlocking === acc.user_id ? 0.6 : 1, touchAction: 'manipulation' }}
                 >
                   <Unlock size={15} /> {unlocking === acc.user_id ? 'Odemykám...' : 'Odemknout'}
                 </button>

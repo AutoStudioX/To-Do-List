@@ -4,7 +4,7 @@ import { Task } from '@/lib/types'
 import { timeSuffix } from '@/lib/taskTime'
 
 const priorityBorder: Record<string, string> = {
-  High: '#e53e3e',
+  High: '#E8192C',
   Medium: '#f59e0b',
   Low: '#10b981',
 }
@@ -58,7 +58,7 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
                   type="checkbox"
                   checked={t.status === 'Done'}
                   onChange={() => onToggleDone(t)}
-                  style={{ width: 24, height: 24, accentColor: '#e53e3e', cursor: 'pointer', touchAction: 'manipulation' }}
+                  style={{ width: 24, height: 24, accentColor: '#E8192C', cursor: 'pointer', touchAction: 'manipulation' }}
                 />
               </label>
               <div
@@ -86,7 +86,7 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
               <button
                 onClick={e => { e.stopPropagation(); onDelete(t.id) }}
                 aria-label="Smazat"
-                style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#e53e3e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
+                style={{ minWidth: 44, minHeight: 44, background: '#fee2e2', border: 'none', borderRadius: 8, color: '#E8192C', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}
               >
                 <Trash2 size={16} />
               </button>
@@ -103,7 +103,7 @@ function TaskRowImpl({ task: t, expanded, showDivider, onToggleDone, onToggleExp
               <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{t.status}</span>
             </div>
             {t.deadline && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#e53e3e' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isOverdue ? '#E8192C' : 'var(--muted)', fontWeight: isOverdue ? 600 : 400 }}>
                 <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString('cs-CZ')}{timeSuffix(t.deadline_time)}
               </span>
             )}

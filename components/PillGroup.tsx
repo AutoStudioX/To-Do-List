@@ -4,7 +4,7 @@
 // Selected state reuses the app's existing badge colors: pass `color`
 // ({ bg, text, border }) per option — the same triples used by the status /
 // priority / transaction-type badges elsewhere. Options without a `color` fall
-// back to solid red (#e53e3e). Unselected = neutral input background.
+// back to solid red (#E8192C). Unselected = neutral input background.
 // Buttons sit side by side and wrap to a second row on narrow screens.
 export type PillColor = { bg: string; text: string; border: string }
 export type PillOption<T extends string> = { value: T; label: string; icon?: React.ReactNode; color?: PillColor }
@@ -20,9 +20,9 @@ export default function PillGroup<T extends string>({
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {options.map(opt => {
         const active = value === opt.value
-        const activeBg = opt.color ? opt.color.bg : '#e53e3e'
+        const activeBg = opt.color ? opt.color.bg : '#E8192C'
         const activeText = opt.color ? opt.color.text : '#ffffff'
-        const activeBorder = opt.color ? opt.color.border : '#e53e3e'
+        const activeBorder = opt.color ? opt.color.border : '#E8192C'
         return (
           <button
             key={opt.value}

@@ -4,7 +4,7 @@
   --bg: #f8f9fa;
   --card: #ffffff;
   --border: #e5e7eb;
-  --accent: #e53e3e;
+  --accent: #E8192C;
   --text: #111827;
   --muted: #6b7280;
   --table-header: #f3f4f6;
@@ -12,7 +12,7 @@
   --hover-bg: #f3f4f6;
   --progress-track: #e5e7eb;
   --nav-active-bg: #fee2e2;
-  --nav-active-text: #e53e3e;
+  --nav-active-text: #E8192C;
   --nav-hover: #f3f4f6;
   --sidebar-bg: #ffffff;
   --sidebar-border: #e5e7eb;
@@ -25,20 +25,20 @@ html.dark {
   --bg: #0f0f0f;
   --card: #1a1a1a;
   --border: #2a2a2a;
-  --accent: #e53e3e;
+  --accent: #E8192C;
   --text: #ffffff;
   --muted: #6b7280;
   --table-header: #2a2a2a;
   --input-bg: #0f0f0f;
   --hover-bg: rgba(255,255,255,0.04);
   --progress-track: #2a2a2a;
-  --nav-active-bg: rgba(229,62,62,0.12);
+  --nav-active-bg: rgba(232, 25, 44,0.12);
   --nav-active-text: #fc8181;
   --nav-hover: #2a2a2a;
   --sidebar-bg: #1a1a1a;
   --sidebar-border: #2a2a2a;
-  --overdue-bg: rgba(229,62,62,0.14);
-  --overdue-border: rgba(229,62,62,0.5);
+  --overdue-bg: rgba(232, 25, 44,0.14);
+  --overdue-border: rgba(232, 25, 44,0.5);
   --shadow: none;
 }
 
@@ -72,7 +72,7 @@ button[style*="background:transparent"]:hover {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+  box-shadow: 0 0 0 3px rgba(232, 25, 44, 0.15);
 }
 
 a {

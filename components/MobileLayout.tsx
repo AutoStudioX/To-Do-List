@@ -35,10 +35,10 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
             display: 'flex', alignItems: 'center', gap: 6,
             position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
           }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Zap size={14} color="white" fill="white" strokeWidth={1.5} />
             </div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>To-Do <span style={{ color: '#e53e3e' }}>List</span></span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>To-Do <span style={{ color: '#E8192C' }}>List</span></span>
           </div>
           <div className="desktop-only" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>

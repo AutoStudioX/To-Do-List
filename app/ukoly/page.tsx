@@ -271,7 +271,7 @@ export default function UkolyPage() {
           <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Úkoly</h1>
           <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>{openCount} otevřených</span>
         </div>
-        <button onClick={openAdd} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(229,62,62,0.35)', touchAction: 'manipulation' }}>
+        <button onClick={openAdd} style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
           <Plus size={16} /> Přidat úkol
         </button>
       </div>
@@ -303,7 +303,7 @@ export default function UkolyPage() {
           {(['All', 'High', 'Medium', 'Low'] as const).map(p => {
             const priorityActive: Record<string, { bg: string; color: string; border: string }> = {
               All: { bg: 'var(--text)', color: 'var(--bg)', border: 'var(--text)' },
-              High: { bg: '#fee2e2', color: '#c53030', border: '#e53e3e' },
+              High: { bg: '#fee2e2', color: '#c53030', border: '#E8192C' },
               Medium: { bg: '#fef3c7', color: '#b45309', border: '#f59e0b' },
               Low: { bg: '#d1fae5', color: '#065f46', border: '#10b981' },
             }
@@ -396,8 +396,8 @@ export default function UkolyPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Název</label>
-            <input style={{ ...inputStyle, borderColor: formError ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} autoFocus />
-            {formError && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formError}</div>}
+            <input style={{ ...inputStyle, borderColor: formError ? '#E8192C' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} autoFocus />
+            {formError && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formError}</div>}
           </div>
           <div><label style={labelStyle}>Priorita</label>
             <PillGroup value={form.priorita} onChange={val => setForm({ ...form, priorita: val })} options={[{ value: 'Low', label: 'Low', color: priorityColors.Low }, { value: 'Medium', label: 'Medium', color: priorityColors.Medium }, { value: 'High', label: 'High', color: priorityColors.High }]} />
@@ -431,7 +431,7 @@ export default function UkolyPage() {
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProjekt() } }}
                   autoFocus
                 />
-                <button type="button" onClick={addProjekt} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <button type="button" onClick={addProjekt} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
                   Uložit
                 </button>
               </div>
@@ -439,7 +439,7 @@ export default function UkolyPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
             <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 20px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

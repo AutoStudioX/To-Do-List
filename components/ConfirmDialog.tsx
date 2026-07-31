@@ -27,7 +27,7 @@ export function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
             cursor: 'pointer', fontSize: 14,
           }}>Zrušit</button>
           <button onClick={onConfirm} style={{
-            background: '#e53e3e', border: 'none',
+            background: '#E8192C', border: 'none',
             borderRadius: 8, padding: '8px 18px', color: 'white',
             cursor: 'pointer', fontSize: 14, fontWeight: 600,
           }}>Smazat</button>

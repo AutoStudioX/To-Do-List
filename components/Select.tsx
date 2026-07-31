@@ -96,7 +96,7 @@ export default function Select({ value, onChange, options, style }: Props) {
                 width: '100%',
                 padding: '10px 14px',
                 background: opt.value === value ? 'var(--nav-active-bg)' : 'transparent',
-                color: opt.value === value ? '#e53e3e' : 'var(--text)',
+                color: opt.value === value ? '#E8192C' : 'var(--text)',
                 fontWeight: opt.value === value ? 600 : 400,
                 fontSize: 14,
                 border: 'none',

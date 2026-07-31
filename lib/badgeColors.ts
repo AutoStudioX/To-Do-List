@@ -8,7 +8,7 @@
 import type { PillColor } from '@/components/PillGroup'
 
 export const priorityColors: Record<string, PillColor> = {
-  High: { bg: '#fee2e2', text: '#c53030', border: '#e53e3e' },
+  High: { bg: '#fee2e2', text: '#c53030', border: '#E8192C' },
   Medium: { bg: '#fef3c7', text: '#b45309', border: '#f59e0b' },
   Low: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
 }
@@ -21,7 +21,7 @@ export const taskStatusColors: Record<string, PillColor> = {
 
 export const txTypColors: Record<string, PillColor> = {
   prijem: { bg: '#d1fae5', text: '#059669', border: '#10b981' },
-  vydaj: { bg: '#fee2e2', text: '#e53e3e', border: '#e53e3e' },
+  vydaj: { bg: '#fee2e2', text: '#E8192C', border: '#E8192C' },
   dluh: { bg: '#ede9fe', text: '#7c3aed', border: '#7c3aed' },
   fixni_naklad: { bg: '#dbeafe', text: '#2563eb', border: '#3b82f6' },
 }
@@ -31,11 +31,11 @@ export const txStatusColors: Record<string, PillColor> = {
   ceka: { bg: '#fef3c7', text: '#d97706', border: '#f59e0b' },
   dluh: { bg: '#ede9fe', text: '#7c3aed', border: '#7c3aed' },
   splaceno: { bg: '#d1fae5', text: '#059669', border: '#10b981' },
-  nesplaceno: { bg: '#fee2e2', text: '#e53e3e', border: '#e53e3e' },
+  nesplaceno: { bg: '#fee2e2', text: '#E8192C', border: '#E8192C' },
 }
 
 export const smerColors: Record<string, PillColor> = {
-  moje: { bg: '#fee2e2', text: '#e53e3e', border: '#e53e3e' },
+  moje: { bg: '#fee2e2', text: '#E8192C', border: '#E8192C' },
   mne: { bg: '#d1fae5', text: '#059669', border: '#10b981' },
 }
 
@@ -46,6 +46,6 @@ export const opakovaniColors: Record<string, PillColor> = {
 }
 
 export const goalStatusColors: Record<string, PillColor> = {
-  active: { bg: '#fee2e2', text: '#e53e3e', border: '#e53e3e' },
+  active: { bg: '#fee2e2', text: '#E8192C', border: '#E8192C' },
   completed: { bg: '#d1fae5', text: '#059669', border: '#10b981' },
 }

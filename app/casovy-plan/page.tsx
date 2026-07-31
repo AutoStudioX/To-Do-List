@@ -11,7 +11,7 @@ import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const DAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
 const HOURS = Array.from({ length: 17 }, (_, i) => i + 6)
-const COLORS = ['#e53e3e', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#ec4899']
+const COLORS = ['#E8192C', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#ec4899']
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
@@ -29,7 +29,7 @@ export default function CasovyPlanPage() {
   const [loading, setLoading] = useState(false)
   const [modal, setModal] = useState(false)
   const [editBlock, setEditBlock] = useState<TimeBlock | null>(null)
-  const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#e53e3e', kategorie: '' })
+  const [form, setForm] = useState({ nazev: '', den: 0, od: '09:00', do: '10:00', barva: '#E8192C', kategorie: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const { toast, showToast, hideToast } = useToast()
@@ -58,7 +58,7 @@ export default function CasovyPlanPage() {
       nazev: '', den: den ?? 0,
       od: hour !== undefined ? `${hour.toString().padStart(2, '0')}:00` : '09:00',
       do: hour !== undefined ? `${(hour + 1).toString().padStart(2, '0')}:00` : '10:00',
-      barva: '#e53e3e', kategorie: ''
+      barva: '#E8192C', kategorie: ''
     })
     setEditBlock(null); setFormError(''); setModal(true)
   }
@@ -103,7 +103,7 @@ export default function CasovyPlanPage() {
       {confirmDialog}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)' }}>Časový plán</h1>
-        <button onClick={() => openAdd()} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => openAdd()} style={{ background: '#E8192C', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={16} /> Přidat blok
         </button>
       </div>
@@ -164,8 +164,8 @@ export default function CasovyPlanPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Název</label>
-            <input style={{ ...inputStyle, borderColor: formError ? '#e53e3e' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} />
-            {formError && <div style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>{formError}</div>}
+            <input style={{ ...inputStyle, borderColor: formError ? '#E8192C' : undefined }} value={form.nazev} onChange={e => { setForm({ ...form, nazev: e.target.value }); setFormError('') }} />
+            {formError && <div style={{ fontSize: 12, color: '#E8192C', marginTop: 4 }}>{formError}</div>}
           </div>
           <div>
             <label style={labelStyle}>Den</label>
@@ -189,10 +189,10 @@ export default function CasovyPlanPage() {
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             {editBlock && (
-              <button onClick={() => { deleteBlock(editBlock.id); setModal(false) }} style={{ background: 'transparent', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', color: '#e53e3e', cursor: 'pointer', fontSize: 14 }}>Smazat</button>
+              <button onClick={() => { deleteBlock(editBlock.id); setModal(false) }} style={{ background: 'transparent', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', color: '#E8192C', cursor: 'pointer', fontSize: 14 }}>Smazat</button>
             )}
             <button onClick={() => setModal(false)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>Zrušit</button>
-            <button onClick={save} disabled={saving} style={{ background: '#e53e3e', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+            <button onClick={save} disabled={saving} style={{ background: '#E8192C', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Ukládám...' : 'Uložit'}
             </button>
           </div>

@@ -23,8 +23,8 @@ export default function TimePicker({ value, onChange }: { value: string; onChang
       style={{
         padding: '8px 12px',
         borderRadius: 8,
-        border: `1px solid ${active ? '#e53e3e' : 'var(--border)'}`,
-        background: active ? '#e53e3e' : 'var(--input-bg)',
+        border: `1px solid ${active ? '#E8192C' : 'var(--border)'}`,
+        background: active ? '#E8192C' : 'var(--input-bg)',
         color: active ? '#fff' : 'var(--text)',
         fontSize: 13,
         fontWeight: 600,

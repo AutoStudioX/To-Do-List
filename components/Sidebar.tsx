@@ -77,13 +77,13 @@ export default function Sidebar({ isOpen, onClose }: Props) {
       </nav>
 
       <div style={{ padding: '10px 14px', margin: '0 8px 8px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Zap size={18} color="white" fill="white" />
         </div>
         <div>
           <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.2 }}>powered by</div>
           <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
-            <span style={{ color: 'var(--text)' }}>Auto</span><span style={{ color: '#e53e3e' }}>Studio</span>
+            <span style={{ color: 'var(--text)' }}>Auto</span><span style={{ color: '#E8192C' }}>Studio</span>
           </div>
         </div>
       </div>
@@ -94,7 +94,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
           borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--muted)',
           fontSize: 14, cursor: 'pointer', width: '100%', transition: 'background 0.15s, color 0.15s',
         }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--nav-hover)'; (e.currentTarget as HTMLElement).style.color = '#e53e3e' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--nav-hover)'; (e.currentTarget as HTMLElement).style.color = '#E8192C' }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}
         >
           <LogOut size={16} />
