@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, SplitType } from '@/lib/types'
 import { useLiveData } from '@/lib/useLiveData'
-import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, startOfWeek } from '@/lib/gym'
-import { Plus, Dumbbell, ChevronRight, Trash2 } from 'lucide-react'
+import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek } from '@/lib/gym'
+import { Plus, Dumbbell, ChevronRight, Trash2, TrendingUp } from 'lucide-react'
 
 type SetRow = { workout_id: string; exercise_id: string; weight_kg: number | null; reps: number | null; is_warmup: boolean; order_index: number }
-type Derived = { count: number; vol: number; summary: { name: string; set: string }[]; pr: boolean }
+type Derived = { count: number; vol: number; summary: { name: string; set: string }[]; top: string; pr: boolean }
 
 const DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
@@ -64,7 +64,7 @@ export default function TreninkPage() {
         const g = byWorkout.get(s.workout_id) || []; g.push(s); byWorkout.set(s.workout_id, g)
       }
       // Per-split max volume → mark a workout as PR when it's the best session of its split.
-      const partial: Record<string, { count: number; vol: number; summary: { name: string; set: string }[] }> = {}
+      const partial: Record<string, { count: number; vol: number; summary: { name: string; set: string }[]; top: string }> = {}
       const splitMax = new Map<string, number>()
       for (const w of list) {
         const rows = byWorkout.get(w.id) || []
@@ -73,8 +73,11 @@ export default function TreninkPage() {
         for (const r of rows) { const g = perEx.get(r.exercise_id) || []; g.push(r); perEx.set(r.exercise_id, g) }
         const exOrder = [...perEx.entries()].sort((a, b) => (a[1][0]?.order_index ?? 0) - (b[1][0]?.order_index ?? 0))
         const summary = exOrder.slice(0, 3).map(([exId, exSets]) => ({ name: names.get(exId) || 'Cvik', set: fmtSet(topSet(exSets)) })).filter(s => s.set)
+        // Single heaviest working set of the whole session → "top: Bench press 85 kg × 6"
+        const best = working.reduce<SetRow | null>((b, r) => (!b || (Number(r.weight_kg) || 0) > (Number(b.weight_kg) || 0) ? r : b), null)
+        const top = best ? `${names.get(best.exercise_id) || 'Cvik'} ${best.weight_kg == null ? 'vlastní' : `${fmtWeight(Number(best.weight_kg))} kg`} × ${best.reps ?? '?'}` : ''
         const vol = volume(rows)
-        partial[w.id] = { count: working.length, vol, summary }
+        partial[w.id] = { count: working.length, vol, summary, top }
         const k = w.split_type || ''
         splitMax.set(k, Math.max(splitMax.get(k) || 0, vol))
       }
@@ -162,10 +165,11 @@ export default function TreninkPage() {
   const newPanel = (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, boxShadow: 'var(--shadow)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>NOVÝ TRÉNINK</div>
+        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>{isMobile ? 'TYP TRÉNINKU' : 'NOVÝ TRÉNINK'}</div>
         {!customMode && <div style={{ fontSize: 12, color: 'var(--muted)' }}>na řadě je <span style={{ color: '#E8192C', fontWeight: 700 }}>{split}</span></div>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+      {/* Mobile: one row of 4 (per design); desktop: 2×2 */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(4, minmax(0,1fr))' : '1fr 1fr', gap: 8, marginBottom: 12 }}>
         {SPLITS.map(s => {
           const active = !customMode && split === s
           return (
@@ -192,7 +196,7 @@ export default function TreninkPage() {
           style={{ width: '100%', minHeight: 48, marginBottom: 12, padding: '0 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 15, boxSizing: 'border-box' }}
         />
       )}
-      {lastOfSplit && lastOfSplit.summary.length > 0 && (
+      {!isMobile && lastOfSplit && lastOfSplit.summary.length > 0 && (
         <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 10, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
             MINULÝ {String(lastOfSplit.workout.split_type || '').toUpperCase()} · {relDate(lastOfSplit.workout.date)}
@@ -207,9 +211,30 @@ export default function TreninkPage() {
           </div>
         </div>
       )}
-      <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ width: '100%', minHeight: 52, background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
+      <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ width: '100%', minHeight: isMobile ? 60 : 52, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: isMobile ? 17 : 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
         <Plus size={20} /> {starting ? 'Zakládám…' : customMode ? 'Začít' : `Začít ${split}`}
       </button>
+    </div>
+  )
+
+  // Mobile: three separate labelled tiles (design has no bar chart on mobile).
+  const weekTiles = (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+      {[
+        { label: 'TÝDEN', value: String(week.count), unit: '', sub: 'tréninky', accent: false },
+        { label: 'OBJEM', value: week.vol ? fmtTonnage(week.vol).replace(/\s*(t|kg)$/, '') : '0', unit: week.vol ? (week.vol >= 1000 ? 't' : 'kg') : '', sub: week.delta != null ? `${week.delta >= 0 ? '+' : ''}${week.delta} %` : 'objem', accent: week.delta != null && week.delta >= 0 },
+        { label: 'SÉRIE', value: String(week.sets), unit: '', sub: 'bez warm-up', accent: false },
+      ].map((t, i) => (
+        <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 10px', boxShadow: 'var(--shadow)', minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.66, color: 'var(--muted)' }}>{t.label}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', lineHeight: 1.1, marginTop: 4 }}>
+            {t.value}{t.unit && <span style={{ fontSize: 13, fontWeight: 700, marginLeft: 2 }}>{t.unit}</span>}
+          </div>
+          <div style={{ fontSize: 11, color: t.accent ? '#10b981' : 'var(--muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            {t.accent && <TrendingUp size={12} />}{t.sub}
+          </div>
+        </div>
+      ))}
     </div>
   )
 
@@ -269,17 +294,30 @@ export default function TreninkPage() {
               <div key={w.id} style={{ display: 'flex', alignItems: 'stretch', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
                 <div style={{ width: 4, background: splitColor(w.split_type), flexShrink: 0 }} />
                 <button onClick={() => router.push(`/trenink/${w.id}`)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, background: 'transparent', border: 'none', padding: '12px 4px 12px 12px', cursor: 'pointer', textAlign: 'left', touchAction: 'manipulation' }}>
-                  {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '5px 9px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
-                  <div style={{ minWidth: isMobile ? 0 : 92, flex: isMobile ? 1 : undefined, flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${w.duration_min} min` : ''}</span></div>
-                    {isMobile && d && d.summary.length > 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}</div>
-                    )}
-                  </div>
-                  {!isMobile && d && d.summary.length > 0 && (
-                    <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}
+                  {isMobile ? (
+                    // Design: badge + date + "· 52 min" on line 1, "N sérií · top: …" on line 2
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '4px 8px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
+                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)}</span>
+                        {w.duration_min && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {w.duration_min} min</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {d?.count ?? 0} sérií{d?.top ? ` · top: ${d.top}` : ''}
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '5px 9px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
+                      <div style={{ minWidth: 92, flexShrink: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${w.duration_min} min` : ''}</span></div>
+                      </div>
+                      {d && d.summary.length > 0 && (
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {d.summary.map(s => `${s.name} ${s.set}`).join(' · ')}
+                        </div>
+                      )}
+                    </>
                   )}
                   {d?.pr && <span style={{ fontSize: 10, fontWeight: 800, color: '#E8192C', border: '1px solid rgba(232,25,44,0.4)', borderRadius: 6, padding: '2px 6px', flexShrink: 0 }}>PR</span>}
                   <ChevronRight size={18} color="var(--muted)" style={{ flexShrink: 0 }} />
@@ -298,23 +336,31 @@ export default function TreninkPage() {
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Dumbbell size={22} color="#fff" />
+    <div style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: isMobile ? 0 : 24, minHeight: isMobile ? '100%' : undefined, display: isMobile ? 'flex' : 'block', flexDirection: 'column' }}>
+      {/* Header — mobile per design: inline red icon, no subtitle */}
+      {isMobile ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Dumbbell size={22} color="#E8192C" />
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
         </div>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
-          {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date).toLowerCase()}</div>}
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: '#E8192C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Dumbbell size={22} color="#fff" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
+            {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date).toLowerCase()}</div>}
+          </div>
         </div>
-      </div>
+      )}
 
       {isMobile ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {weekCard}
-          {newPanel}
+        // Design order: week tiles → history → split panel pinned to the thumb zone.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
+          {weekTiles}
           {historyBlock}
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>{newPanel}</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 400px) 1fr', gap: 20, alignItems: 'start' }}>
