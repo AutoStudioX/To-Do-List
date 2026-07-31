@@ -65,3 +65,13 @@ Pro okamžitou realtime synchronizaci přidej tabulky do publikace:
 - **Vlastní typ splitu**: čtvrtá pilulka „Vlastní" vedle Push/Pull/Legs → odkryje textové pole (název, max 40 znaků, např. „Full body", „Ruce", „Kardio"). Uloží se do `split_type` jako libovolný text.
 - Migrace **`0006_workout_custom_split.sql`**: `drop constraint workouts_split_type_check` (0005 to omezovalo jen na Push/Pull/Legs). SPUSTIT v SQL Editoru, jinak insert vlastního splitu selže.
 - `split_type` v `lib/types.ts` uvolněn na `string | null`. Barvy: `splitColor(s)` helper v `lib/gym.ts` — tři defaulty drží svou barvu, vlastní = fialová (#7c3aed). `nextSplit` vlastní názvy ignoruje (nabídne Push). Detail i home page používají helper.
+
+## Trénink — redesign (Claude Design) + odvozené metriky
+Přepis vzhledu celé sekce dle nového designu. **Veškerá logika/handlery/DB volání zachovány** (2-tap zápis, prefill z minula, add/del/reorder cviku, warm-up, custom split, mazání tréninku). Přidány jen **read-only odvozené výpočty nad stávajícími tabulkami — bez změny schématu.**
+- **Home (`app/trenink/page.tsx`)**: hlavička s posledním tréninkem; **TENTO TÝDEN** dlaždice (počet tréninků / objem-tonáž + % vs. minulý týden / počet sérií); karta nového tréninku s **náhledem minulého splitu** (top-set souhrn); **HISTORIE** s filtrem Vše/Push/Pull/Legs a top-set souhrnem řádku. Objem = Σ váha×opak. bez warm-upu.
+- **Aktivní (`app/trenink/[id]/page.tsx`)**: číslované cviky, **běžící čas tréninku** + „X z Y sérií" v hlavičce, porovnávací **odznaky** u potvrzených sérií (`= minule` / `+N rep` / `+váha` / `PR objem`), **rest timer** dole. ⚠️ **Rest timer se NIKDY nespouští sám** — jen na tap „Pauza" (+30 s / ×). Auto-odpočet po sérii by byl otravný.
+- **Detail cviku (`components/gym/ExerciseChart.tsx`)**: dlaždice **1RM odhad (Epley), max váha, Δ za 8 týdnů, objem/trénink**; záložky rozsahu **8 týdnů / 6 měsíců / vše**; graf max váhy; **historie sérií** s „PR objem" odznakem.
+- Helpery v `lib/gym.ts`: `startOfWeek`, `volume`, `fmtTonnage`, `pctDelta`, `epley1RM`, `topSet`, `fmtSet`.
+- Styl: inline (konzistence s appkou, žádné CSS soubory). Barvy přes CSS vars (theme-aware), akcent #E8192C, split barvy z `splitColor()`.
+- **Pozn.:** předchozí pravidlo „bez timerů/1RM" bylo na výslovnou žádost uživatele zrušeno (timer jen na tap, 1RM jako odhad).
+- Desktop: obsah vycentrovaný na max 720px (neroztahuje se). Ověřeno na 390px i 1440px přes dočasnou demo route (smazána); plné `/trenink` je za loginem, proto vizuál přes demo + logika typecheckem.

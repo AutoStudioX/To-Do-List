@@ -8,13 +8,30 @@ import NumberStepper from '@/components/gym/NumberStepper'
 import ExercisePicker from '@/components/gym/ExercisePicker'
 import ExerciseChart from '@/components/gym/ExerciseChart'
 import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor } from '@/lib/gym'
-import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame } from 'lucide-react'
+import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, X } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
 
 let keySeq = 0
 const newKey = () => `s${++keySeq}`
+
+const REST_DEFAULT = 90 // seconds; the rest timer NEVER auto-starts — user taps "Pauza".
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`
+
+// Comparison badge for a confirmed working set vs the same-index previous set.
+function setBadge(weight: number, reps: number, prev: { weight_kg: number | null; reps: number | null }[], workingIdx: number): { text: string; kind: 'pr' | 'up' | 'same' } | null {
+  const curVol = weight * reps
+  const bestPrevVol = prev.reduce((m, p) => Math.max(m, (Number(p.weight_kg) || 0) * (p.reps || 0)), 0)
+  if (bestPrevVol > 0 && curVol > bestPrevVol) return { text: 'PR objem', kind: 'pr' }
+  const p = prev[workingIdx]
+  if (!p) return null
+  const pw = Number(p.weight_kg) || 0, pr = p.reps || 0
+  if (weight === pw && reps === pr) return { text: '= minule', kind: 'same' }
+  if (weight === pw && reps > pr) return { text: `+${reps - pr} rep`, kind: 'up' }
+  if (weight > pw) return { text: `+${fmtWeight(weight - pw)} kg`, kind: 'up' }
+  return null
+}
 
 export default function ActiveWorkoutPage() {
   const router = useRouter()
@@ -26,6 +43,8 @@ export default function ActiveWorkoutPage() {
   const [editing, setEditing] = useState<{ ex: number; set: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chartExercise, setChartExercise] = useState<Exercise | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const [rest, setRest] = useState<number | null>(null) // remaining seconds, null = off
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -87,6 +106,15 @@ export default function ActiveWorkoutPage() {
   }, [id])
 
   useEffect(() => { load() }, [load])
+
+  // Live clocks: elapsed workout time + rest countdown. Rest only runs once started.
+  useEffect(() => {
+    const t = setInterval(() => {
+      setNowMs(Date.now())
+      setRest(r => (r == null ? r : Math.max(0, r - 1)))
+    }, 1000)
+    return () => clearInterval(t)
+  }, [])
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -184,70 +212,127 @@ export default function ActiveWorkoutPage() {
     router.push('/trenink')
   }
 
+  // Derived counters for the header.
+  const { doneSets, totalSets } = useMemo(() => {
+    let done = 0, total = 0
+    for (const it of items) for (const s of it.sets) {
+      if (s.is_warmup) continue
+      total++
+      if (s.confirmed) done++
+    }
+    return { doneSets: done, totalSets: total }
+  }, [items])
+
+  const elapsedMin = workout?.created_at ? Math.floor((nowMs - new Date(workout.created_at).getTime()) / 60000) : 0
+  const elapsedSec = workout?.created_at ? Math.floor((nowMs - new Date(workout.created_at).getTime()) / 1000) % 60 : 0
+
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!workout) return <div style={{ color: 'var(--muted)', padding: 24 }}>Trénink nenalezen.</div>
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', paddingBottom: 96 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto', paddingBottom: rest != null ? 120 : 96 }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer' }}><ChevronLeft size={22} /></button>
-        {workout.split_type && <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: splitColor(workout.split_type), borderRadius: 8, padding: '5px 12px' }}>{workout.split_type}</span>}
-        <div style={{ flex: 1, fontSize: 14, color: 'var(--muted)' }}>{new Date(workout.date).toLocaleDateString('cs-CZ')}</div>
-        <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Hotovo</button>
+        <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', cursor: 'pointer' }}><ChevronLeft size={22} /></button>
+        {workout.split_type && <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(workout.split_type), borderRadius: 8, padding: '5px 12px', textTransform: 'uppercase' }}>{workout.split_type}</span>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Dnes</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{mmss(elapsedMin * 60 + elapsedSec)} · {doneSets} z {totalSets} sérií</div>
+        </div>
+        <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Hotovo</button>
       </div>
+
+      {items.length > 0 && (
+        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, margin: '0 0 10px' }}>CVIKY · {items.length}</div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {items.map((it, exIdx) => (
-          <div key={it.exercise.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-              <button onClick={() => setChartExercise(it.exercise)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>{it.exercise.name} <BarChart3 size={14} color="var(--muted)" /></div>
-                {it.previous.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>minule: {formatPrevious(it.previous)}</div>}
-              </button>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <button onClick={() => moveExercise(exIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
-                <button onClick={() => moveExercise(exIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
-                <button onClick={() => removeExercise(exIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: '#fee2e2', color: '#E8192C' }}><Trash2 size={16} /></button>
+        {items.map((it, exIdx) => {
+          let workingIdx = -1
+          return (
+            <div key={it.exercise.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                <button onClick={() => setChartExercise(it.exercise)} style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0, flex: 1, display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, background: '#E8192C', color: '#fff', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{exIdx + 1}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>{it.exercise.name} <BarChart3 size={14} color="var(--muted)" /></span>
+                    {it.previous.length > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginTop: 2 }}>minule: {formatPrevious(it.previous)}</span>}
+                  </span>
+                </button>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => moveExercise(exIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
+                  <button onClick={() => moveExercise(exIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
+                  <button onClick={() => removeExercise(exIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {it.sets.map((s, setIdx) => {
+                  const isEditing = editing && editing.ex === exIdx && editing.set === setIdx
+                  const grey = !s.confirmed && s.prefilled
+                  if (!s.is_warmup) workingIdx++
+                  const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, it.previous, workingIdx) : null
+                  const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
+                  return (
+                    <div key={s.key} style={{ border: `1px solid ${s.confirmed ? '#10b981' : 'var(--border)'}`, borderRadius: 12, background: s.confirmed ? 'rgba(16,185,129,0.06)' : 'transparent' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
+                        <button onClick={() => toggleWarmup(exIdx, setIdx)} aria-label="Rozehřívací série" title="Warm-up (nepočítá se)" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid var(--border)', background: s.is_warmup ? '#fef3c7' : 'var(--input-bg)', color: s.is_warmup ? '#d97706' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Flame size={16} /></button>
+                        <button onClick={() => setEditing(isEditing ? null : { ex: exIdx, set: setIdx })} style={{ flex: 1, minHeight: 44, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
+                          {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 700 }}>W</span>}
+                          {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
+                        </button>
+                        <button onClick={() => confirmSet(exIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation' }}><Check size={20} /></button>
+                      </div>
+                      {isEditing && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', padding: '0 8px 10px' }}>
+                          <NumberStepper label="Váha (kg)" value={s.weight} step={WEIGHT_STEP} allowDecimal onChange={v => patchSet(exIdx, setIdx, { weight: v })} />
+                          <NumberStepper label="Opakování" value={s.reps} step={REP_STEP} min={0} onChange={v => patchSet(exIdx, setIdx, { reps: v })} />
+                          <button onClick={() => deleteSet(exIdx, setIdx)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px solid rgba(232,25,44,0.4)', borderRadius: 10, color: '#E8192C', fontSize: 14, cursor: 'pointer' }}>Smazat sérii</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button onClick={() => addSet(exIdx)} style={{ flex: 1, minHeight: 44, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>
+                <button onClick={() => setRest(REST_DEFAULT)} style={{ minHeight: 44, padding: '0 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, touchAction: 'manipulation' }}><Timer size={16} /> Pauza</button>
               </div>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {it.sets.map((s, setIdx) => {
-                const isEditing = editing && editing.ex === exIdx && editing.set === setIdx
-                const grey = !s.confirmed && s.prefilled
-                return (
-                  <div key={s.key} style={{ border: `1px solid ${s.confirmed ? '#10b981' : 'var(--border)'}`, borderRadius: 10, background: s.confirmed ? 'rgba(16,185,129,0.06)' : 'transparent' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
-                      <button onClick={() => toggleWarmup(exIdx, setIdx)} aria-label="Rozehřívací série" title="Warm-up (nepočítá se)" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: '1px solid var(--border)', background: s.is_warmup ? '#fef3c7' : 'var(--input-bg)', color: s.is_warmup ? '#d97706' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Flame size={16} /></button>
-                      <button onClick={() => setEditing(isEditing ? null : { ex: exIdx, set: setIdx })} style={{ flex: 1, minHeight: 44, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation' }}>
-                        {fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}{s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', marginLeft: 6, fontWeight: 600 }}>W</span>}
-                      </button>
-                      <button onClick={() => confirmSet(exIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation' }}><Check size={20} /></button>
-                    </div>
-                    {isEditing && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', padding: '0 8px 10px' }}>
-                        <NumberStepper label="Váha (kg)" value={s.weight} step={WEIGHT_STEP} allowDecimal onChange={v => patchSet(exIdx, setIdx, { weight: v })} />
-                        <NumberStepper label="Opakování" value={s.reps} step={REP_STEP} min={0} onChange={v => patchSet(exIdx, setIdx, { reps: v })} />
-                        <button onClick={() => deleteSet(exIdx, setIdx)} style={{ minHeight: 44, padding: '0 14px', background: 'transparent', border: '1px solid #fca5a5', borderRadius: 10, color: '#E8192C', fontSize: 14, cursor: 'pointer' }}>Smazat sérii</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <button onClick={() => addSet(exIdx)} style={{ marginTop: 10, minHeight: 44, width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={18} /> Přidat cvik</button>
+      {items.length === 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, textAlign: 'center', boxShadow: 'var(--shadow)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Zatím žádný cvik</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Přidej cvik — u známých se předvyplní váhy z posledního tréninku téhož splitu.</div>
+        </div>
+      )}
+
+      <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={18} /> Přidat cvik</button>
+
+      {/* Rest timer — appears only after the user taps "Pauza" (never auto-starts) */}
+      {rest != null && (
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(var(--bottom-nav-h, 64px))', zIndex: 90, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none' }}>
+          <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 696, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, borderRadius: 14, padding: '10px 12px', boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }}>
+            <Timer size={18} color={rest === 0 ? '#10b981' : '#E8192C'} />
+            <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>PAUZA</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: rest === 0 ? '#10b981' : 'var(--text)', minWidth: 62 }}>{rest === 0 ? 'Hotovo' : mmss(rest)}</span>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setRest(r => (r == null ? 30 : r + 30))} style={{ minHeight: 40, padding: '0 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+30 s</button>
+            <button onClick={() => setRest(null)} aria-label="Přeskočit pauzu" style={{ minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
+          </div>
+        </div>
+      )}
 
       <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Přidat cvik">
         <ExercisePicker exercises={catalog} onPick={addExercise} onAddCustom={addCustomExercise} />
       </Modal>
       <Modal isOpen={!!chartExercise} onClose={() => setChartExercise(null)} title={chartExercise?.name || 'Cvik'}>
-        {chartExercise && <ExerciseChart exerciseId={chartExercise.id} />}
+        {chartExercise && <ExerciseChart exerciseId={chartExercise.id} exerciseName={chartExercise.name} muscleGroup={chartExercise.muscle_group} />}
       </Modal>
     </div>
   )
