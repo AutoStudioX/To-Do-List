@@ -102,6 +102,7 @@ export function fmtSet(s: { weight_kg: number | null; reps: number | null } | nu
 
 // ---- Progression advice (read-only; the app suggests, the user decides) ----
 
+/** Per-exercise goal. The increment is computed, not configured. */
 export type Target = { sets: number; reps: number }
 export type AdviceKind = 'increase' | 'hold' | 'stagnation'
 export type Advice = { kind: AdviceKind; short: string; long: string; reason: string }
@@ -128,9 +129,22 @@ export function isBigLift(name: string): boolean {
   return BIG_LIFTS.some(k => n.includes(k))
 }
 
-/** Recommended jump: 2.5 kg for compound lifts, 1.25 kg for the rest. */
-export function weightStepFor(name: string): number {
-  return isBigLift(name) ? 2.5 : 1.25
+/** One-handed work: the jump lands on both sides, so it counts double. */
+export function isOneHanded(name: string): boolean {
+  const n = name.toLowerCase()
+  return n.includes('jednoručk') || n.includes('dumbbell')
+}
+
+/**
+ * Increment for the NEXT jump, ~2.5–5 % of the working weight rounded up to a
+ * real plate step:
+ *   ≤ 20 kg → 1.25 · 20–100 kg → 2.5 · > 100 kg → 5
+ * One-handed exercises get half of that. The floor stays at 1.25 kg — half of
+ * the smallest tier would be 0.625 kg, which nobody can actually load.
+ */
+export function stepForWeight(weight: number, exerciseName: string): number {
+  const base = weight <= 20 ? 1.25 : weight <= 100 ? 2.5 : 5
+  return isOneHanded(exerciseName) ? Math.max(1.25, base / 2) : base
 }
 
 const working = (s: SetLike[]) => s.filter(x => !x.is_warmup)
@@ -174,7 +188,8 @@ export function buildAdvice(sessions: ExSession[], target: Target | null, exerci
   if (!target) return null
 
   if (targetMet(last.sets, target)) {
-    const step = weightStepFor(exerciseName)
+    // Derived from the weight actually lifted, so it scales as the lift grows.
+    const step = stepForWeight(lastMax, exerciseName)
     const next = lastMax > 0 ? lastMax + step : null
     return {
       kind: 'increase',
@@ -182,9 +197,7 @@ export function buildAdvice(sessions: ExSession[], target: Target | null, exerci
       long: next
         ? `Splnil jsi cíl ${target.sets}×${target.reps} ve všech sériích — zkus ${fmtWeight(next)} kg (+${fmtWeight(step)} kg).`
         : `Splnil jsi cíl ${target.sets}×${target.reps} ve všech sériích — zkus přidat váhu.`,
-      reason: isBigLift(exerciseName)
-        ? 'Velký komplexní cvik, proto celý krok +2,5 kg.'
-        : 'Menší nebo jednoruční cvik, proto +1,25 kg. Když takový přírůstek nemáš čím složit, dej +2,5 kg.',
+      reason: `Poslední trénink vyšel na ${fmtWeight(lastMax)} kg ve všech ${target.sets} sériích po ${target.reps}. Krok +${fmtWeight(step)} kg vychází z aktuální váhy${isOneHanded(exerciseName) ? ' a z toho, že jednoručka se přidává na obě strany' : ''}.`,
     }
   }
 

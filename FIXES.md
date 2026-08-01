@@ -206,3 +206,30 @@ Appka **radí, nerozhoduje**. Nikdy sama nemění váhy a nekomentuje techniku, 
 - V prohlížeči na **1440 i 390**: chip cíle, řádek s radou, modál úpravy cíle (série/opakování + zrušit cíl), karta v D3 pro doporučení i pro stagnaci.
 
 ⚠️ **Spusť `supabase/migrations/0008_exercise_targets.sql`** — bez ní nejde cíl uložit (tabulka neexistuje) a objeví se červený toast s důvodem.
+
+## Trénink — krok váhy se počítá sám + přímé zadání (migrace 0009)
+### Krok už se nenastavuje ručně
+Rozlišení podle názvu cviku bylo křehké („Bench na šikmé lavici", vlastní cviky). Krok se teď **počítá z aktuální váhy** (~2,5–5 %, zaokrouhleno nahoru na reálný přírůstek):
+
+| váha | krok |
+|---|---|
+| do 20 kg | +1,25 kg |
+| 20–100 kg | +2,5 kg |
+| nad 100 kg | +5 kg |
+
+**Jednoruční cviky → poloviční krok** (přidává se na obě strany). Podlaha je 1,25 kg — polovina nejnižšího pásma je 0,625 kg, což nikdo nesloží.
+
+Migrace **0009** přidává `exercise_targets.step_kg` (default 2,5). **Není to uživatelské nastavení** — sloupec se plní vypočítanou hodnotou při uložení cíle. Rada i tlačítka +/− počítají krok živě z aktuální váhy. V modálu cíle zůstalo jen **série × opakování**.
+
+### Přímé zadání a dvojí krok
+Nová komponenta `components/gym/StepperField.tsx`:
+- **Tap na číslo** otevře numerickou klávesnici a jde napsat libovolná hodnota (23, 27, 34…). Desetinná **čárka i tečka**. `inputMode="decimal"`, písmo **26 px** (pod 16 px by iOS zoomoval stránku).
+- **+/− podle cviku** — krok se řídí aktuální váhou v poli, ne natvrdo 2,5.
+- **Dlouhý stisk** (450 ms) přepne na **5× krok** a opakuje — z 20 na 60 kg netřeba klikat 16×.
+
+### Ověřeno
+Zadané případy sedí: **12,5 → „zkus 13,75 kg"**, **50 → „zkus 52,5 kg"**, **110 → „zkus 115 kg"**. K tomu 15 jednotkových testů (hranice pásem 20/100 kg, jednoručky, podlaha 1,25, růst kroku s váhou). V prohlížeči na **1440 i 390**: napsáno `23,5` → řádek i pole `23,5 kg` → tap `+` → `26 kg`; jednoručka 30 kg → `+1,25`; dlouhý stisk 110 → 160 kg.
+
+**Cestou opraveny dvě reálné chyby ve stepperu:**
+1. Opakování při dlouhém stisku si drželo starou hodnotu, takže skočilo jen jednou — čte se přes ref.
+2. Rozepsaný text v poli přežil změnu hodnoty zvenčí (řádek ukazoval 170 kg, pole 12,5) — draft se zahodí, když se hodnota změní mimo psaní.

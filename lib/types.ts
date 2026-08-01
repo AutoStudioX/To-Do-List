@@ -28,6 +28,8 @@ export interface ExerciseTarget {
   exercise_id: string
   target_sets: number
   target_reps: number
+  /** weight increment the user picked for this exercise */
+  step_kg: number
 }
 
 export interface Workout {

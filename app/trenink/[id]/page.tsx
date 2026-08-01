@@ -5,10 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import type { Workout, WorkoutSet, Exercise, ExerciseTarget } from '@/lib/types'
 import Modal from '@/components/Modal'
 import ExercisePicker from '@/components/gym/ExercisePicker'
+import StepperField from '@/components/gym/StepperField'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage, buildAdvice, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
@@ -327,6 +328,7 @@ export default function ActiveWorkoutPage() {
   // ---------- derived ----------
   const active = items[activeIdx]
   const activeTarget = active ? targets[active.exercise.id] ?? null : null
+
   const panelIdx = useMemo(() => {
     if (!active) return -1
     const sel = selectedKey ? active.sets.findIndex(s => s.key === selectedKey) : -1
@@ -394,11 +396,16 @@ export default function ActiveWorkoutPage() {
   async function saveTarget(next: Target | null) {
     const ex = items[activeIdx]?.exercise
     if (!ex) return
+    // step_kg is no longer a user setting — it's a snapshot of the computed
+    // increment for the weight currently being used.
+    const it = items[activeIdx]
+    const seen = [...it.sets.filter(x => !x.is_warmup).map(x => x.weight), ...it.previous.map(p => Number(p.weight_kg) || 0)]
+    const refWeight = seen.length ? Math.max(...seen) : 0
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
     if (next) {
       const { error } = await supabase.from('exercise_targets')
-        .upsert({ user_id: session.user.id, exercise_id: ex.id, target_sets: next.sets, target_reps: next.reps })
+        .upsert({ user_id: session.user.id, exercise_id: ex.id, target_sets: next.sets, target_reps: next.reps, step_kg: stepForWeight(refWeight, ex.name) })
       if (error) { showToast(`Uložení cíle selhalo: ${error.message}`, 'error'); return }
       setTargets(t => ({ ...t, [ex.id]: next }))
       showToast(`Cíl ${next.sets}×${next.reps} uložen`)
@@ -678,12 +685,10 @@ export default function ActiveWorkoutPage() {
         <button onClick={() => setPanelOpen(false)} aria-label="Zavřít panel" style={{ minWidth: 36, minHeight: 36, marginRight: -6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}><X size={18} /></button>
       </div>
       <div style={{ display: isMobile ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: isMobile ? undefined : '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {stepperRow('Váha', `${fmtWeight(panelSet.weight)} kg`,
-          () => patchSet(activeIdx, panelIdx, { weight: Math.max(0, Math.round((panelSet.weight - WEIGHT_STEP) * 100) / 100) }),
-          () => patchSet(activeIdx, panelIdx, { weight: Math.round((panelSet.weight + WEIGHT_STEP) * 100) / 100 }))}
-        {stepperRow('Opakování', String(panelSet.reps),
-          () => patchSet(activeIdx, panelIdx, { reps: Math.max(0, panelSet.reps - REP_STEP) }),
-          () => patchSet(activeIdx, panelIdx, { reps: panelSet.reps + REP_STEP }))}
+        <StepperField label="Váha" unit="kg" value={panelSet.weight} step={stepForWeight(panelSet.weight, active.exercise.name)} decimal
+          onChange={v => patchSet(activeIdx, panelIdx, { weight: v })} />
+        <StepperField label="Opakování" value={panelSet.reps} step={REP_STEP}
+          onChange={v => patchSet(activeIdx, panelIdx, { reps: v })} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => toggleWarmup(activeIdx, panelIdx)} aria-label="Rozehřívací série" title="Warm-up (nepočítá se)" style={{ width: isMobile ? 64 : 52, height: isMobile ? 64 : 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, border: `1px solid ${panelSet.is_warmup ? '#d97706' : 'var(--border)'}`, background: panelSet.is_warmup ? '#fef3c7' : 'var(--input-bg)', color: panelSet.is_warmup ? '#d97706' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Flame size={22} /></button>
@@ -852,15 +857,13 @@ export default function ActiveWorkoutPage() {
         {targetEdit && (
           <div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
-              Kolik sérií a opakování chceš zvládnout, než přidáš váhu. Nastavuje se jednou a platí i pro další tréninky.
+              Kolik sérií a opakování chceš zvládnout, než přidáš váhu. Nastavuje se jednou a platí i pro další tréninky. O kolik přidat spočítá appka podle aktuální váhy.
             </div>
             <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-              {stepperRow('Série', String(targetEdit.sets),
-                () => setTargetEdit(t => t && { ...t, sets: Math.max(1, t.sets - 1) }),
-                () => setTargetEdit(t => t && { ...t, sets: Math.min(20, t.sets + 1) }))}
-              {stepperRow('Opakování', String(targetEdit.reps),
-                () => setTargetEdit(t => t && { ...t, reps: Math.max(1, t.reps - 1) }),
-                () => setTargetEdit(t => t && { ...t, reps: Math.min(100, t.reps + 1) }))}
+              <StepperField label="Série" value={targetEdit.sets} step={1} min={1}
+                onChange={v => setTargetEdit(t => t && { ...t, sets: Math.min(20, Math.max(1, v)) })} />
+              <StepperField label="Opakování" value={targetEdit.reps} step={1} min={1}
+                onChange={v => setTargetEdit(t => t && { ...t, reps: Math.min(100, Math.max(1, v)) })} />
             </div>
             <button onClick={() => saveTarget(targetEdit)} style={{ width: '100%', minHeight: 52, background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
               Uložit cíl {targetEdit.sets}×{targetEdit.reps}

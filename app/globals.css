@@ -119,6 +119,9 @@ a:hover {
   /* Touch targets */
   .btn-primary, .btn-secondary { min-height: 44px !important; font-size: 15px !important; }
   input, select, textarea { min-height: 44px !important; font-size: 16px !important; }
+  /* The stepper's big number is an input; keep it large (and ≥16px so iOS
+     doesn't zoom the page when it gets focus). */
+  .stepper-input { font-size: 26px !important; min-height: 0 !important; }
 
   /* Finance chart pills wrap */
   .stats-bar { flex-wrap: wrap !important; gap: 8px !important; }
