@@ -163,3 +163,20 @@ Dle mobilní obrazovky 2 z designu. **Text `Zatím žádný cvik` zůstává nah
 - **Desktop beze změny** — blok zůstává v normálním toku pod textem, vycentrovaný na 520 px.
 
 **Pozn. k hlášení „na desktopu prvky úplně chybí":** reprodukoval jsem uvedený scénář (běžící trénink → smazat všechny cviky) na 1440 px a karta `MINULÝ PUSH`, červené tlačítko i `Přidat cvik` se zobrazily správně už před touto změnou. Karta a červené tlačítko se **záměrně** skryjí, jen když pro daný split neexistuje minulý trénink (není co načíst), a všechna tlačítka se skryjí u **ukončeného** tréninku (read-only). Pokud prvky chybí i jinde, půjde nejspíš o starší nasazený build.
+
+## Trénink — nový trénink začíná prázdný + progress v hlavičce
+### 1) Žádné automatické předvyplnění
+Dřív se cviky z minulého tréninku téhož splitu natáhly samy při otevření. Teď **nový trénink začíná prázdný, i když minulý existuje**, a nabídne volbu.
+- `load()` staví seznam **jen z už zapsaných sérií** (`confirmed`); template se do něj nepromítá.
+- Template zůstává v paměti a slouží ke dvěma věcem: **„minule: …" + porovnávací odznaky** u cviku, a **tlačítko `⟳ Načíst minulý trénink`**, které udělá to, co se dřív dělo samo (cviky včetně vah a opakování).
+- Prázdný stav se tím pádem zobrazí **vždy**, když trénink nemá žádný cvik: karta `MINULÝ <split> · datum` (max 3 cviky + `+ N dalších cviků`), červené `⟳ Načíst minulý trénink`, `+ Přidat cvik`.
+- Bez minulého tréninku téhož splitu karta i červené tlačítko zmizí a zbyde `+ Přidat cvik` (beze změny).
+
+### 2) Progress bar a počítadlo sérií v hlavičce
+- **Čitatel** = potvrzené série bez warm-upu, **jmenovatel** = všechny řádky sérií napříč cviky bez warm-upu.
+- **Desktop**: `‹ · odznak splitu · „Dnes" · čas · „3 z 15 sérií"` + bar 180 px v řádku hlavičky.
+- **Mobil**: do řádku se bar nevejde, takže je **tenký (4 px) přes celou šířku pod hlavičkou**. Podtitulek ukazuje čas i počítadlo (`33:00 · 3 z 16 sérií`).
+- Na mobilu nahradilo počítadlo dřívější `cvik 1/5 · N série hotové` — pozici a postup po cvicích ukazuje přilepený proužek chipů nad seznamem, takže se informace neztratila.
+
+### Ověřeno (1440 i 390, tmavý režim)
+Nový trénink s existujícím minulým: prázdný stav, hlavička `0 z 0 sérií`. Po tapu na `Načíst minulý trénink`: 5 cviků, série předvyplněné (`85 kg × 6`), hlavička `0 z 15 sérií`. Po potvrzení dvou sérií `2 z 15` a výplň baru 24 z 180 px = přesně 2/15. Na mobilu tenký bar pod hlavičkou.

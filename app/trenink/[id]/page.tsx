@@ -108,8 +108,10 @@ export default function ActiveWorkoutPage() {
     }
     const confG = groupBy(confirmed)
     const tmplG = groupBy(template)
+    // A new workout starts EMPTY even when a previous one exists — only
+    // exercises that already have logged sets show up. The previous workout is
+    // offered explicitly via "Načíst minulý trénink" in the empty state.
     const order: string[] = []
-    for (const s of template) if (!order.includes(s.exercise_id)) order.push(s.exercise_id)
     for (const s of confirmed) if (!order.includes(s.exercise_id)) order.push(s.exercise_id)
 
     // Keep the template around so the empty state can offer "Načíst minulý trénink".
@@ -127,11 +129,8 @@ export default function ActiveWorkoutPage() {
       const conf = confG.get(exId) || []
       const tmp = tmplG.get(exId) || []
       const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: true, prefilled: false }))
-      for (let i = conf.length; i < tmp.length; i++) {
-        const t = tmp[i]
-        sets.push({ key: newKey(), id: null, weight: Number(t.weight_kg ?? 0), reps: t.reps ?? 0, is_warmup: t.is_warmup, confirmed: false, prefilled: true })
-      }
       if (sets.length === 0) sets.push({ key: newKey(), id: null, weight: 20, reps: 8, is_warmup: false, confirmed: false, prefilled: false })
+      // The template still feeds "minule: …" and the comparison badges.
       built.push({ exercise: ex, previous: tmp.filter(t => !t.is_warmup).map(t => ({ weight_kg: t.weight_kg, reps: t.reps })), sets })
     }
     setItems(built)
@@ -351,7 +350,6 @@ export default function ActiveWorkoutPage() {
   const elapsedSec = finished
     ? (workout!.duration_min as number) * 60
     : workout ? Math.max(0, Math.floor((nowMs - clockOrigin(workout)) / 1000)) : 0
-  const doneOnActive = active ? active.sets.filter(s => s.confirmed && !s.is_warmup).length : 0
 
   // Tap/click anywhere outside the panel closes it (desktop included).
   // Registered only while open, so the opening tap itself can't close it.
@@ -387,24 +385,25 @@ export default function ActiveWorkoutPage() {
   const accent = splitColor(split)
 
   // ---------- blocks ----------
+  // Confirmed / total working sets across the whole workout (warm-ups excluded).
+  const setProgress = totalSets ? doneSets / totalSets : 0
+
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+    <div style={{ marginBottom: 14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', cursor: 'pointer', flexShrink: 0 }}><ChevronLeft size={22} /></button>
       {split && <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: accent, borderRadius: 8, padding: '5px 10px', textTransform: 'uppercase', flexShrink: 0 }}>{split}</span>}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {isMobile && active ? active.exercise.name : 'Dnes'}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-          {isMobile && active
-            // Finished workouts lead with the saved length so it's visible on mobile too.
-            ? `${finished ? `${mmss(elapsedSec)} · ` : ''}cvik ${activeIdx + 1}/${items.length} · ${doneOnActive} ${doneOnActive === 1 ? 'série hotová' : 'série hotové'}`
-            : `${mmss(elapsedSec)} · ${doneSets} z ${totalSets} sérií`}
+        <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
         </div>
       </div>
       {!isMobile && (
         <div style={{ width: 180, height: 6, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', flexShrink: 0 }}>
-          <div style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
+          <div style={{ width: `${setProgress * 100}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
         </div>
       )}
       {finished ? (
@@ -414,6 +413,13 @@ export default function ActiveWorkoutPage() {
       ) : (
         <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{isMobile ? 'Hotovo' : 'Ukončit trénink'}</button>
       )}
+    </div>
+    {/* Mobile: the bar doesn't fit the row, so it sits full-width underneath. */}
+    {isMobile && (
+      <div style={{ height: 4, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', marginTop: 10 }}>
+        <div style={{ width: `${setProgress * 100}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
+      </div>
+    )}
     </div>
   )
 
