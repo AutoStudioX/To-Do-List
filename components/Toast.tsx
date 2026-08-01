@@ -12,7 +12,7 @@ interface ToastProps {
 
 export function Toast({ message, type, onClose }: ToastProps) {
   useEffect(() => {
-    const t = setTimeout(onClose, 3500)
+    const t = setTimeout(onClose, 3000)
     return () => clearTimeout(t)
   }, [onClose])
 

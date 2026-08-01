@@ -247,6 +247,32 @@ update public.login_lockout set failed_attempts = 0, locked_until = null
 - **Never force a fixed multi-column row that can overflow at 375px.** Card/ring/stat grids must stack or wrap on mobile (gate the column count on `isMobile`, and use `minmax(0, 1fr)` columns so cells can shrink instead of clipping). The Přehled rings use `repeat(2, minmax(0,1fr))` on mobile, `repeat(3, minmax(0,1fr))` on desktop.
 - **Route names are Czech; keep redirects for any renamed/English path.** The goals page lives at `/goaly`; `/goals` (and `/goals/:path*`) permanently redirect to it via `next.config.ts` so bookmarked/external links don't 404. Add a similar redirect whenever a route is renamed.
 
+## Dialogy a zpětná vazba (platí pro všechny projekty)
+
+### ŽÁDNÉ NATIVNÍ DIALOGY
+**Nikdy nepoužívej `confirm()`, `alert()` ani `prompt()`.** Vždy vlastní modál v designu appky.
+
+**Proč:** nativní dialogy vypadají jako rozbitá appka (systémový chrome cizí zbytku UI), nejdou stylovat, ignorují tmavý režim, na mobilu vypadají jinak než na desktopu a nedají se otestovat v prohlížeči.
+
+Modál musí mít:
+- text otázky s **konkrétním předmětem** — `Smazat konverzaci „název“? Nejde to vrátit.`, ne `Opravdu smazat?`
+- dvě tlačítka: **Zrušit** / potvrzení (destruktivní **červené**)
+- zavření klávesou **Esc** i **klikem mimo**
+- **focus na potvrzovacím tlačítku** po otevření
+
+V této appce na to slouží `useConfirm()` z `components/ConfirmDialog.tsx`
+(`const { confirm, dialog } = useConfirm()` → `if (!await confirm('…', 'Odebrat')) return`,
+a `{dialog}` vyrenderovat na konci stránky). Druhý systém nezakládej.
+
+### KAŽDÁ ZMĚNA MUSÍ MÍT ZPĚTNOU VAZBU
+Po každé akci, která něco změní (uložení, smazání, úprava), musí přijít **toast**:
+- úspěch **zeleně**, chyba **červeně s důvodem** (`Smazání selhalo: <error.message>`)
+- auto-zmizí po **3 s**
+- **chyba se NIKDY nesmí spolknout mlčky** — žádné `if (error) return` bez hlášky
+
+Bez potvrzení uživatel neví, jestli se akce provedla. V této appce: `useToast()` z
+`components/Toast.tsx` (`showToast('Trénink smazán')` / `showToast(msg, 'error')`).
+
 ## Behavior Notes / Fixes
 
 - **Completing a task never deletes it.** The checkbox only flips `status` (`Todo`↔`Done`). Completed tasks must stay visible under the `Done` and `Vše` (All) filters. Do not add a filter that hides `Done` tasks globally (a previous `hideDoneFromPill` flag caused completed tasks to vanish from every tab — removed).

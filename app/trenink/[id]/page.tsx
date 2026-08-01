@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { Workout, WorkoutSet, Exercise } from '@/lib/types'
 import Modal from '@/components/Modal'
 import ExercisePicker from '@/components/gym/ExercisePicker'
-import ExerciseChart from '@/components/gym/ExerciseChart'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
 import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage } from '@/lib/gym'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell } from 'lucide-react'
@@ -48,10 +49,11 @@ export default function ActiveWorkoutPage() {
   const [activeIdx, setActiveIdx] = useState(0)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [chartExercise, setChartExercise] = useState<Exercise | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [rest, setRest] = useState<number | null>(null) // remaining seconds, null = off
   const [isMobile, setIsMobile] = useState(false)
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -175,7 +177,12 @@ export default function ActiveWorkoutPage() {
   async function deleteSet(ex: number, set: number) {
     const s = items[ex]?.sets[set]
     if (!s) return
-    if (s.confirmed && s.id) await supabase.from('workout_sets').delete().eq('id', s.id)
+    if (s.confirmed && s.id) {
+      if (!await confirm(`Smazat sérii ${fmtWeight(s.weight)} kg × ${s.reps}? Nejde to vrátit.`)) return
+      const { error } = await supabase.from('workout_sets').delete().eq('id', s.id)
+      if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
+      showToast('Série smazána')
+    }
     setItems(prev => prev.map((it, i) => i !== ex ? it : { ...it, sets: it.sets.filter((_, j) => j !== set) }))
     setSelectedKey(null)
   }
@@ -243,10 +250,17 @@ export default function ActiveWorkoutPage() {
 
   async function removeExercise(ex: number) {
     const it = items[ex]
+    if (!it) return
     const ids = it.sets.filter(s => s.confirmed && s.id).map(s => s.id as string)
-    if (ids.length) await supabase.from('workout_sets').delete().in('id', ids)
+    const note = ids.length ? ` i s ${ids.length} zapsanými sériemi` : ''
+    if (!await confirm(`Odebrat cvik „${it.exercise.name}"${note}? Nejde to vrátit.`, 'Odebrat')) return
+    if (ids.length) {
+      const { error } = await supabase.from('workout_sets').delete().in('id', ids)
+      if (error) { showToast(`Odebrání selhalo: ${error.message}`, 'error'); return }
+    }
     setItems(prev => prev.filter((_, i) => i !== ex))
     setActiveIdx(i => Math.max(0, i > ex ? i - 1 : i === ex ? Math.min(i, items.length - 2) : i))
+    showToast('Cvik odebrán')
   }
 
   async function moveExercise(ex: number, dir: -1 | 1) {
@@ -313,13 +327,13 @@ export default function ActiveWorkoutPage() {
       if (e.key !== 'Enter' || e.repeat) return
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (pickerOpen || chartExercise) return
+      if (pickerOpen) return
       if (panelIdx >= 0) { e.preventDefault(); confirmSet(activeIdx, panelIdx) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdx, panelIdx, items, pickerOpen, chartExercise])
+  }, [activeIdx, panelIdx, items, pickerOpen])
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!workout) return <div style={{ color: 'var(--muted)', padding: 24 }}>Trénink nenalezen.</div>
@@ -419,7 +433,7 @@ export default function ActiveWorkoutPage() {
           {active.previous.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>minule: {formatPrevious(active.previous)}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={() => setChartExercise(active.exercise)} aria-label="Graf pokroku" style={iconBtn}><BarChart3 size={17} /></button>
+          <button onClick={() => router.push(`/trenink/cvik/${active.exercise.id}`)} aria-label="Graf pokroku" style={iconBtn}><BarChart3 size={17} /></button>
           <button onClick={() => moveExercise(activeIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
           <button onClick={() => moveExercise(activeIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
           <button onClick={() => removeExercise(activeIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
@@ -432,7 +446,8 @@ export default function ActiveWorkoutPage() {
           let workingNo = 0
           return active.sets.map((s, setIdx) => {
             if (!s.is_warmup) workingNo++
-            const idxLabel = s.is_warmup ? 'W' : String(workingNo)
+            // Warm-up rows are marked with the same flame as the panel toggle, not a "W".
+            const idxLabel = s.is_warmup ? <Flame size={15} /> : String(workingNo)
             const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, active.previous, workingNo - 1) : null
             const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
             const isPanel = setIdx === panelIdx
@@ -440,16 +455,17 @@ export default function ActiveWorkoutPage() {
             return (
               <div key={s.key} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, minHeight: 54,
-                border: `1px solid ${s.confirmed ? 'rgba(16,185,129,0.32)' : isPanel ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
-                background: s.confirmed ? 'rgba(16,185,129,0.07)' : isPanel ? 'rgba(232,25,44,0.05)' : 'transparent',
+                // Green = "counts towards stats". Warm-ups never count, so they stay neutral.
+                border: `1px solid ${s.confirmed && !s.is_warmup ? 'rgba(16,185,129,0.32)' : isPanel ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
+                background: s.confirmed && !s.is_warmup ? 'rgba(16,185,129,0.07)' : isPanel ? 'rgba(232,25,44,0.05)' : 'var(--input-bg)',
               }}>
-                <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, textAlign: 'center' }}>{idxLabel}</span>
+                <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idxLabel}</span>
                 <button onClick={() => setSelectedKey(s.key)} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
                   {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
                   {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
                 </button>
-                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? '#10b981' : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}><Check size={20} /></button>
+                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? (s.is_warmup ? '#d97706' : '#10b981') : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}><Check size={20} /></button>
               </div>
             )
           })
@@ -647,9 +663,8 @@ export default function ActiveWorkoutPage() {
       <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Přidat cvik">
         <ExercisePicker exercises={catalog} onPick={addExercise} onAddCustom={addCustomExercise} />
       </Modal>
-      <Modal isOpen={!!chartExercise} onClose={() => setChartExercise(null)} title={chartExercise?.name || 'Cvik'}>
-        {chartExercise && <ExerciseChart exerciseId={chartExercise.id} exerciseName={chartExercise.name} muscleGroup={chartExercise.muscle_group} />}
-      </Modal>
+      {confirmDialog}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

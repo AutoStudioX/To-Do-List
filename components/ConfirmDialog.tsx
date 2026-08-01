@@ -1,13 +1,24 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Props {
   message: string
+  confirmLabel?: string
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ message, confirmLabel = 'Smazat', onConfirm, onCancel }: Props) {
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  // Esc closes; the destructive button takes focus so Enter confirms.
+  useEffect(() => {
+    confirmRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99998,
@@ -26,11 +37,11 @@ export function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
             borderRadius: 8, padding: '8px 18px', color: 'var(--text)',
             cursor: 'pointer', fontSize: 14,
           }}>Zrušit</button>
-          <button onClick={onConfirm} style={{
+          <button ref={confirmRef} onClick={onConfirm} style={{
             background: '#E8192C', border: 'none',
             borderRadius: 8, padding: '8px 18px', color: 'white',
             cursor: 'pointer', fontSize: 14, fontWeight: 600,
-          }}>Smazat</button>
+          }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -38,17 +49,17 @@ export function ConfirmDialog({ message, onConfirm, onCancel }: Props) {
 }
 
 export function useConfirm() {
-  const [state, setState] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null)
+  const [state, setState] = useState<{ message: string; confirmLabel?: string; resolve: (v: boolean) => void } | null>(null)
 
-  function confirm(message: string): Promise<boolean> {
-    return new Promise(resolve => setState({ message, resolve }))
+  function confirm(message: string, confirmLabel?: string): Promise<boolean> {
+    return new Promise(resolve => setState({ message, confirmLabel, resolve }))
   }
 
   function handleConfirm() { state?.resolve(true); setState(null) }
   function handleCancel() { state?.resolve(false); setState(null) }
 
   const dialog = state ? (
-    <ConfirmDialog message={state.message} onConfirm={handleConfirm} onCancel={handleCancel} />
+    <ConfirmDialog message={state.message} confirmLabel={state.confirmLabel} onConfirm={handleConfirm} onCancel={handleCancel} />
   ) : null
 
   return { confirm, dialog }

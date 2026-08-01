@@ -86,3 +86,12 @@ Přepis `/trenink/[id]`. Logika a DB volání beze změny; přibyly jen odvozen�
 - **Pauza se NIKDY nespouští sama** — jen na tap (`Spustit pauzu` / `Spustit`), pak `+30 s` / `Přeskočit`.
 - Nové: `components/gym/ExerciseSparkline.tsx`. Smazáno: `components/gym/NumberStepper.tsx` (nahrazen steppery v panelu — žádný mrtvý kód).
 - Ověřeno na **1440px i 390px** proti designu na reálné komponentě (dočasný mock v `load()`, odstraněn); `next build` prochází.
+
+## Trénink — detail cviku (D3) jako samostatná stránka + dialogy
+- **Detail cviku už není modál.** Nová route **`/trenink/cvik/[id]`**, celá šířka, tlačítko zpět v hlavičce. Ikona grafu v zadávání na ni routuje.
+- **Layout dle D3**: hlavička (zpět · název · `svalová partie · N tréninků` · pilulky `8 týdnů / 6 měsíců / Vše`); dva sloupce — **vlevo** řádek 4 dlaždic (`1RM EST.`, `MAX VÁHA`, `ZA 8 TÝDNŮ` zeleně, `OBJEM / TRÉNINK`) + velká karta **`MAX VÁHA V ČASE`** s legendou a **kombinovaným grafem** (šedé sloupce objemu na pozadí, červená spojnice max váhy, poslední bod větší); **vpravo** `HISTORIE SÉRIÍ` — karta po tréninku (datum + objem, série jako chipy), **aktuální trénink zeleně orámovaný**, odznak `PR OBJEM` u nejobjemnějšího, dole `Zobrazit všech N tréninků`. Mobil stackuje, pilulky na vlastním řádku.
+- Smazán `components/gym/ExerciseChart.tsx` (nahradila ho stránka) — žádný mrtvý kód.
+- **Warm-up série je neutrální**, ne zelená. Zelená = „počítá se do statistik“, warm-up ne. Místo písmene `W` je **ikona plamínku** (stejná jako v přepínači v panelu), oranžová.
+- **Konec nativních `confirm()`**: mazání tréninku, cviku i série jde přes existující `useConfirm()` (`ConfirmDialog`) — text s konkrétním předmětem + `Nejde to vrátit.`, Zrušit / červené potvrzení, **Esc**, klik mimo, **focus na destruktivním tlačítku**. Po akci **toast** (`useToast`), chyba červeně i s důvodem. Toast zkrácen na 3 s.
+- Grep celé appky: nativní `confirm(` byl **jen v tréninku**; ostatní stránky už používaly vlastní hook. Žádné `alert(` ani `prompt(` nikde.
+- Pozn.: v grafu měly dvě osy Y vlevo — druhá (skrytá, pro objem) přebíjela popisky té viditelné; opraveno `orientation="right"`.

@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, SplitType } from '@/lib/types'
 import { useLiveData } from '@/lib/useLiveData'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { Toast, useToast } from '@/components/Toast'
 import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek } from '@/lib/gym'
 import { Plus, Dumbbell, ChevronRight, Trash2, TrendingUp } from 'lucide-react'
 
@@ -35,6 +37,8 @@ export default function TreninkPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [filter, setFilter] = useState<'Vše' | SplitType>('Vše')
   const [isMobile, setIsMobile] = useState(false)
+  const { confirm, dialog: confirmDialog } = useConfirm()
+  const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768)
@@ -150,13 +154,16 @@ export default function TreninkPage() {
   }
 
   async function deleteWorkout(id: string) {
-    if (!confirm('Opravdu smazat tento trénink i s jeho sériemi?')) return
+    const w = workouts.find(x => x.id === id)
+    const what = w?.split_type ? `trénink ${w.split_type} (${relDate(w.date).toLowerCase()})` : 'tento trénink'
+    if (!await confirm(`Smazat ${what} i se všemi sériemi? Nejde to vrátit.`)) return
     setDeleting(id)
     const supabase = createClient()
     const { error } = await supabase.from('workouts').delete().eq('id', id)
     setDeleting(null)
-    if (error) return
-    setWorkouts(prev => prev.filter(w => w.id !== id))
+    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
+    setWorkouts(prev => prev.filter(x => x.id !== id))
+    showToast('Trénink smazán')
   }
 
   const shown = filter === 'Vše' ? workouts : workouts.filter(w => w.split_type === filter)
@@ -371,6 +378,9 @@ export default function TreninkPage() {
           {historyBlock}
         </div>
       )}
+
+      {confirmDialog}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }
