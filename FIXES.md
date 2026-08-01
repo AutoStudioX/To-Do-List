@@ -95,3 +95,28 @@ Přepis `/trenink/[id]`. Logika a DB volání beze změny; přibyly jen odvozen�
 - **Konec nativních `confirm()`**: mazání tréninku, cviku i série jde přes existující `useConfirm()` (`ConfirmDialog`) — text s konkrétním předmětem + `Nejde to vrátit.`, Zrušit / červené potvrzení, **Esc**, klik mimo, **focus na destruktivním tlačítku**. Po akci **toast** (`useToast`), chyba červeně i s důvodem. Toast zkrácen na 3 s.
 - Grep celé appky: nativní `confirm(` byl **jen v tréninku**; ostatní stránky už používaly vlastní hook. Žádné `alert(` ani `prompt(` nikde.
 - Pozn.: v grafu měly dvě osy Y vlevo — druhá (skrytá, pro objem) přebíjela popisky té viditelné; opraveno `orientation="right"`.
+
+## Trénink — stav probíhá / ukončený (migrace 0007)
+**Bug:** po ukončení tréninku se při znovuotevření rozeběhl čas znovu — ukončený trénink se tvářil jako běžící (čas se počítal z `created_at`).
+
+### Rozhodnutí: žádný sloupec `status`, ale ANO nový `started_at`
+- **Stav jde odvodit z `duration_min`** — zapisuje ho jen `finish()` a je `NULL`, dokud se trénink neukončí. Samostatný `status` by byl druhý zdroj pravdy pro totéž.
+- **Na návaznost času to ale nestačí.** Běžící stopky se počítaly z `created_at`, což je vznik ŘÁDKU, ne počátek měření. Ukončíš v 52. minutě, vrátíš se za pět hodin → `now − created_at` = 5:00:00. Aby šlo navázat na 52:00, musí se počátek posunout — proto **jeden** nový sloupec `started_at`.
+
+```
+běží     → duration_min IS NULL,     elapsed = now() − started_at
+ukončeno → duration_min IS NOT NULL, elapsed = duration_min minut
+finish() → duration_min = round((now() − started_at) / 60)
+resume() → started_at = now() − duration_min minut, duration_min = NULL
+```
+Kompromis: `duration_min` jsou celé minuty, takže jedno pokračování zaokrouhlí sekundy na `:00`. Ukládat sekundy by chtělo druhý sloupec bez praktického přínosu.
+
+### Chování
+- **Ukončený**: čas stojí a ukazuje uloženou délku; `Ukončit trénink` zmizí, místo něj **`Pokračovat v tréninku`** (na mobilu `Pokračovat`, délka se přidá do podtitulku); pruh s vysvětlením.
+- **Pokračovat**: vrátí trénink do běhu a čas **naváže** na uloženou hodnotu, nezačíná od nuly.
+- **Prohlížení nic nezapisuje**: otevření je čistě čtecí. Zamčeno je potvrzení série, výběr série do panelu, stepper panel, `+ Série`, `Přidat cvik`, přeuspořádání/odebrání cviku, pauza i `Načíst minulý trénink`. Hlídaný je i efekt, který jinak dopisuje prázdnou sérii na konec — u ukončeného tréninku se nespustí.
+
+### Ověřeno (1440 i 390, tmavý režim)
+Ukončený: čas `52:00` stojí i po 3 s, všechna potvrzovací tlačítka `disabled`, žádný stepper panel / `+ Série` / `Přidat cvik` / pauza. Běžící: čas tiká (32:25 → 32:27), tlačítko `Ukončit trénink`. Návaznost: `started_at = now − 52 min` → elapsed `52:00`, tedy pokračuje, ne od nuly.
+
+⚠️ **Spusť `supabase/migrations/0007_workout_started_at.sql`** — bez něj `Pokračovat` selže (sloupec `started_at` neexistuje) a zobrazí červený toast s důvodem.

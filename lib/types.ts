@@ -28,7 +28,10 @@ export interface Workout {
   date: string
   split_type: string | null
   note: string | null
+  /** null = running; set = finished, and holds the saved length */
   duration_min: number | null
+  /** clock origin; moved back on resume so the timer continues */
+  started_at?: string | null
   created_at?: string
 }
 

@@ -38,6 +38,11 @@ function setBadge(weight: number, reps: number, prev: { weight_kg: number | null
 
 const shortDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : ''
 
+// Where the running clock counts from. started_at is the resumable origin;
+// rows created before migration 0007 fall back to created_at.
+const clockOrigin = (w: { started_at?: string | null; created_at?: string } | null | undefined) =>
+  new Date(w?.started_at || w?.created_at || Date.now()).getTime()
+
 export default function ActiveWorkoutPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
@@ -145,6 +150,8 @@ export default function ActiveWorkoutPage() {
   // The stepper panel always edits a real set: keep one unconfirmed set at the
   // end of the active exercise. Bails out when one already exists.
   useEffect(() => {
+    // A finished workout is read-only — don't conjure a pending set into it.
+    if (workout?.duration_min != null) return
     setItems(prev => {
       const ex = prev[activeIdx]
       if (!ex || ex.sets.some(s => !s.confirmed)) return prev
@@ -153,7 +160,7 @@ export default function ActiveWorkoutPage() {
       next[activeIdx] = { ...ex, sets: [...ex.sets, { key: newKey(), id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
       return next
     })
-  }, [activeIdx, items])
+  }, [activeIdx, items, workout?.duration_min])
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -276,12 +283,26 @@ export default function ActiveWorkoutPage() {
     }
   }
 
+  // duration_min NULL = running, set = finished (see migration 0007).
   async function finish() {
-    if (workout?.created_at) {
-      const mins = Math.max(1, Math.round((Date.now() - new Date(workout.created_at).getTime()) / 60000))
-      await supabase.from('workouts').update({ duration_min: mins }).eq('id', id)
-    }
+    const origin = clockOrigin(workout)
+    const mins = Math.max(1, Math.round((Date.now() - origin) / 60000))
+    const { error } = await supabase.from('workouts').update({ duration_min: mins }).eq('id', id)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setWorkout(w => w ? { ...w, duration_min: mins } : w)
     router.push('/trenink')
+  }
+
+  // Resume: move the clock origin back by the saved length so the timer
+  // continues instead of restarting, and clear the finished flag.
+  async function resume() {
+    if (!workout) return
+    const newStart = new Date(Date.now() - (workout.duration_min || 0) * 60000).toISOString()
+    const { error } = await supabase.from('workouts').update({ duration_min: null, started_at: newStart }).eq('id', id)
+    if (error) { showToast(`Nepodařilo se pokračovat: ${error.message}`, 'error'); return }
+    setWorkout(w => w ? { ...w, duration_min: null, started_at: newStart } : w)
+    setNowMs(Date.now())
+    showToast('Trénink pokračuje')
   }
 
   // ---------- derived ----------
@@ -318,7 +339,11 @@ export default function ActiveWorkoutPage() {
     return { todayVol, oneRM, delta }
   }, [active])
 
-  const elapsedSec = workout?.created_at ? Math.max(0, Math.floor((nowMs - new Date(workout.created_at).getTime()) / 1000)) : 0
+  // Finished workouts show their saved length; the clock only runs while active.
+  const finished = workout?.duration_min != null
+  const elapsedSec = finished
+    ? (workout!.duration_min as number) * 60
+    : workout ? Math.max(0, Math.floor((nowMs - clockOrigin(workout)) / 1000)) : 0
   const doneOnActive = active ? active.sets.filter(s => s.confirmed && !s.is_warmup).length : 0
 
   // Enter confirms the panel set (design: "nebo klávesa Enter").
@@ -352,7 +377,8 @@ export default function ActiveWorkoutPage() {
         </div>
         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
           {isMobile && active
-            ? `cvik ${activeIdx + 1}/${items.length} · ${doneOnActive} ${doneOnActive === 1 ? 'série hotová' : 'série hotové'}`
+            // Finished workouts lead with the saved length so it's visible on mobile too.
+            ? `${finished ? `${mmss(elapsedSec)} · ` : ''}cvik ${activeIdx + 1}/${items.length} · ${doneOnActive} ${doneOnActive === 1 ? 'série hotová' : 'série hotové'}`
             : `${mmss(elapsedSec)} · ${doneSets} z ${totalSets} sérií`}
         </div>
       </div>
@@ -361,7 +387,13 @@ export default function ActiveWorkoutPage() {
           <div style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
         </div>
       )}
-      <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{isMobile ? 'Hotovo' : 'Ukončit trénink'}</button>
+      {finished ? (
+        <button onClick={resume} style={{ minHeight: 44, padding: '0 16px', background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
+          <RotateCcw size={16} /> {isMobile ? 'Pokračovat' : 'Pokračovat v tréninku'}
+        </button>
+      ) : (
+        <button onClick={finish} style={{ minHeight: 44, padding: '0 16px', background: '#10b981', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>{isMobile ? 'Hotovo' : 'Ukončit trénink'}</button>
+      )}
     </div>
   )
 
@@ -392,7 +424,7 @@ export default function ActiveWorkoutPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>CVIKY · {items.length}</div>
       {items.map(exerciseRow)}
-      <button onClick={() => setPickerOpen(true)} style={{ minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Plus size={16} /> Přidat cvik</button>
+      {!finished && <button onClick={() => setPickerOpen(true)} style={{ minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Plus size={16} /> Přidat cvik</button>}
     </div>
   )
 
@@ -434,9 +466,11 @@ export default function ActiveWorkoutPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button onClick={() => router.push(`/trenink/cvik/${active.exercise.id}`)} aria-label="Graf pokroku" style={iconBtn}><BarChart3 size={17} /></button>
-          <button onClick={() => moveExercise(activeIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
-          <button onClick={() => moveExercise(activeIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
-          <button onClick={() => removeExercise(activeIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
+          {!finished && <>
+            <button onClick={() => moveExercise(activeIdx, -1)} aria-label="Nahoru" style={iconBtn}><ArrowUp size={16} /></button>
+            <button onClick={() => moveExercise(activeIdx, 1)} aria-label="Dolů" style={iconBtn}><ArrowDown size={16} /></button>
+            <button onClick={() => removeExercise(activeIdx)} aria-label="Odebrat cvik" style={{ ...iconBtn, background: 'rgba(232,25,44,0.12)', color: '#E8192C', borderColor: 'rgba(232,25,44,0.4)' }}><Trash2 size={16} /></button>
+          </>}
         </div>
       </div>
 
@@ -462,12 +496,12 @@ export default function ActiveWorkoutPage() {
                 background: s.is_warmup ? 'var(--input-bg)' : s.confirmed ? 'rgba(16,185,129,0.07)' : 'transparent',
               }}>
                 <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idxLabel}</span>
-                <button onClick={() => setSelectedKey(s.key)} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => !finished && setSelectedKey(s.key)} disabled={finished} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
                   {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
                   {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
                 </button>
-                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{
+                <button onClick={() => confirmSet(activeIdx, setIdx)} disabled={finished} aria-label="Potvrdit sérii" style={{
                   minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10,
                   // Working sets confirm green (they count); warm-ups stay neutral grey.
                   border: s.is_warmup ? '1px solid var(--border)' : 'none',
@@ -481,10 +515,10 @@ export default function ActiveWorkoutPage() {
         })()}
       </div>
 
-      <button onClick={() => addSet(activeIdx)} style={{ marginTop: 10, minHeight: 44, width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>
+      {!finished && <button onClick={() => addSet(activeIdx)} style={{ marginTop: 10, minHeight: 44, width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, touchAction: 'manipulation' }}><Plus size={16} /> Série</button>}
 
       {/* Rest row (mobile) — tap to start, never automatic */}
-      {isMobile && (
+      {isMobile && !finished && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '10px 12px', borderRadius: 12, border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, background: 'var(--card)' }}>
           <Timer size={18} color={rest == null ? 'var(--muted)' : rest === 0 ? '#10b981' : '#E8192C'} />
           <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Pauza</span>
@@ -515,7 +549,7 @@ export default function ActiveWorkoutPage() {
     </div>
   )
 
-  const stepperPanel = active && panelSet && (
+  const stepperPanel = active && panelSet && !finished && (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: isMobile ? 22 : 16, padding: isMobile ? '14px 16px 16px' : 16, boxShadow: isMobile ? '0 -6px 24px rgba(0,0,0,0.18)' : 'var(--shadow)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: '#E8192C', letterSpacing: 0.4 }}>SÉRIE {panelSetNo}</span>
@@ -547,7 +581,7 @@ export default function ActiveWorkoutPage() {
   const sidePanel = active && (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Rest — tap to start, never automatic */}
-      <div style={{ background: 'var(--card)', border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)', textAlign: 'center' }}>
+      {!finished && <div style={{ background: 'var(--card)', border: `1px solid ${rest === 0 ? '#10b981' : 'var(--border)'}`, borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)', textAlign: 'center' }}>
         <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>PAUZA</div>
         <div style={{ fontSize: 34, fontWeight: 800, color: rest === 0 ? '#10b981' : 'var(--text)', lineHeight: 1.2, margin: '2px 0 8px' }}>{rest == null ? '—' : rest === 0 ? 'Hotovo' : mmss(rest)}</div>
         <div style={{ height: 5, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', marginBottom: 10 }}>
@@ -561,7 +595,7 @@ export default function ActiveWorkoutPage() {
             <button onClick={() => setRest(null)} style={{ flex: 1, minHeight: 44, background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 14, cursor: 'pointer' }}>Přeskočit</button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Progress */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
@@ -632,27 +666,36 @@ export default function ActiveWorkoutPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-        {tmpl.groups.length > 0 && (
+        {!finished && tmpl.groups.length > 0 && (
           <button onClick={loadTemplate} style={{ width: '100%', minHeight: 56, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
             <RotateCcw size={18} /> Načíst minulý trénink
           </button>
         )}
-        <button onClick={() => setPickerOpen(true)} style={{ width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}>
-          <Plus size={18} /> Přidat cvik
-        </button>
+        {!finished && (
+          <button onClick={() => setPickerOpen(true)} style={{ width: '100%', minHeight: 52, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 14, color: 'var(--text)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}>
+            <Plus size={18} /> Přidat cvik
+          </button>
+        )}
       </div>
     </div>
   )
 
   return (
-    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length ? MOBILE_PANEL_SPACE : 24 }}>
+    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length && !finished ? MOBILE_PANEL_SPACE : 24 }}>
       {header}
+
+      {finished && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13 }}>
+          <Check size={16} color="#10b981" />
+          Trénink je ukončený — série si můžeš prohlížet, pro zápis klikni na „Pokračovat{isMobile ? '' : ' v tréninku'}".
+        </div>
+      )}
 
       {items.length === 0 ? emptyState : isMobile ? (
         <>
           {exerciseStrip}
           {activeColumn}
-          <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={16} /> Přidat cvik</button>
+          {!finished && <button onClick={() => setPickerOpen(true)} style={{ marginTop: 14, width: '100%', minHeight: 48, background: 'transparent', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, touchAction: 'manipulation' }}><Plus size={16} /> Přidat cvik</button>}
           {/* Stepper panel pinned in the thumb zone */}
           <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'var(--gym-panel-bottom, 62px)', zIndex: 60, padding: '0 12px' }}>
             {stepperPanel}
