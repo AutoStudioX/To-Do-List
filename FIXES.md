@@ -120,3 +120,22 @@ Kompromis: `duration_min` jsou celé minuty, takže jedno pokračování zaokrou
 Ukončený: čas `52:00` stojí i po 3 s, všechna potvrzovací tlačítka `disabled`, žádný stepper panel / `+ Série` / `Přidat cvik` / pauza. Běžící: čas tiká (32:25 → 32:27), tlačítko `Ukončit trénink`. Návaznost: `started_at = now − 52 min` → elapsed `52:00`, tedy pokračuje, ne od nuly.
 
 ⚠️ **Spusť `supabase/migrations/0007_workout_started_at.sql`** — bez něj `Pokračovat` selže (sloupec `started_at` neexistuje) a zobrazí červený toast s důvodem.
+
+## Modál „Přidat cvik" — výsledky pod klávesnicí (mobil)
+**Bug:** při psaní do hledání se výsledky schovaly pod klávesnici. Příčina: spodní sheet měl `max-height: 92vh` a celý modál scrolloval. **Na iOS klávesnice `vh` nemění** — mění jen *visual viewport*, takže sheet zůstal 92 % *layout* viewportu a jeho spodek (= výsledky) skončil pod klávesnicí.
+
+### Fix
+- **`components/Modal.tsx` sleduje `window.visualViewport`** (`resize` + `scroll`) a overlay se sám nastaví na `height: vv.height` + `translateY(vv.offsetTop)`. Sheet je tím pádem ukotvený nad klávesnicí, ne pod ní.
+- Výška obsahu je teď **v procentech overlaye** (`85 %`, na mobilu `92 %`), ne ve `vh` — procenta se počítají z už zmenšeného overlaye. `max-height: 92vh` v `globals.css` → `92 %`.
+- **Modál je flex sloupec**: hlavička `flex-shrink: 0`, tělo `flex: 1; min-height: 0`. Scrolluje tělo, ne celý modál — hlavička nikdy neuteče.
+- Nový prop **`bodyFill`**: tělo nescrolluje samo a nechá dítě, ať si scroll řídí. Používá ho jen picker.
+- **`ExercisePicker`**: vyhledávací pole `flex-shrink: 0` (zafixované nahoře), seznam `flex: 1; overflow-y: auto` s **`min-height: 150px` = 3 řádky vždy vidět**. Řádky `flex-shrink: 0`, ať se nesmáčknou.
+- Pole hledání má `font-size: 16` — pod 16px iOS při fokusu zoomuje stránku a rozhodí layout.
+
+### Ověřeno
+Simulace zmenšeného visual viewportu (výška, která telefonu zbude s klávesnicí):
+- **390×420**: sheet končí přesně na 420 (nad klávesnicí), pole vidět, **4 řádky** celé vidět, seznam scrolluje.
+- **390×330** (malý telefon, velká klávesnice): sheet 304 px končí na 330, pole zůstává na místě i po odscrollování seznamu, **přesně 3 řádky** celé vidět — limit `min-height: 150` drží.
+- Bez klávesnice 390×844 a desktop 1440×900 beze změny; ověřen i modál `Nový úkol` (Modal je sdílený) — bez regrese.
+
+⚠️ **Neověřeno na reálném iPhonu** — nemám ho k dispozici a nástroj pro simulátor umí jen nativní aplikace, ne Safari s klávesnicí. Ověřeno zmenšeným viewportem, což je totéž, co s klávesnicí udělá `visualViewport`. Reálný iPhone prosím projeď ty.

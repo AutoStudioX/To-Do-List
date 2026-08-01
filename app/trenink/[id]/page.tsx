@@ -712,7 +712,7 @@ export default function ActiveWorkoutPage() {
         </div>
       )}
 
-      <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Přidat cvik">
+      <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Přidat cvik" bodyFill>
         <ExercisePicker exercises={catalog} onPick={addExercise} onAddCustom={addCustomExercise} />
       </Modal>
       {confirmDialog}

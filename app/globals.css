@@ -109,9 +109,11 @@ a:hover {
     min-width: unset !important;
     width: 100vw !important;
     max-width: 100vw !important;
-    max-height: 92vh !important;
+    /* % of the overlay, which JS sizes to the VISUAL viewport — vh would
+       ignore the on-screen keyboard on iOS and hide the sheet under it. */
+    max-height: 92% !important;
     border-radius: 20px 20px 0 0 !important;
-    padding: 20px 16px !important;
+    padding: 16px 16px 20px !important;
   }
 
   /* Touch targets */
