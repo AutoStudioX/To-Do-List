@@ -180,3 +180,29 @@ Dřív se cviky z minulého tréninku téhož splitu natáhly samy při otevřen
 
 ### Ověřeno (1440 i 390, tmavý režim)
 Nový trénink s existujícím minulým: prázdný stav, hlavička `0 z 0 sérií`. Po tapu na `Načíst minulý trénink`: 5 cviků, série předvyplněné (`85 kg × 6`), hlavička `0 z 15 sérií`. Po potvrzení dvou sérií `2 z 15` a výplň baru 24 z 180 px = přesně 2/15. Na mobilu tenký bar pod hlavičkou.
+
+## Trénink — doporučení, kdy přidat váhu (migrace 0008)
+Appka **radí, nerozhoduje**. Nikdy sama nemění váhy a nekomentuje techniku, únavu ani regeneraci — z čísel se vyčíst nedají.
+
+### Kam patří cíl: nová tabulka `exercise_targets`, ne sloupce na `exercises`
+- Většina řádků v `exercises` je **sdílený katalog** (`user_id IS NULL`). Cíl zapsaný tam by buď protékal mezi uživateli, nebo by nešel použít právě u cviků, které lidé používají nejvíc. Cíl je **záměr uživatele**, ne vlastnost pohybu — dva lidé můžou mít u stejného benche jiný cíl.
+- **Ne na úroveň cviku v tréninku:** zadání říká „nastaví se jednou a dědí se". Uložení u tréninku by znamenalo kopírovat cíl do každé další session a nechat kopie rozejít. Jeden řádek na `(user, exercise)` dává dědění zadarmo — každý trénink čte tentýž řádek.
+- Nepovinné: bez řádku appka jen neradí, jinak funguje stejně.
+
+### Pravidlo
+- **Splnil cíl ve všech pracovních sériích** (dost sérií a každá ≥ cílová opakování) → doporučí přidat: velké komplexní cviky **+2,5 kg**, ostatní a jednoruční **+1,25 kg** (s poznámkou, že když menší přírůstek nejde složit, dá se +2,5 kg).
+- **Nesplnil** → zůstat na stejné váze.
+- **Stagnace**: 3 tréninky po sobě bez zvýšení váhy i opakování → `Stagnace 3 tréninky — zkus snížit váhu o 10 % a jít znovu nahoru.` Stagnace má přednost před ostatními radami.
+
+⚠️ **Velká/malá partie se NEDÁ odvodit z `muscle_group`** — ten u nás drží **split** (Push/Pull/Legs), ne sval. Rozlišení proto jede podle **názvu cviku** (seznam komplexních cviků: dřep, mrtvý tah, bench, tlak nad hlavu, leg press, shyby, přítahy, veslování, hip thrust, výpady, bradla). Neznámý název i cokoli s „jednoručk" spadne na menší, bezpečnější krok.
+
+### Kde to je
+- **V zadávání**: u názvu cviku chip `cíl 3×10` (tap otevře úpravu), a pod „minule:" jeden decentní řádek na celou šířku — `↗ splnil jsi cíl → zkus 52,5 kg` (zeleně) / `💡 stagnace 3 tréninky…` (oranžově). Nezasahuje do zápisu.
+- **V detailu cviku (D3)**: samostatná karta `DOPORUČENÍ` s odůvodněním a připomenutím cíle.
+
+### Ověřeno
+- **24 jednotkových testů** logiky (rozlišení velký/malý cvik, krok, splnění cíle vč. ignorování warm-upu, stagnace vs. progres, chování bez cíle i bez historie) — všechny prošly.
+- Cestou opraven `fmtWeight`: zaokrouhloval na jedno desetinné místo, takže krok 1,25 kg ukazoval `21,3` místo `21,25`.
+- V prohlížeči na **1440 i 390**: chip cíle, řádek s radou, modál úpravy cíle (série/opakování + zrušit cíl), karta v D3 pro doporučení i pro stagnaci.
+
+⚠️ **Spusť `supabase/migrations/0008_exercise_targets.sql`** — bez ní nejde cíl uložit (tabulka neexistuje) a objeví se červený toast s důvodem.

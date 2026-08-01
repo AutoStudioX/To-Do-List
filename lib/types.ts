@@ -22,6 +22,14 @@ export interface Exercise {
   created_at?: string
 }
 
+/** Per-user goal for an exercise (e.g. 3×10). Optional — no row = no advice. */
+export interface ExerciseTarget {
+  user_id: string
+  exercise_id: string
+  target_sets: number
+  target_reps: number
+}
+
 export interface Workout {
   id: string
   user_id: string

@@ -2,10 +2,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Exercise } from '@/lib/types'
+import type { Exercise, ExerciseTarget } from '@/lib/types'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { fmtWeight, epley1RM, volume, fmtTonnage, type SetLike } from '@/lib/gym'
-import { ChevronLeft } from 'lucide-react'
+import { fmtWeight, epley1RM, volume, fmtTonnage, buildAdvice, type SetLike, type Target, type Advice } from '@/lib/gym'
+import { ChevronLeft, Lightbulb, TrendingUp, Target as TargetIcon } from 'lucide-react'
 
 type Row = { weight_kg: number | null; reps: number | null; is_warmup: boolean; workouts: { date: string } | null }
 type Session = { date: string; label: string; maxW: number; vol: number; sets: SetLike[] }
@@ -29,6 +29,7 @@ export default function ExerciseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<Range>('vse')
   const [showAll, setShowAll] = useState(false)
+  const [target, setTarget] = useState<Target | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -40,11 +41,14 @@ export default function ExerciseDetailPage() {
 
   const load = useCallback(async () => {
     const supabase = createClient()
-    const [{ data: ex }, { data: rows }] = await Promise.all([
+    const [{ data: ex }, { data: rows }, { data: tg }] = await Promise.all([
       supabase.from('exercises').select('*').eq('id', id).single(),
       supabase.from('workout_sets').select('weight_kg, reps, is_warmup, workouts!inner(date)').eq('exercise_id', id),
+      supabase.from('exercise_targets').select('*').eq('exercise_id', id).maybeSingle(),
     ])
     setExercise((ex as Exercise) ?? null)
+    const t = tg as ExerciseTarget | null
+    setTarget(t ? { sets: t.target_sets, reps: t.target_reps } : null)
     const byDate = new Map<string, SetLike[]>()
     for (const r of (rows || []) as Row[]) {
       const d = r.workouts?.date
@@ -81,6 +85,11 @@ export default function ExerciseDetailPage() {
     return { oneRM: epley1RM(all), maxW, avgVol, delta8, bestVolDate }
   }, [sessions])
 
+  // Advice card: same rules as the logging screen, with the reasoning spelled out.
+  const advice: Advice | null = useMemo(
+    () => exercise ? buildAdvice(sessions.map(s => ({ date: s.date, sets: s.sets })), target, exercise.name) : null,
+    [sessions, target, exercise])
+
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!exercise) return <div style={{ color: 'var(--muted)', padding: 24 }}>Cvik nenalezen.</div>
 
@@ -103,6 +112,27 @@ export default function ExerciseDetailPage() {
           </div>
         </div>
       ))}
+    </div>
+  )
+
+  const adviceCard = advice && (
+    <div style={{
+      background: 'var(--card)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)',
+      border: `1px solid ${advice.kind === 'increase' ? 'rgba(16,185,129,0.4)' : advice.kind === 'stagnation' ? 'rgba(217,119,6,0.45)' : 'var(--border)'}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        {advice.kind === 'stagnation'
+          ? <Lightbulb size={16} color="#d97706" />
+          : <TrendingUp size={16} color={advice.kind === 'increase' ? '#10b981' : 'var(--muted)'} />}
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: 'var(--muted)' }}>DOPORUČENÍ</span>
+        {target && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
+            <TargetIcon size={12} /> cíl {target.sets}×{target.reps}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>{advice.long}</div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>{advice.reason}</div>
     </div>
   )
 
@@ -215,6 +245,7 @@ export default function ExerciseDetailPage() {
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {tiles}
+          {adviceCard}
           {chartCard}
           {history}
         </div>
@@ -222,6 +253,7 @@ export default function ExerciseDetailPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 400px', gap: 24, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {tiles}
+            {adviceCard}
             {chartCard}
           </div>
           {history}

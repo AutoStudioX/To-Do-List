@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Workout, WorkoutSet, Exercise } from '@/lib/types'
+import type { Workout, WorkoutSet, Exercise, ExerciseTarget } from '@/lib/types'
 import Modal from '@/components/Modal'
 import ExercisePicker from '@/components/gym/ExercisePicker'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage } from '@/lib/gym'
-import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X } from 'lucide-react'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage, buildAdvice, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
@@ -36,6 +36,10 @@ function setBadge(weight: number, reps: number, prev: { weight_kg: number | null
   return null
 }
 
+// Advice is informational: green nudges forward, amber flags a plateau.
+const adviceColor = (k: 'increase' | 'hold' | 'stagnation') =>
+  k === 'increase' ? '#10b981' : k === 'stagnation' ? '#d97706' : 'var(--muted)'
+
 const shortDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : ''
 
 // Where the running clock counts from. started_at is the resumable origin;
@@ -56,6 +60,9 @@ export default function ActiveWorkoutPage() {
   const [panelOpen, setPanelOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [targets, setTargets] = useState<Record<string, Target>>({})
+  const [targetEdit, setTargetEdit] = useState<Target | null>(null)
+  const [advice, setAdvice] = useState<Advice | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [rest, setRest] = useState<number | null>(null) // remaining seconds, null = off
   const [isMobile, setIsMobile] = useState(false)
@@ -82,6 +89,12 @@ export default function ActiveWorkoutPage() {
     const { data: cat } = await supabase.from('exercises').select('*').or(`user_id.is.null,user_id.eq.${user.id}`).order('name')
     const catalog = (cat || []) as Exercise[]
     setCatalog(catalog)
+
+    // Per-exercise targets (optional; missing row simply means "no advice").
+    const { data: tg } = await supabase.from('exercise_targets').select('*').eq('user_id', user.id)
+    const tMap: Record<string, Target> = {}
+    for (const t of (tg || []) as ExerciseTarget[]) tMap[t.exercise_id] = { sets: t.target_sets, reps: t.target_reps }
+    setTargets(tMap)
     const exMap = new Map(catalog.map(e => [e.id, e]))
 
     // Confirmed sets of THIS workout.
@@ -313,6 +326,7 @@ export default function ActiveWorkoutPage() {
 
   // ---------- derived ----------
   const active = items[activeIdx]
+  const activeTarget = active ? targets[active.exercise.id] ?? null : null
   const panelIdx = useMemo(() => {
     if (!active) return -1
     const sel = selectedKey ? active.sets.findIndex(s => s.key === selectedKey) : -1
@@ -350,6 +364,52 @@ export default function ActiveWorkoutPage() {
   const elapsedSec = finished
     ? (workout!.duration_min as number) * 60
     : workout ? Math.max(0, Math.floor((nowMs - clockOrigin(workout)) / 1000)) : 0
+
+  // Advice for the ACTIVE exercise: its own history, newest last, excluding the
+  // workout being logged. Read-only — nothing here ever writes.
+  useEffect(() => {
+    const ex = items[activeIdx]?.exercise
+    if (!ex) { setAdvice(null); return }
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('workout_sets')
+        .select('weight_kg, reps, is_warmup, workouts!inner(date)')
+        .eq('exercise_id', ex.id)
+        .neq('workout_id', id)
+      if (!alive) return
+      const byDate = new Map<string, { weight_kg: number | null; reps: number | null; is_warmup: boolean }[]>()
+      for (const r of (data || []) as { weight_kg: number | null; reps: number | null; is_warmup: boolean; workouts: { date: string } | null }[]) {
+        const d = r.workouts?.date
+        if (!d) continue
+        const g = byDate.get(d) || []; g.push({ weight_kg: r.weight_kg, reps: r.reps, is_warmup: r.is_warmup }); byDate.set(d, g)
+      }
+      const sessions: ExSession[] = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, sets]) => ({ date, sets }))
+      setAdvice(buildAdvice(sessions, targets[ex.id] ?? null, ex.name))
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, items[activeIdx]?.exercise.id, targets, id])
+
+  async function saveTarget(next: Target | null) {
+    const ex = items[activeIdx]?.exercise
+    if (!ex) return
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    if (next) {
+      const { error } = await supabase.from('exercise_targets')
+        .upsert({ user_id: session.user.id, exercise_id: ex.id, target_sets: next.sets, target_reps: next.reps })
+      if (error) { showToast(`Uložení cíle selhalo: ${error.message}`, 'error'); return }
+      setTargets(t => ({ ...t, [ex.id]: next }))
+      showToast(`Cíl ${next.sets}×${next.reps} uložen`)
+    } else {
+      const { error } = await supabase.from('exercise_targets').delete().eq('user_id', session.user.id).eq('exercise_id', ex.id)
+      if (error) { showToast(`Smazání cíle selhalo: ${error.message}`, 'error'); return }
+      setTargets(t => { const c = { ...t }; delete c[ex.id]; return c })
+      showToast('Cíl zrušen')
+    }
+    setTargetEdit(null)
+  }
 
   // Tap/click anywhere outside the panel closes it (desktop included).
   // Registered only while open, so the opening tap itself can't close it.
@@ -497,7 +557,22 @@ export default function ActiveWorkoutPage() {
       {/* Exercise title + actions */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active.exercise.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active.exercise.name}</span>
+            {/* Target is optional: without it the app just doesn't advise. */}
+            <button
+              onClick={() => setTargetEdit(activeTarget ?? { sets: 3, reps: 10 })}
+              disabled={finished}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, minHeight: 28, padding: '0 9px', borderRadius: 999,
+                border: `1px solid ${activeTarget ? 'var(--border)' : 'transparent'}`,
+                background: activeTarget ? 'var(--input-bg)' : 'transparent',
+                color: 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: finished ? 'default' : 'pointer', flexShrink: 0,
+              }}>
+              <TargetIcon size={13} />
+              {activeTarget ? `cíl ${activeTarget.sets}×${activeTarget.reps}` : 'nastavit cíl'}
+            </button>
+          </div>
           {active.previous.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>minule: {formatPrevious(active.previous)}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -509,6 +584,14 @@ export default function ActiveWorkoutPage() {
           </>}
         </div>
       </div>
+
+      {/* Information, not an action — one quiet full-width line, never in the way. */}
+      {advice && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, color: adviceColor(advice.kind), minWidth: 0 }}>
+          {advice.kind === 'stagnation' ? <Lightbulb size={13} style={{ flexShrink: 0 }} /> : <TrendingUp size={13} style={{ flexShrink: 0 }} />}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{advice.short}</span>
+        </div>
+      )}
 
       {/* Set rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -765,6 +848,31 @@ export default function ActiveWorkoutPage() {
         </div>
       )}
 
+      <Modal isOpen={!!targetEdit} onClose={() => setTargetEdit(null)} title={`Cíl — ${active?.exercise.name ?? 'cvik'}`}>
+        {targetEdit && (
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+              Kolik sérií a opakování chceš zvládnout, než přidáš váhu. Nastavuje se jednou a platí i pro další tréninky.
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              {stepperRow('Série', String(targetEdit.sets),
+                () => setTargetEdit(t => t && { ...t, sets: Math.max(1, t.sets - 1) }),
+                () => setTargetEdit(t => t && { ...t, sets: Math.min(20, t.sets + 1) }))}
+              {stepperRow('Opakování', String(targetEdit.reps),
+                () => setTargetEdit(t => t && { ...t, reps: Math.max(1, t.reps - 1) }),
+                () => setTargetEdit(t => t && { ...t, reps: Math.min(100, t.reps + 1) }))}
+            </div>
+            <button onClick={() => saveTarget(targetEdit)} style={{ width: '100%', minHeight: 52, background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
+              Uložit cíl {targetEdit.sets}×{targetEdit.reps}
+            </button>
+            {activeTarget && (
+              <button onClick={() => saveTarget(null)} style={{ width: '100%', minHeight: 44, marginTop: 10, background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>
+                Zrušit cíl
+              </button>
+            )}
+          </div>
+        )}
+      </Modal>
       <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} title="Přidat cvik" bodyFill>
         <ExercisePicker exercises={catalog} onPick={addExercise} onAddCustom={addCustomExercise} />
       </Modal>
