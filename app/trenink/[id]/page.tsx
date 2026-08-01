@@ -455,9 +455,11 @@ export default function ActiveWorkoutPage() {
             return (
               <div key={s.key} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, minHeight: 54,
-                // Green = "counts towards stats". Warm-ups never count, so they stay neutral.
-                border: `1px solid ${s.confirmed && !s.is_warmup ? 'rgba(16,185,129,0.32)' : isPanel ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
-                background: s.confirmed && !s.is_warmup ? 'rgba(16,185,129,0.07)' : isPanel ? 'rgba(232,25,44,0.05)' : 'var(--input-bg)',
+                // Green = "counts towards stats" — every working set, confirmed or not.
+                // Warm-ups never count, so they stay neutral (no frame). Red is reserved
+                // for primary/destructive actions and has no place on a set row.
+                border: `1px solid ${s.is_warmup ? 'transparent' : isPanel ? 'rgba(16,185,129,0.6)' : 'rgba(16,185,129,0.32)'}`,
+                background: s.is_warmup ? 'var(--input-bg)' : s.confirmed ? 'rgba(16,185,129,0.07)' : 'transparent',
               }}>
                 <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idxLabel}</span>
                 <button onClick={() => setSelectedKey(s.key)} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -465,7 +467,14 @@ export default function ActiveWorkoutPage() {
                   {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
                   {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
                 </button>
-                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, border: 'none', background: s.confirmed ? (s.is_warmup ? '#d97706' : '#10b981') : '#E8192C', color: '#fff', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}><Check size={20} /></button>
+                <button onClick={() => confirmSet(activeIdx, setIdx)} aria-label="Potvrdit sérii" style={{
+                  minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10,
+                  // Working sets confirm green (they count); warm-ups stay neutral grey.
+                  border: s.is_warmup ? '1px solid var(--border)' : 'none',
+                  background: s.is_warmup ? 'var(--card)' : '#10b981',
+                  color: s.is_warmup ? 'var(--muted)' : '#fff',
+                  cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0,
+                }}><Check size={20} /></button>
               </div>
             )
           })
