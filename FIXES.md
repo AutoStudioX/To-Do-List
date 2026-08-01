@@ -156,3 +156,10 @@ Simulace zmenšeného visual viewportu (výška, která telefonu zbude s kláves
 ### Ověřeno (skutečné klikání, ne JS)
 - **390×844**: panel po načtení skrytý → tap na neposlanou sérii otevřel → tap mimo zavřel → `+ Série` přidalo sérii 3 a otevřelo panel na ní → křížek zavřel → `Potvrdit sérii` zavřelo.
 - **1440×900**: panel po načtení skrytý, tři sloupce beze změny → klik na sérii otevřel panel ve středním sloupci → klik mimo zavřel.
+
+## Trénink — prázdný stav: akce do palcové zóny (mobil)
+Dle mobilní obrazovky 2 z designu. **Text `Zatím žádný cvik` zůstává nahoře**, akční blok se přilepí ke spodnímu okraji nad navigaci. Pořadí zdola: `+ Přidat cvik` → `⟳ Načíst minulý trénink` → karta `MINULÝ <split> · datum`.
+- Kořen stránky je na mobilu při prázdném stavu flex sloupec s `min-height: 100 %`, akční blok má `margin-top: auto`. Stejný vzor jako panel „Typ tréninku" na home.
+- **Desktop beze změny** — blok zůstává v normálním toku pod textem, vycentrovaný na 520 px.
+
+**Pozn. k hlášení „na desktopu prvky úplně chybí":** reprodukoval jsem uvedený scénář (běžící trénink → smazat všechny cviky) na 1440 px a karta `MINULÝ PUSH`, červené tlačítko i `Přidat cvik` se zobrazily správně už před touto změnou. Karta a červené tlačítko se **záměrně** skryjí, jen když pro daný split neexistuje minulý trénink (není co načíst), a všechna tlačítka se skryjí u **ukončeného** tréninku (read-only). Pokud prvky chybí i jinde, půjde nejspíš o starší nasazený build.

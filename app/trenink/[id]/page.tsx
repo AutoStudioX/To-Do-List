@@ -656,7 +656,15 @@ export default function ActiveWorkoutPage() {
   )
 
   const emptyState = (
-    <div style={{ maxWidth: 520, margin: '0 auto' }}>
+    // Mobile: the actionable block is pushed to the thumb zone (design screen 2);
+    // the "Zatím žádný cvik" card stays at the top. Desktop keeps normal flow.
+    <div style={{
+      maxWidth: 520, margin: '0 auto', width: '100%',
+      flex: isMobile ? 1 : undefined,
+      display: isMobile ? 'flex' : undefined,
+      flexDirection: isMobile ? 'column' : undefined,
+      minHeight: isMobile ? 0 : undefined,
+    }}>
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '28px 20px', textAlign: 'center', boxShadow: 'var(--shadow)' }}>
         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--input-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
           <Dumbbell size={28} color="var(--muted)" />
@@ -669,8 +677,9 @@ export default function ActiveWorkoutPage() {
         </div>
       </div>
 
+      <div style={{ marginTop: isMobile ? 'auto' : 12, paddingTop: isMobile ? 16 : 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
       {tmpl.groups.length > 0 && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, marginTop: 12, boxShadow: 'var(--shadow)' }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
           <div style={{ fontSize: 11, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 10 }}>
             MINULÝ {String(split || '').toUpperCase()}{tmpl.date ? ` · ${shortDate(tmpl.date)}` : ''}
           </div>
@@ -686,7 +695,7 @@ export default function ActiveWorkoutPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!finished && tmpl.groups.length > 0 && (
           <button onClick={loadTemplate} style={{ width: '100%', minHeight: 56, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
             <RotateCcw size={18} /> Načíst minulý trénink
@@ -698,11 +707,18 @@ export default function ActiveWorkoutPage() {
           </button>
         )}
       </div>
+      </div>
     </div>
   )
 
   return (
-    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length && !finished && panelOpen ? MOBILE_PANEL_SPACE : 24 }}>
+    <div style={{
+      maxWidth: 1440, margin: '0 auto',
+      paddingBottom: isMobile && items.length && !finished && panelOpen ? MOBILE_PANEL_SPACE : 24,
+      minHeight: isMobile && items.length === 0 ? '100%' : undefined,
+      display: isMobile && items.length === 0 ? 'flex' : undefined,
+      flexDirection: isMobile && items.length === 0 ? 'column' : undefined,
+    }}>
       {header}
 
       {finished && (
