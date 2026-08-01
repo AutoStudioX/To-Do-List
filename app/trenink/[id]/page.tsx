@@ -393,18 +393,28 @@ export default function ActiveWorkoutPage() {
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <button onClick={() => router.push('/trenink')} aria-label="Zpět" style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', cursor: 'pointer', flexShrink: 0 }}><ChevronLeft size={22} /></button>
       {split && <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: accent, borderRadius: 8, padding: '5px 10px', textTransform: 'uppercase', flexShrink: 0 }}>{split}</span>}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {isMobile && active ? active.exercise.name : 'Dnes'}
+      {isMobile ? (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {active ? active.exercise.name : 'Dnes'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
-        </div>
-      </div>
-      {!isMobile && (
-        <div style={{ width: 180, height: 6, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', flexShrink: 0 }}>
-          <div style={{ width: `${setProgress * 100}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
-        </div>
+      ) : (
+        // Design: date, counter and bar sit together on the left; the empty
+        // space is between the bar and the finish button, not before the bar.
+        <>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>Dnes</span>
+          <span style={{ fontSize: 13, color: 'var(--muted)', flexShrink: 0 }}>
+            {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
+          </span>
+          <div style={{ width: 340, height: 6, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', flexShrink: 0, marginLeft: 6 }}>
+            <div style={{ width: `${setProgress * 100}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
+          </div>
+          <div style={{ flex: 1 }} />
+        </>
       )}
       {finished ? (
         <button onClick={resume} style={{ minHeight: 44, padding: '0 16px', background: '#E8192C', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
