@@ -139,3 +139,20 @@ Simulace zmenšeného visual viewportu (výška, která telefonu zbude s kláves
 - Bez klávesnice 390×844 a desktop 1440×900 beze změny; ověřen i modál `Nový úkol` (Modal je sdílený) — bez regrese.
 
 ⚠️ **Neověřeno na reálném iPhonu** — nemám ho k dispozici a nástroj pro simulátor umí jen nativní aplikace, ne Safari s klávesnicí. Ověřeno zmenšeným viewportem, což je totéž, co s klávesnicí udělá `visualViewport`. Reálný iPhone prosím projeď ty.
+
+## Trénink — stepper panel jen na vyžádání
+**Problém:** panel pro potvrzení série byl na mobilu pořád vidět a zabíral spodní třetinu obrazovky.
+
+- **Výchozí stav: skrytý** (na mobilu i na desktopu).
+- **Otevře se**: tapem na `+ Série` (rovnou na nově přidané sérii) nebo tapem na sérii v seznamu.
+- **Zavře se**: tapem/klikem **mimo panel**, křížkem v hlavičce panelu, po **potvrzení série**, po smazání série a při přepnutí cviku.
+- Zavírání mimo poslouchá `pointerdown` na dokumentu, takže **funguje i myší na desktopu**. Posluchač se registruje až když je panel otevřený, aby ho neshodil ten samý tap, který ho otevírá.
+- Klávesa `Enter` potvrzuje sérii jen když je panel na obrazovce.
+- Rezerva místa pod obsahem na mobilu (`MOBILE_PANEL_SPACE`) se uplatní jen když je panel otevřený — zavřený nezabírá nic.
+- **Umístění beze změny**: na desktopu inline ve sloupci s cviky, na mobilu přilepený dole v palcové zóně.
+
+**Pozn.:** panel se otevírá i tapem na **potvrzenou** sérii, ne jen na neposlanou — jinak by nešlo potvrzenou sérii opravit ani smazat (`Smazat sérii` je uvnitř panelu).
+
+### Ověřeno (skutečné klikání, ne JS)
+- **390×844**: panel po načtení skrytý → tap na neposlanou sérii otevřel → tap mimo zavřel → `+ Série` přidalo sérii 3 a otevřelo panel na ní → křížek zavřel → `Potvrdit sérii` zavřelo.
+- **1440×900**: panel po načtení skrytý, tři sloupce beze změny → klik na sérii otevřel panel ve středním sloupci → klik mimo zavřel.

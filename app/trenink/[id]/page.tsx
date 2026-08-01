@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, WorkoutSet, Exercise } from '@/lib/types'
@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
 import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage } from '@/lib/gym'
-import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell } from 'lucide-react'
+import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
@@ -53,6 +53,8 @@ export default function ActiveWorkoutPage() {
   const [loading, setLoading] = useState(true)
   const [activeIdx, setActiveIdx] = useState(0)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [rest, setRest] = useState<number | null>(null) // remaining seconds, null = off
@@ -179,6 +181,7 @@ export default function ActiveWorkoutPage() {
       patchSet(ex, set, { confirmed: true, prefilled: false, id: data?.id ?? null })
     }
     setSelectedKey(null)
+    setPanelOpen(false)
   }
 
   async function deleteSet(ex: number, set: number) {
@@ -192,14 +195,18 @@ export default function ActiveWorkoutPage() {
     }
     setItems(prev => prev.map((it, i) => i !== ex ? it : { ...it, sets: it.sets.filter((_, j) => j !== set) }))
     setSelectedKey(null)
+    setPanelOpen(false)
   }
 
   function addSet(ex: number) {
+    const key = newKey()
     setItems(prev => prev.map((it, i) => {
       if (i !== ex) return it
       const last = it.sets[it.sets.length - 1]
-      return { ...it, sets: [...it.sets, { key: newKey(), id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
+      return { ...it, sets: [...it.sets, { key, id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
     }))
+    setSelectedKey(key)
+    setPanelOpen(true)
   }
 
   async function toggleWarmup(ex: number, set: number) {
@@ -346,19 +353,32 @@ export default function ActiveWorkoutPage() {
     : workout ? Math.max(0, Math.floor((nowMs - clockOrigin(workout)) / 1000)) : 0
   const doneOnActive = active ? active.sets.filter(s => s.confirmed && !s.is_warmup).length : 0
 
+  // Tap/click anywhere outside the panel closes it (desktop included).
+  // Registered only while open, so the opening tap itself can't close it.
+  useEffect(() => {
+    if (!panelOpen) return
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node | null
+      if (t && panelRef.current?.contains(t)) return
+      setPanelOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [panelOpen])
+
   // Enter confirms the panel set (design: "nebo klávesa Enter").
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (pickerOpen) return
+      if (pickerOpen || !panelOpen) return
       if (panelIdx >= 0) { e.preventDefault(); confirmSet(activeIdx, panelIdx) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdx, panelIdx, items, pickerOpen])
+  }, [activeIdx, panelIdx, items, pickerOpen, panelOpen])
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!workout) return <div style={{ color: 'var(--muted)', padding: 24 }}>Trénink nenalezen.</div>
@@ -403,7 +423,7 @@ export default function ActiveWorkoutPage() {
     const total = it.sets.filter(s => !s.is_warmup).length
     const prev = it.previous[0]
     return (
-      <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null) }} style={{
+      <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null); setPanelOpen(false) }} style={{
         display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation',
         padding: '10px 12px', borderRadius: 12, minHeight: 56, width: '100%',
         border: `1px solid ${isActive ? 'rgba(232,25,44,0.35)' : 'var(--border)'}`,
@@ -439,7 +459,7 @@ export default function ActiveWorkoutPage() {
           const done = it.sets.filter(s => s.confirmed && !s.is_warmup).length
           const total = it.sets.filter(s => !s.is_warmup).length
           return (
-            <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null) }} style={{
+            <button key={it.exercise.id} onClick={() => { setActiveIdx(i); setSelectedKey(null); setPanelOpen(false) }} style={{
               flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', gap: 7, padding: '0 12px', borderRadius: 999, cursor: 'pointer', touchAction: 'manipulation',
               border: `1px solid ${isActive ? '#E8192C' : 'var(--border)'}`,
               background: isActive ? 'rgba(232,25,44,0.12)' : 'var(--card)',
@@ -496,7 +516,7 @@ export default function ActiveWorkoutPage() {
                 background: s.is_warmup ? 'var(--input-bg)' : s.confirmed ? 'rgba(16,185,129,0.07)' : 'transparent',
               }}>
                 <span style={{ width: 22, fontSize: 13, fontWeight: 700, color: s.is_warmup ? '#d97706' : 'var(--muted)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idxLabel}</span>
-                <button onClick={() => !finished && setSelectedKey(s.key)} disabled={finished} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => { if (finished) return; setSelectedKey(s.key); setPanelOpen(true) }} disabled={finished} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
                   {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
                   {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
@@ -549,13 +569,14 @@ export default function ActiveWorkoutPage() {
     </div>
   )
 
-  const stepperPanel = active && panelSet && !finished && (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: isMobile ? 22 : 16, padding: isMobile ? '14px 16px 16px' : 16, boxShadow: isMobile ? '0 -6px 24px rgba(0,0,0,0.18)' : 'var(--shadow)' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#E8192C', letterSpacing: 0.4 }}>SÉRIE {panelSetNo}</span>
-        <span style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+  const stepperPanel = active && panelSet && !finished && panelOpen && (
+    <div ref={panelRef} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: isMobile ? 22 : 16, padding: isMobile ? '14px 16px 16px' : 16, boxShadow: isMobile ? '0 -6px 24px rgba(0,0,0,0.18)' : 'var(--shadow)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#E8192C', letterSpacing: 0.4, flexShrink: 0 }}>SÉRIE {panelSetNo}</span>
+        <span style={{ flex: 1, textAlign: 'right', fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {panelPrev ? `minule: ${panelPrev.weight_kg == null ? 'vlastní' : fmtWeight(Number(panelPrev.weight_kg))} × ${panelPrev.reps ?? '?'}` : 'nová série'}{panelSet.prefilled ? ' · předvyplněno' : ''}
         </span>
+        <button onClick={() => setPanelOpen(false)} aria-label="Zavřít panel" style={{ minWidth: 36, minHeight: 36, marginRight: -6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}><X size={18} /></button>
       </div>
       <div style={{ display: isMobile ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: isMobile ? undefined : '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {stepperRow('Váha', `${fmtWeight(panelSet.weight)} kg`,
@@ -681,7 +702,7 @@ export default function ActiveWorkoutPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length && !finished ? MOBILE_PANEL_SPACE : 24 }}>
+    <div style={{ maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile && items.length && !finished && panelOpen ? MOBILE_PANEL_SPACE : 24 }}>
       {header}
 
       {finished && (
