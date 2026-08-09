@@ -309,3 +309,32 @@ Pojistka `new < old` se v testu opravdu uplatnila: syntetický trénink uložen�
 `fmtDuration()` v `lib/gym.ts`: pod hodinu `47 min`, nad hodinu `1 h 57 min`, celé hodiny bez nuly (`2 h`, ne `2 h 0 min`). Použito v historii (mobil i desktop), v hlavičce ukončeného tréninku a v pruhu o automatickém ukončení. 15 jednotkových testů (hranice 59/60/61, celé hodiny, null/undefined/záporná hodnota → prázdný řetězec).
 
 **Živé stopky u běžícího tréninku zůstávají `mm:ss`** — během tréninku jsou vteřiny k něčemu, `1 h 30 min 12 s` by bylo horší. Přepíná se to až po ukončení, kdy je z toho délka, ne hodiny.
+
+## Trénink — fantom série, obrácené „minule" a rada podle top série
+### 1) Prázdná série navíc u každého cviku
+Efekt v `app/trenink/[id]/page.tsx` po každém potvrzení dolepil na konec aktivního cviku prázdnou nepotvrzenou sérii. Tři odcvičené série se ukazovaly jako **3/4** a smazat to nešlo — smazání efekt okamžitě vrátil.
+
+Efekt je pryč, novou sérii přidává výhradně uživatel přes **„+ Série"**. Zrušena i mrtvá větev v `load()`, která totéž dělala při načtení (`order` vzniká jen z potvrzených sérií, takže se do ní nikdy netrefila).
+
+Počítadlo v hlavičce, v chipech i v seznamu cviků teď počítá jen skutečné řádky. Ověřeno na reálném tréninku: **22 z 23 → 22 z 22**, a po smazání ručně přidané série **22/23 → 22/22**, tentokrát natrvalo.
+
+**Co zůstalo:** přidání cviku přes „Přidat cvik" pořád založí jeden řádek — je to série, kterou se chystáš zapsat, jde smazat a nevrací se. Prázdný cvik bez řádku by neměl co editovat ve stepperu.
+
+### 2) Doporučená váha brala vrchol rampy
+`addExercise()` tahal historii jedním dotazem `order(created_at, desc).limit(12)`. „Nejnovější" série je ale **poslední série rampy, tedy nejtěžší** — a ta se lepila do série 1. U Bench pressu (minule 50/60/70) začínala série 1 na **70 kg**.
+
+Stejné pole plnilo i „minule: …", takže bylo **pozpátku** a série 1 se porovnávala s vrcholem minula místo se svým protějškem (`previous[čísloSérie−1]`). Limit navíc míchal série z různých tréninků a warm-upy se filtrovaly až po něm.
+
+Teď dva dotazy: nejdřív **ze kterého tréninku**, pak **všechny jeho série vzestupně**. Série 1 startuje tam, kde minule startovala rampa. Ověřeno v prohlížeči na cviku Zkrcovačky: `minule: 23 kg × 10, 24 × 10, 32 × 10` a série 1 předvyplněná na **23 kg** (dřív by to bylo 32).
+
+### 3) Rada se vztahuje k TOP SÉRII
+Model počítal se straight sets, ale rampa 50/60/70 × 10 „splnila cíl 3×10" vždycky — všechny série mají 10 opakování, i když se vrchol vůbec nezvedl.
+
+- `targetMet()` teď žádá **dost pracovních sérií celkem** a **cílový počet opakování na nejtěžší z nich**. Náběh se neposuzuje.
+- `topSet()` při shodné váze bere sérii s **víc opakováními** (85 × 8 místo 85 × 6).
+- Texty mluví o vrcholu: `top série: zkus 72,5 kg`, `Top série 70 kg × 10 splnila cíl 3×10 — zkus 72,5 kg (+2,5 kg).`
+- Rada se zobrazuje **jen pod nejtěžší sérií**, ne jako řádek nad celým cvikem. Při shodné váze visí u pozdějšího řádku, aby seděla na tom, který právě děláš.
+
+14 jednotkových testů: rampa s vrcholem na 10 → increase; rampa s vrcholem na 6 → hold; straight sets; málo sérií; warm-up se nepočítá; náběh na 8 opakování už cíl nezabíjí; jednoručka 30 kg → `zkus 31,25 kg`; stagnace vyhrává nad cílem; shodná váha → vyšší opakování.
+
+Ověřeno na **1440 i 390**: rada `top série: zkus 40 kg` visí u Tlaků na ramena pod sérií 4 (36 kg, nejtěžší), pod sériemi 1–3 ne.

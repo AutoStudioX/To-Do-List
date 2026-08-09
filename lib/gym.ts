@@ -93,12 +93,15 @@ export function epley1RM(sets: SetLike[]): number {
   return Math.round(best)
 }
 
-// Heaviest working set (by weight). null when none.
+// Heaviest working set (by weight); at equal weight the one with more reps.
+// null when none.
 export function topSet(sets: SetLike[]): { weight_kg: number | null; reps: number | null } | null {
   let best: SetLike | null = null
   for (const s of sets) {
     if (s.is_warmup) continue
-    if (!best || (Number(s.weight_kg) || 0) > (Number(best.weight_kg) || 0)) best = s
+    if (!best) { best = s; continue }
+    const w = Number(s.weight_kg) || 0, bw = Number(best.weight_kg) || 0
+    if (w > bw || (w === bw && (s.reps || 0) > (best.reps || 0))) best = s
   }
   return best
 }
@@ -161,11 +164,18 @@ const working = (s: SetLike[]) => s.filter(x => !x.is_warmup)
 const maxWeight = (s: SetLike[]) => working(s).reduce((m, x) => Math.max(m, Number(x.weight_kg) || 0), 0)
 const maxReps = (s: SetLike[]) => working(s).reduce((m, x) => Math.max(m, x.reps || 0), 0)
 
-/** Target met = enough working sets AND every one of them hit the rep goal. */
+/**
+ * Cíl se posuzuje podle TOP SÉRIE: dost pracovních sérií celkem a nejtěžší
+ * z nich dala cílový počet opakování.
+ *
+ * PROČ NE „všechny série splnily opakování": při rampě 50×10 / 60×10 / 70×10
+ * to platí vždycky, protože náběhové série jsou lehké — cíl by byl splněný
+ * i ve chvíli, kdy se vrchol vůbec nezvedl. Náběh je náběh, rozhoduje vrchol.
+ */
 export function targetMet(sets: SetLike[], target: Target): boolean {
   const w = working(sets)
   if (w.length < target.sets) return false
-  return w.every(s => (s.reps || 0) >= target.reps)
+  return (topSet(w)?.reps || 0) >= target.reps
 }
 
 /**
@@ -176,7 +186,11 @@ export function targetMet(sets: SetLike[], target: Target): boolean {
 export function buildAdvice(sessions: ExSession[], target: Target | null, exerciseName: string): Advice | null {
   if (!sessions.length) return null
   const last = sessions[sessions.length - 1]
+  // Všechno se točí kolem TOP SÉRIE. Náběhové série rampy appka neřeší —
+  // jsou to schody k vrcholu, ne cíl sám o sobě.
+  const lastTop = topSet(working(last.sets))
   const lastMax = maxWeight(last.sets)
+  const topReps = lastTop?.reps ?? 0
 
   // Stagnation beats everything else: three sessions with no gain in weight or
   // reps means "add weight" advice has already been ignored (or is not working).
@@ -188,9 +202,9 @@ export function buildAdvice(sessions: ExSession[], target: Target | null, exerci
       const back = Math.round(lastMax * 0.9 * 4) / 4 // 10 % down, rounded to 0.25
       return {
         kind: 'stagnation',
-        short: 'stagnace 3 tréninky — zkus zpět na ' + fmtWeight(back) + ' kg',
-        long: 'Stagnace 3 tréninky — zkus snížit váhu o 10 % a jít znovu nahoru.',
-        reason: `Za poslední tři tréninky se nezvedla váha (max ${fmtWeight(lastMax)} kg) ani počet opakování. Deset procent dolů je ${fmtWeight(back)} kg.`,
+        short: `top série: stagnace 3 tréninky — zkus zpět na ${fmtWeight(back)} kg`,
+        long: 'Top série stagnuje 3 tréninky — zkus snížit váhu o 10 % a jít znovu nahoru.',
+        reason: `Za poslední tři tréninky se nezvedla top série (max ${fmtWeight(lastMax)} kg) ani počet opakování. Deset procent dolů je ${fmtWeight(back)} kg.`,
       }
     }
   }
@@ -203,18 +217,20 @@ export function buildAdvice(sessions: ExSession[], target: Target | null, exerci
     const next = lastMax > 0 ? lastMax + step : null
     return {
       kind: 'increase',
-      short: next ? `splnil jsi cíl → zkus ${fmtWeight(next)} kg` : 'splnil jsi cíl → zkus přidat váhu',
+      short: next ? `top série: zkus ${fmtWeight(next)} kg` : 'top série: zkus přidat váhu',
       long: next
-        ? `Splnil jsi cíl ${target.sets}×${target.reps} ve všech sériích — zkus ${fmtWeight(next)} kg (+${fmtWeight(step)} kg).`
-        : `Splnil jsi cíl ${target.sets}×${target.reps} ve všech sériích — zkus přidat váhu.`,
-      reason: `Poslední trénink vyšel na ${fmtWeight(lastMax)} kg ve všech ${target.sets} sériích po ${target.reps}. Krok +${fmtWeight(step)} kg vychází z aktuální váhy${isOneHanded(exerciseName) ? ' a z toho, že jednoručka se přidává na obě strany' : ''}.`,
+        ? `Top série ${fmtWeight(lastMax)} kg × ${topReps} splnila cíl ${target.sets}×${target.reps} — zkus ${fmtWeight(next)} kg (+${fmtWeight(step)} kg).`
+        : `Top série splnila cíl ${target.sets}×${target.reps} — zkus přidat váhu.`,
+      reason: `Minule jsi na vrcholu dal ${fmtWeight(lastMax)} kg × ${topReps} a celkem ${working(last.sets).length} pracovních sérií. Náběhové série se neposuzují. Krok +${fmtWeight(step)} kg vychází z aktuální váhy${isOneHanded(exerciseName) ? ' a z toho, že jednoručka se přidává na obě strany' : ''}.`,
     }
   }
 
   return {
     kind: 'hold',
-    short: lastMax > 0 ? `cíl zatím nesplněn → zůstaň na ${fmtWeight(lastMax)} kg` : 'cíl zatím nesplněn → zůstaň na stejné váze',
-    long: `Cíl ${target.sets}×${target.reps} zatím nesplněn ve všech sériích — zůstaň na stejné váze.`,
-    reason: 'Váhu má smysl přidat, až cíl vyjde ve všech pracovních sériích.',
+    short: lastMax > 0 ? `top série: zůstaň na ${fmtWeight(lastMax)} kg` : 'top série: zůstaň na stejné váze',
+    long: `Top série zatím nesplnila cíl ${target.sets}×${target.reps} — zůstaň na stejné váze.`,
+    reason: working(last.sets).length < target.sets
+      ? `Minule jsi udělal ${working(last.sets).length} pracovních sérií z ${target.sets}. Váhu má smysl přidat, až jich bude dost a vrchol dá ${target.reps} opakování.`
+      : `Top série minule dala ${topReps} opakování z cílových ${target.reps}. Váhu má smysl přidat, až vrchol vyjde celý.`,
   }
 }

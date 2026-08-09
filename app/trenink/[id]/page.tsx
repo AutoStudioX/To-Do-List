@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, WorkoutSet, Exercise, ExerciseTarget } from '@/lib/types'
@@ -149,8 +149,9 @@ export default function ActiveWorkoutPage() {
       if (!ex) continue
       const conf = confG.get(exId) || []
       const tmp = tmplG.get(exId) || []
+      // `order` vzniká jen z potvrzených sérií, takže `conf` nikdy není prázdné
+      // — žádná náhradní prázdná série se sem nedoplňuje.
       const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: true, prefilled: false }))
-      if (sets.length === 0) sets.push({ key: newKey(), id: null, weight: 20, reps: 8, is_warmup: false, confirmed: false, prefilled: false })
       // The template still feeds "minule: …" and the comparison badges.
       built.push({ exercise: ex, previous: tmp.filter(t => !t.is_warmup).map(t => ({ weight_kg: t.weight_kg, reps: t.reps })), sets })
     }
@@ -172,20 +173,10 @@ export default function ActiveWorkoutPage() {
     return () => clearInterval(t)
   }, [])
 
-  // The stepper panel always edits a real set: keep one unconfirmed set at the
-  // end of the active exercise. Bails out when one already exists.
-  useEffect(() => {
-    // A finished workout is read-only — don't conjure a pending set into it.
-    if (workout?.duration_min != null) return
-    setItems(prev => {
-      const ex = prev[activeIdx]
-      if (!ex || ex.sets.some(s => !s.confirmed)) return prev
-      const last = ex.sets[ex.sets.length - 1]
-      const next = [...prev]
-      next[activeIdx] = { ...ex, sets: [...ex.sets, { key: newKey(), id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
-      return next
-    })
-  }, [activeIdx, items, workout?.duration_min])
+  // ŽÁDNÉ AUTOMATICKÉ DOLEPOVÁNÍ SÉRIÍ. Tady dřív visel efekt, který po každém
+  // potvrzení přidal na konec aktivního cviku prázdnou nepotvrzenou sérii.
+  // Nešla smazat (efekt ji hned vrátil) a lezla do počítadla — 3 hotové série
+  // se ukazovaly jako 3/4. Novou sérii přidává výhradně uživatel přes „+ Série".
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -244,21 +235,44 @@ export default function ActiveWorkoutPage() {
     setPickerOpen(false)
     const existing = items.findIndex(it => it.exercise.id === ex.id)
     if (existing >= 0) { setActiveIdx(existing); return }
-    // Prefill from this exercise's most recent previous set, if any.
+    // Předvyplnění z MINULÉHO TRÉNINKU tohoto cviku, v pořadí, v jakém se
+    // série opravdu cvičily.
+    //
+    // Dřív to byl jeden dotaz `order(created_at, desc).limit(12)`, což mělo dvě
+    // chyby: „nejnovější" série je poslední série rampy, tedy ta NEJTĚŽŠÍ, a ta
+    // se lepila do série 1 (u Bench pressu 70 kg místo 50). A `previous` bylo
+    // pozpátku, takže se série 1 porovnávala s vrcholem minula. Limit navíc
+    // míchal série z různých tréninků.
+    //
+    // Dva dotazy: nejdřív ZE KTERÉHO tréninku, pak všechny jeho série vzestupně.
     const { data: { session } } = await supabase.auth.getSession()
     let previous: { weight_kg: number | null; reps: number | null }[] = []
     let seed = { weight: 20, reps: 8 }
     if (session?.user) {
-      const { data: prev } = await supabase
+      const { data: lastRow } = await supabase
         .from('workout_sets')
-        .select('weight_kg, reps, is_warmup, workout_id, workouts!inner(user_id, date)')
+        .select('workout_id, workouts!inner(user_id)')
         .eq('exercise_id', ex.id)
         .neq('workout_id', id)
         .order('created_at', { ascending: false })
-        .limit(12)
-      const rows = (prev || []) as { weight_kg: number | null; reps: number | null; is_warmup: boolean; workout_id: string }[]
-      const working = rows.filter(r => !r.is_warmup)
-      if (working.length) { seed = { weight: Number(working[0].weight_kg ?? 20), reps: working[0].reps ?? 8 }; previous = working.slice(0, 4).map(r => ({ weight_kg: r.weight_kg, reps: r.reps })) }
+        .limit(1)
+      const lastWorkoutId = (lastRow || [])[0]?.workout_id as string | undefined
+      if (lastWorkoutId) {
+        const { data: prevSets } = await supabase
+          .from('workout_sets')
+          .select('weight_kg, reps, is_warmup')
+          .eq('exercise_id', ex.id)
+          .eq('workout_id', lastWorkoutId)
+          .order('order_index')
+          .order('created_at')
+        const working = ((prevSets || []) as { weight_kg: number | null; reps: number | null; is_warmup: boolean }[])
+          .filter(r => !r.is_warmup)
+        if (working.length) {
+          // Série 1 začíná tam, kde minule začala rampa — ne na jejím vrcholu.
+          seed = { weight: Number(working[0].weight_kg ?? 20), reps: working[0].reps ?? 8 }
+          previous = working.map(r => ({ weight_kg: r.weight_kg, reps: r.reps }))
+        }
+      }
     }
     setItems(prev => {
       const next = [...prev, { exercise: ex, previous, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }]
@@ -355,6 +369,18 @@ export default function ActiveWorkoutPage() {
     return active.sets.slice(0, panelIdx + 1).filter(s => !s.is_warmup).length || 1
   }, [active, panelIdx])
   const panelPrev = active?.previous[Math.max(0, panelSetNo - 1)]
+
+  // Index nejtěžší pracovní série — k té se váže rada. Při shodné váze vyhrává
+  // pozdější řádek, aby rada seděla na tom, který právě děláš.
+  const topRowIdx = useMemo(() => {
+    if (!active) return -1
+    let idx = -1, best = -Infinity
+    active.sets.forEach((s, i) => {
+      if (s.is_warmup) return
+      if (s.weight >= best) { best = s.weight; idx = i }
+    })
+    return idx
+  }, [active])
 
   const { doneSets, totalSets } = useMemo(() => {
     let done = 0, total = 0
@@ -610,14 +636,6 @@ export default function ActiveWorkoutPage() {
         </div>
       </div>
 
-      {/* Information, not an action — one quiet full-width line, never in the way. */}
-      {advice && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, color: adviceColor(advice.kind), minWidth: 0 }}>
-          {advice.kind === 'stagnation' ? <Lightbulb size={13} style={{ flexShrink: 0 }} /> : <TrendingUp size={13} style={{ flexShrink: 0 }} />}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{advice.short}</span>
-        </div>
-      )}
-
       {/* Set rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(() => {
@@ -630,8 +648,12 @@ export default function ActiveWorkoutPage() {
             const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
             const isPanel = setIdx === panelIdx
             const grey = !s.confirmed && s.prefilled
+            // Rada patří TOP SÉRII. Série 1–2 jsou u rampy náběh a appka je neřeší,
+            // takže pod nimi nemá co vysvítit.
+            const showAdvice = advice && setIdx === topRowIdx
             return (
-              <div key={s.key} style={{
+              <Fragment key={s.key}>
+              <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, minHeight: 54,
                 // Green = "counts towards stats" — every working set, confirmed or not.
                 // Warm-ups never count, so they stay neutral (no frame). Red is reserved
@@ -654,6 +676,13 @@ export default function ActiveWorkoutPage() {
                   cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0,
                 }}><Check size={20} /></button>
               </div>
+              {showAdvice && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', marginTop: -2, fontSize: 12, color: adviceColor(advice.kind), minWidth: 0 }}>
+                  {advice.kind === 'stagnation' ? <Lightbulb size={13} style={{ flexShrink: 0 }} /> : <TrendingUp size={13} style={{ flexShrink: 0 }} />}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{advice.short}</span>
+                </div>
+              )}
+              </Fragment>
             )
           })
         })()}
