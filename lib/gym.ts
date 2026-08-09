@@ -113,6 +113,44 @@ export function fmtSet(s: { weight_kg: number | null; reps: number | null } | nu
   return `${w} × ${s.reps ?? '?'}`
 }
 
+// ---- Porovnání série s minulým tréninkem ----
+
+export type PrevSet = { weight_kg: number | null; reps: number | null }
+export type SetBadge = { text: string; kind: 'pr' | 'up' | 'same' | 'down' }
+
+/**
+ * Odznak u potvrzené pracovní série: jak dopadla proti odpovídající sérii
+ * minule. `prevMaxWeight` je nejvyšší váha, kterou měl tenhle cvik minule.
+ *
+ * PR = VÁHA, ne objem. Objemové PR (váha × opakování víc než nejlepší série
+ * minule) svítilo i při poklesu váhy, když se přidala opakování, a nikdo
+ * netušil, co „PR objem" znamená.
+ *
+ * Zhoršení se hlásí taky — je to fakt, ne chyba, takže tlumeně (`down`),
+ * nikdy červeně.
+ */
+export function setBadge(weight: number, reps: number, prev: PrevSet[], workingIdx: number, prevMaxWeight: number): SetBadge | null {
+  if (prevMaxWeight > 0 && weight > prevMaxWeight) return { text: 'PR váha', kind: 'pr' }
+  const p = prev[workingIdx]
+  if (!p) return null
+  const pw = Number(p.weight_kg) || 0
+  const pr = p.reps || 0
+  if (weight === pw) {
+    if (reps === pr) return { text: '= minule', kind: 'same' }
+    return reps > pr
+      ? { text: `+${reps - pr} rep`, kind: 'up' }
+      : { text: `-${pr - reps} rep`, kind: 'down' }
+  }
+  return weight > pw
+    ? { text: `+${fmtWeight(weight - pw)} kg`, kind: 'up' }
+    : { text: `-${fmtWeight(pw - weight)} kg`, kind: 'down' }
+}
+
+/** Nejvyšší váha mezi pracovními sériemi minulého tréninku. 0 když žádné nejsou. */
+export function maxPrevWeight(prev: PrevSet[]): number {
+  return prev.reduce((m, p) => Math.max(m, Number(p.weight_kg) || 0), 0)
+}
+
 // ---- Progression advice (read-only; the app suggests, the user decides) ----
 
 /** Per-exercise goal. The increment is computed, not configured. */

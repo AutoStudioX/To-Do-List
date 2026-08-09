@@ -9,12 +9,12 @@ import StepperField from '@/components/gym/StepperField'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, setBadge, maxPrevWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
 import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
-type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; sets: ActiveSet[] }
+type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; prevDate: string | null; sets: ActiveSet[] }
 type Template = { date: string | null; groups: { exercise: Exercise; sets: WorkoutSet[] }[] }
 
 let keySeq = 0
@@ -23,20 +23,6 @@ const newKey = () => `s${++keySeq}`
 const REST_DEFAULT = 90 // seconds; the rest timer NEVER auto-starts — user taps "Pauza".
 const MOBILE_PANEL_SPACE = 380 // room reserved under the content for the pinned stepper panel
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`
-
-// Comparison badge for a confirmed working set vs the same-index previous set.
-function setBadge(weight: number, reps: number, prev: { weight_kg: number | null; reps: number | null }[], workingIdx: number): { text: string; kind: 'pr' | 'up' | 'same' } | null {
-  const curVol = weight * reps
-  const bestPrevVol = prev.reduce((m, p) => Math.max(m, (Number(p.weight_kg) || 0) * (p.reps || 0)), 0)
-  if (bestPrevVol > 0 && curVol > bestPrevVol) return { text: 'PR objem', kind: 'pr' }
-  const p = prev[workingIdx]
-  if (!p) return null
-  const pw = Number(p.weight_kg) || 0, pr = p.reps || 0
-  if (weight === pw && reps === pr) return { text: '= minule', kind: 'same' }
-  if (weight === pw && reps > pr) return { text: `+${reps - pr} rep`, kind: 'up' }
-  if (weight > pw) return { text: `+${fmtWeight(weight - pw)} kg`, kind: 'up' }
-  return null
-}
 
 // Advice is informational: green nudges forward, amber flags a plateau.
 const adviceColor = (k: 'increase' | 'hold' | 'stagnation') =>
@@ -143,17 +129,57 @@ export default function ActiveWorkoutPage() {
       groups: tmplOrder.map(exId => ({ exercise: exMap.get(exId)!, sets: tmplG.get(exId) || [] })).filter(g => g.exercise),
     })
 
+    // „MINULE" = poslední trénink, ve kterém byl TENHLE CVIK — bez ohledu na split.
+    //
+    // Dřív se to bralo ze šablony, tedy z minulého tréninku STEJNÉHO SPLITU.
+    // Když žádný takový nebyl (první Push v historii), bylo `previous` prázdné
+    // pro všechny cviky naráz — a s ním zmizely porovnávací odznaky, řádek
+    // „minule: …" i karta „Vs. minule", i když data v databázi byla. Cviky se
+    // navíc opakují napříč splity (Tlaky na ramena jsou v Push i v Legs), takže
+    // vázat porovnání na split je i věcně špatně.
+    const prevByEx = new Map<string, { sets: { weight_kg: number | null; reps: number | null }[]; date: string | null }>()
+    if (order.length) {
+      // Krok 1: ze kterého tréninku je pro každý cvik to „minule".
+      const { data: stamps } = await supabase
+        .from('workout_sets')
+        .select('exercise_id, workout_id, created_at')
+        .in('exercise_id', order)
+        .neq('workout_id', id)
+        .order('created_at', { ascending: false })
+      const lastWid = new Map<string, string>()
+      for (const r of (stamps || []) as { exercise_id: string; workout_id: string }[]) {
+        if (!lastWid.has(r.exercise_id)) lastWid.set(r.exercise_id, r.workout_id)
+      }
+      const wids = [...new Set(lastWid.values())]
+      if (wids.length) {
+        // Krok 2: jejich série ve skutečném pořadí cvičení + datum na popisek.
+        const [{ data: prevSets }, { data: prevWs }] = await Promise.all([
+          supabase.from('workout_sets').select('exercise_id, workout_id, weight_kg, reps, is_warmup')
+            .in('workout_id', wids).in('exercise_id', order).order('order_index').order('created_at'),
+          supabase.from('workouts').select('id, date').in('id', wids),
+        ])
+        const dateOf = new Map(((prevWs || []) as { id: string; date: string }[]).map(x => [x.id, x.date]))
+        const rows = (prevSets || []) as { exercise_id: string; workout_id: string; weight_kg: number | null; reps: number | null; is_warmup: boolean }[]
+        for (const [exId, wid] of lastWid) {
+          prevByEx.set(exId, {
+            sets: rows.filter(r => r.exercise_id === exId && r.workout_id === wid && !r.is_warmup)
+              .map(r => ({ weight_kg: r.weight_kg, reps: r.reps })),
+            date: dateOf.get(wid) ?? null,
+          })
+        }
+      }
+    }
+
     const built: ActiveExercise[] = []
     for (const exId of order) {
       const ex = exMap.get(exId)
       if (!ex) continue
       const conf = confG.get(exId) || []
-      const tmp = tmplG.get(exId) || []
       // `order` vzniká jen z potvrzených sérií, takže `conf` nikdy není prázdné
       // — žádná náhradní prázdná série se sem nedoplňuje.
       const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: true, prefilled: false }))
-      // The template still feeds "minule: …" and the comparison badges.
-      built.push({ exercise: ex, previous: tmp.filter(t => !t.is_warmup).map(t => ({ weight_kg: t.weight_kg, reps: t.reps })), sets })
+      const p = prevByEx.get(exId)
+      built.push({ exercise: ex, previous: p?.sets ?? [], prevDate: p?.date ?? null, sets })
     }
     setItems(built)
     setLoading(false)
@@ -265,16 +291,18 @@ export default function ActiveWorkoutPage() {
     // Dva dotazy: nejdřív ZE KTERÉHO tréninku, pak všechny jeho série vzestupně.
     const { data: { session } } = await supabase.auth.getSession()
     let previous: { weight_kg: number | null; reps: number | null }[] = []
+    let prevDate: string | null = null
     let seed = { weight: 20, reps: 8 }
     if (session?.user) {
       const { data: lastRow } = await supabase
         .from('workout_sets')
-        .select('workout_id, workouts!inner(user_id)')
+        .select('workout_id, workouts!inner(user_id, date)')
         .eq('exercise_id', ex.id)
         .neq('workout_id', id)
         .order('created_at', { ascending: false })
         .limit(1)
       const lastWorkoutId = (lastRow || [])[0]?.workout_id as string | undefined
+      prevDate = ((lastRow || [])[0]?.workouts as { date?: string } | undefined)?.date ?? null
       if (lastWorkoutId) {
         const { data: prevSets } = await supabase
           .from('workout_sets')
@@ -293,7 +321,7 @@ export default function ActiveWorkoutPage() {
       }
     }
     setItems(prev => {
-      const next = [...prev, { exercise: ex, previous, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }]
+      const next = [...prev, { exercise: ex, previous, prevDate, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }]
       setActiveIdx(next.length - 1)
       return next
     })
@@ -312,6 +340,7 @@ export default function ActiveWorkoutPage() {
     setItems(tmpl.groups.map(g => ({
       exercise: g.exercise,
       previous: g.sets.filter(s => !s.is_warmup).map(s => ({ weight_kg: s.weight_kg, reps: s.reps })),
+      prevDate: tmpl.date,
       sets: g.sets.map(s => ({ key: newKey(), id: null, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: false, prefilled: true })),
     })))
     setActiveIdx(0)
@@ -387,6 +416,9 @@ export default function ActiveWorkoutPage() {
     return active.sets.slice(0, panelIdx + 1).filter(s => !s.is_warmup).length || 1
   }, [active, panelIdx])
   const panelPrev = active?.previous[Math.max(0, panelSetNo - 1)]
+
+  // Nejvyšší váha tohoto cviku v minulém tréninku — proti ní se poměřuje PR.
+  const prevMax = useMemo(() => active ? maxPrevWeight(active.previous) : 0, [active])
 
   // Index nejtěžší pracovní série — k té se váže rada. Při shodné váze vyhrává
   // pozdější řádek, aby rada seděla na tom, který právě děláš.
@@ -662,7 +694,9 @@ export default function ActiveWorkoutPage() {
             if (!s.is_warmup) workingNo++
             // Warm-up rows are marked with the same flame as the panel toggle, not a "W".
             const idxLabel = s.is_warmup ? <Flame size={15} /> : String(workingNo)
-            const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, active.previous, workingNo - 1) : null
+            const badge = s.confirmed && !s.is_warmup ? setBadge(s.weight, s.reps, active.previous, workingNo - 1, prevMax) : null
+            // Zhoršení i „= minule" tlumeně — je to fakt, ne chyba. Červená
+            // zůstává PR, zelená zlepšení.
             const badgeColor = badge?.kind === 'pr' ? '#E8192C' : badge?.kind === 'up' ? '#10b981' : 'var(--muted)'
             const isPanel = setIdx === panelIdx
             const grey = !s.confirmed && s.prefilled
@@ -808,8 +842,10 @@ export default function ActiveWorkoutPage() {
       {/* Previous session for this exercise */}
       {active.previous.length > 0 && (
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 14, boxShadow: 'var(--shadow)' }}>
+          {/* Zdrojem je poslední trénink S TÍMHLE CVIKEM, ne nutně stejný split
+              — popisek proto split netvrdí. */}
           <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
-            MINULÝ {String(split || '').toUpperCase()}{tmpl.date ? ` · ${shortDate(tmpl.date)}` : ''}
+            MINULE{active.prevDate ? ` · ${shortDate(active.prevDate)}` : ''}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {active.previous.map((p, i) => (

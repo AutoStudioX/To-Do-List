@@ -347,3 +347,36 @@ Teď se indexuje **pořadím pracovní série** do `previous` (warm-upy se nepo�
 Hodnota z minula se značí jako `předvyplněno` (šedý řádek), opsaný řádek ne — je vidět, odkud číslo je.
 
 Ověřeno na Zkrcovačkách (minule 23/24/32) na **1440 i 390**: série 1 → 23, „+ Série" → 24, „+ Série" → 32, „+ Série" → 32 (minulý trénink měl jen tři, takže se opsal poslední řádek).
+
+## Trénink — odznaky sérií a prázdná karta „Vs. minule"
+### Diagnóza: „minule" se bralo jen z tréninku STEJNÉHO SPLITU
+`previous` se v `load()` plnilo ze šablony, tedy z posledního tréninku se stejným `split_type`. Když žádný takový nebyl (první Push v historii), bylo `previous` prázdné **pro všechny cviky naráz** — a s ním zmizely porovnávací odznaky, řádek „minule: …" i karta **Vs. minule**, přestože data v databázi byla.
+
+V reálných datech měl uživatel po jednom tréninku od každého splitu, takže karta byla prázdná **všude**.
+
+Věcně to bylo špatně i jinak: cviky se opakují napříč splity (Tlaky na ramena jsou v Push i v Legs), takže vázat porovnání na split zahazuje nejbližší relevantní trénink. Navíc `addExercise()` už tohle dělal správně (poslední trénink s tím cvikem) — dvě cesty, dvě různá data.
+
+**Oprava:** „minule" = poslední trénink, ve kterém byl **ten cvik**, bez ohledu na split. Dva dotazy (ze kterého tréninku → jeho série vzestupně), obojí bez umělého limitu. Popisek karty v pravém sloupci proto už netvrdí split: **`MINULE · 1. 8.`** místo `MINULÝ PUSH · …`. Šablona zůstává split-based, ta slouží tlačítku „Načíst minulý trénink" a to je správně.
+
+### PR podle VÁHY, ne podle objemu
+`setBadge` počítal objemové PR: `váha × opakování` víc než nejlepší série minule. Svítilo to i při **poklesu váhy**, když se přidala opakování (60 × 20 přebilo 70 × 10), a „PR objem" nikomu nic neříkalo.
+
+Teď: **`PR váha`** svítí jen když je váha série vyšší než **nejvyšší váha toho cviku v minulém tréninku**. Objemové PR zrušeno.
+
+### Odznaky pro zhoršení
+Dřív se hlásily jen dobré zprávy — při menším počtu opakování nebo nižší váze nesvítilo nic. Doplněno:
+
+| stav | odznak | barva |
+|---|---|---|
+| váha nad maximem minula | `PR váha` | červená |
+| vyšší váha než odpovídající série | `+5 kg` | zelená |
+| stejná váha, víc opakování | `+2 rep` | zelená |
+| shoda | `= minule` | tlumeně |
+| stejná váha, míň opakování | `-1 rep` | **tlumeně** |
+| nižší váha | `-2,5 kg` | **tlumeně** |
+
+Zhoršení není chyba, je to fakt — proto šedě, nikdy červeně. Červená zůstává PR a destruktivním akcím.
+
+`setBadge` a `maxPrevWeight` se přestěhovaly z komponenty do `lib/gym.ts`, aby šly testovat. 14 jednotkových testů včetně případu, který dřív hlásil „PR objem" (60 × 20 proti rampě 50/60/70) a teď správně hlásí `+10 rep`.
+
+Ověřeno na **1440 i 390** na reálných datech (Tlaky na ramena, minule 22,5/27,5/37,5): série 1 a 2 `+4,5 kg` zeleně, série 3 `-1,5 kg` šedě, série nad 37,5 `PR váha` červeně, karta **Vs. minule +29,1 %** a `MINULE · 1. 8.` s výpisem sérií.
