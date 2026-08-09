@@ -338,3 +338,12 @@ Model počítal se straight sets, ale rampa 50/60/70 × 10 „splnila cíl 3×10
 14 jednotkových testů: rampa s vrcholem na 10 → increase; rampa s vrcholem na 6 → hold; straight sets; málo sérií; warm-up se nepočítá; náběh na 8 opakování už cíl nezabíjí; jednoručka 30 kg → `zkus 31,25 kg`; stagnace vyhrává nad cílem; shodná váha → vyšší opakování.
 
 Ověřeno na **1440 i 390**: rada `top série: zkus 40 kg` visí u Tlaků na ramena pod sérií 4 (36 kg, nejtěžší), pod sériemi 1–3 ne.
+
+### 4) „+ Série" bere odpovídající sérii z minula, ne řádek nad sebou
+Nová série se předvyplňovala kopií předchozího řádku, což **zplošťovalo rampu**: z minulých 25/35/35 vzniklo 25/25/25, protože série 2 opsala 25 a série 3 zase 25.
+
+Teď se indexuje **pořadím pracovní série** do `previous` (warm-upy se nepočítají), takže série N dostane N-tou sérii minulého tréninku. Když minulý trénink tolik sérií neměl, chování zůstává původní — opsat poslední řádek.
+
+Hodnota z minula se značí jako `předvyplněno` (šedý řádek), opsaný řádek ne — je vidět, odkud číslo je.
+
+Ověřeno na Zkrcovačkách (minule 23/24/32) na **1440 i 390**: série 1 → 23, „+ Série" → 24, „+ Série" → 32, „+ Série" → 32 (minulý trénink měl jen tři, takže se opsal poslední řádek).

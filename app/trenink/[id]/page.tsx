@@ -212,12 +212,30 @@ export default function ActiveWorkoutPage() {
     setPanelOpen(false)
   }
 
+  // Nová série se předvyplní ODPOVÍDAJÍCÍ sérií z minulého tréninku, ne
+  // předchozím řádkem. Kopírování řádku nad sebou zplošťovalo rampu: z minulých
+  // 25/35/35 vzniklo 25/25/25, protože série 2 opsala 25 a série 3 opsala 25.
+  // `previous` je v pořadí, v jakém se minule cvičilo, takže se indexuje pořadím
+  // pracovní série (warm-upy se nepočítají).
+  // Když minulý trénink tolik sérií neměl, zůstává původní chování — opsat
+  // poslední řádek.
   function addSet(ex: number) {
     const key = newKey()
     setItems(prev => prev.map((it, i) => {
       if (i !== ex) return it
       const last = it.sets[it.sets.length - 1]
-      return { ...it, sets: [...it.sets, { key, id: null, weight: last?.weight ?? 20, reps: last?.reps ?? 8, is_warmup: false, confirmed: false, prefilled: false }] }
+      const workingCount = it.sets.filter(s => !s.is_warmup).length
+      const match = it.previous[workingCount]
+      const fromPrev = match && match.weight_kg != null
+      return {
+        ...it,
+        sets: [...it.sets, {
+          key, id: null,
+          weight: fromPrev ? Number(match.weight_kg) : (last?.weight ?? 20),
+          reps: fromPrev ? (match.reps ?? last?.reps ?? 8) : (last?.reps ?? 8),
+          is_warmup: false, confirmed: false, prefilled: !!fromPrev,
+        }],
+      }
     }))
     setSelectedKey(key)
     setPanelOpen(true)
