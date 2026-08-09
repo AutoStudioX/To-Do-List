@@ -6,7 +6,8 @@ import type { Workout, SplitType } from '@/lib/types'
 import { useLiveData } from '@/lib/useLiveData'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
-import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek } from '@/lib/gym'
+import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek, fmtDuration } from '@/lib/gym'
+import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
 import { Plus, Dumbbell, ChevronRight, Trash2, TrendingUp } from 'lucide-react'
 
 type SetRow = { workout_id: string; exercise_id: string; weight_kg: number | null; reps: number | null; is_warmup: boolean; order_index: number }
@@ -52,6 +53,13 @@ export default function TreninkPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
+    // Úklid zapomenutých tréninků. Běží při každém načtení seznamu, takže se
+    // uklidí i tréninky, které uživatel od té doby vůbec neotevřel.
+    const swept = await autoFinishStale(supabase)
+    if (swept.error) showToast(`Automatické ukončení selhalo: ${swept.error}`, 'error')
+    else if (swept.closed.length) showToast(swept.closed.length === 1
+      ? `Zapomenutý trénink byl automaticky ukončen (${IDLE_LIMIT_MIN} min bez série)`
+      : `${swept.closed.length} zapomenuté tréninky byly automaticky ukončeny`)
     const { data: ws } = await supabase.from('workouts').select('*').eq('user_id', user.id).order('date', { ascending: false }).order('created_at', { ascending: false })
     const list = (ws || []) as Workout[]
     setWorkouts(list)
@@ -95,6 +103,9 @@ export default function TreninkPage() {
       setDerived({})
     }
     setLoading(false)
+    // showToast se schválně nesleduje — mění identitu při každém renderu a
+    // load() visí na useEffect + useLiveData, takže by se načítání zacyklilo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -297,6 +308,11 @@ export default function TreninkPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {shown.map(w => {
             const d = derived[w.id]
+            // Délka je dopočítaná do poslední série, ne naměřená — ať je to na
+            // řádku vidět, jinak číslo vypadá jako změřený čas.
+            const autoBadge = w.auto_finished ? (
+              <span title={`Ukončeno automaticky po ${IDLE_LIMIT_MIN} min bez série — délka je do poslední série + ${TAIL_MIN} min na dokončení`} style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: '#d97706', border: '1px solid rgba(217,119,6,0.45)', borderRadius: 6, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase' }}>auto</span>
+            ) : null
             return (
               <div key={w.id} style={{ display: 'flex', alignItems: 'stretch', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
                 <div style={{ width: 4, background: splitColor(w.split_type), flexShrink: 0 }} />
@@ -307,7 +323,8 @@ export default function TreninkPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                         {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '4px 8px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
                         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)}</span>
-                        {w.duration_min && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {w.duration_min} min</span>}
+                        {w.duration_min && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {fmtDuration(w.duration_min)}</span>}
+                        {autoBadge}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {d?.count ?? 0} sérií{d?.top ? ` · top: ${d.top}` : ''}
@@ -316,8 +333,9 @@ export default function TreninkPage() {
                   ) : (
                     <>
                       {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '5px 9px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
-                      <div style={{ minWidth: 92, flexShrink: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${w.duration_min} min` : ''}</span></div>
+                      <div style={{ minWidth: 92, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${fmtDuration(w.duration_min)}` : ''}</span></div>
+                        {autoBadge}
                       </div>
                       {d && d.summary.length > 0 && (
                         <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -42,6 +42,10 @@ export interface Workout {
   duration_min: number | null
   /** clock origin; moved back on resume so the timer continues */
   started_at?: string | null
+  /** true = length was derived from the last set, not measured (see migration 0010) */
+  auto_finished?: boolean
+  /** last "Pokračovat v tréninku"; counts as activity so a resume isn't lost */
+  resumed_at?: string | null
   created_at?: string
 }
 

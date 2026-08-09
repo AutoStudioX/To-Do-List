@@ -9,7 +9,8 @@ import StepperField from '@/components/gym/StepperField'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
 type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
@@ -83,6 +84,12 @@ export default function ActiveWorkoutPage() {
     const user = session?.user
     if (!user) return
 
+    // Úklid běží PŘED načtením, aby se zapomenutý trénink otevřel rovnou jako
+    // ukončený a hodiny se znovu nerozeběhly.
+    const swept = await autoFinishStale(supabase)
+    if (swept.error) showToast(`Automatické ukončení selhalo: ${swept.error}`, 'error')
+    else if (swept.closed.includes(id)) showToast(`Trénink byl ukončen automaticky — ${IDLE_LIMIT_MIN} min bez série`)
+
     const { data: w } = await supabase.from('workouts').select('*').eq('id', id).eq('user_id', user.id).single()
     if (!w) { setLoading(false); return }
     setWorkout(w as Workout)
@@ -149,6 +156,9 @@ export default function ActiveWorkoutPage() {
     }
     setItems(built)
     setLoading(false)
+    // showToast se schválně nesleduje — mění identitu při každém renderu a
+    // load() visí na useEffect, takže by se načítání zacyklilo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   useEffect(() => { load() }, [load])
@@ -307,9 +317,10 @@ export default function ActiveWorkoutPage() {
   async function finish() {
     const origin = clockOrigin(workout)
     const mins = Math.max(1, Math.round((Date.now() - origin) / 60000))
-    const { error } = await supabase.from('workouts').update({ duration_min: mins }).eq('id', id)
+    // Ukončeno ručně → délka je naměřená, značka „auto" musí pryč.
+    const { error } = await supabase.from('workouts').update({ duration_min: mins, auto_finished: false }).eq('id', id)
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
-    setWorkout(w => w ? { ...w, duration_min: mins } : w)
+    setWorkout(w => w ? { ...w, duration_min: mins, auto_finished: false } : w)
     router.push('/trenink')
   }
 
@@ -318,9 +329,13 @@ export default function ActiveWorkoutPage() {
   async function resume() {
     if (!workout) return
     const newStart = new Date(Date.now() - (workout.duration_min || 0) * 60000).toISOString()
-    const { error } = await supabase.from('workouts').update({ duration_min: null, started_at: newStart }).eq('id', id)
+    // resumed_at je poslední aktivita: bez něj by automatické ukončení po
+    // návratu bez zapsané série spočítalo délku od posunutého startu k staré
+    // sérii a odpracované minuty zahodilo (viz migrace 0010).
+    const resumedAt = new Date().toISOString()
+    const { error } = await supabase.from('workouts').update({ duration_min: null, started_at: newStart, resumed_at: resumedAt, auto_finished: false }).eq('id', id)
     if (error) { showToast(`Nepodařilo se pokračovat: ${error.message}`, 'error'); return }
-    setWorkout(w => w ? { ...w, duration_min: null, started_at: newStart } : w)
+    setWorkout(w => w ? { ...w, duration_min: null, started_at: newStart, resumed_at: resumedAt, auto_finished: false } : w)
     setNowMs(Date.now())
     showToast('Trénink pokračuje')
   }
@@ -366,6 +381,9 @@ export default function ActiveWorkoutPage() {
   const elapsedSec = finished
     ? (workout!.duration_min as number) * 60
     : workout ? Math.max(0, Math.floor((nowMs - clockOrigin(workout)) / 1000)) : 0
+  // Běžící trénink = živé stopky (mm:ss). Ukončený = délka, ne hodiny — "545:00"
+  // se čte mizerně a vteřiny na uloženém tréninku stejně nic neznamenají.
+  const clockLabel = finished ? fmtDuration(workout!.duration_min) : mmss(elapsedSec)
 
   // Advice for the ACTIVE exercise: its own history, newest last, excluding the
   // workout being logged. Read-only — nothing here ever writes.
@@ -466,7 +484,7 @@ export default function ActiveWorkoutPage() {
             {active ? active.exercise.name : 'Dnes'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
+            {clockLabel} · {doneSets} z {totalSets} sérií
           </div>
         </div>
       ) : (
@@ -475,7 +493,7 @@ export default function ActiveWorkoutPage() {
         <>
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>Dnes</span>
           <span style={{ fontSize: 13, color: 'var(--muted)', flexShrink: 0 }}>
-            {mmss(elapsedSec)} · {doneSets} z {totalSets} sérií
+            {clockLabel} · {doneSets} z {totalSets} sérií
           </span>
           <div style={{ width: 340, height: 6, borderRadius: 999, background: 'var(--input-bg)', overflow: 'hidden', flexShrink: 0, marginLeft: 6 }}>
             <div style={{ width: `${setProgress * 100}%`, height: '100%', background: '#E8192C', borderRadius: 999, transition: 'width .3s' }} />
@@ -826,10 +844,21 @@ export default function ActiveWorkoutPage() {
       {header}
 
       {finished && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13 }}>
-          <Check size={16} color="#10b981" />
-          Trénink je ukončený — série si můžeš prohlížet, pro zápis klikni na „Pokračovat{isMobile ? '' : ' v tréninku'}".
-        </div>
+        workout.auto_finished ? (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.4)', color: 'var(--muted)', fontSize: 13, lineHeight: 1.45 }}>
+            <Timer size={16} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              <b style={{ color: '#d97706' }}>Ukončeno automaticky</b> — {IDLE_LIMIT_MIN} min se nepotvrdila žádná série.
+              Délka {fmtDuration(workout.duration_min)} je počítaná do poslední série + {TAIL_MIN} min na dokončení.
+              Pro zápis klikni na „Pokračovat{isMobile ? '' : ' v tréninku'}".
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 13 }}>
+            <Check size={16} color="#10b981" />
+            Trénink je ukončený — série si můžeš prohlížet, pro zápis klikni na „Pokračovat{isMobile ? '' : ' v tréninku'}".
+          </div>
+        )
       )}
 
       {items.length === 0 ? emptyState : isMobile ? (

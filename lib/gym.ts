@@ -43,6 +43,16 @@ export function fmtWeight(w: number): string {
   return s.replace('.', ',')
 }
 
+// Délka tréninku: 47 → "47 min", 117 → "1 h 47 min", 120 → "2 h".
+// Celé hodiny se píšou bez "0 min" — "2 h 0 min" nikdo neříká.
+export function fmtDuration(min: number | null | undefined): string {
+  if (min == null || min < 0) return ''
+  if (min < 60) return `${Math.round(min)} min`
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
 // ---- Derived, read-only metrics (no schema change; all computed from sets) ----
 
 export type SetLike = { weight_kg: number | null; reps: number | null; is_warmup: boolean }

@@ -233,3 +233,79 @@ Zadané případy sedí: **12,5 → „zkus 13,75 kg"**, **50 → „zkus 52,5 k
 **Cestou opraveny dvě reálné chyby ve stepperu:**
 1. Opakování při dlouhém stisku si drželo starou hodnotu, takže skočilo jen jednou — čte se přes ref.
 2. Rozepsaný text v poli přežil změnu hodnoty zvenčí (řádek ukazoval 170 kg, pole 12,5) — draft se zahodí, když se hodnota změní mimo psaní.
+
+## Trénink — automatické ukončení zapomenutého tréninku (migrace 0010 + 0011)
+### Problém
+Trénink se ukončuje ručně. Když se na to zapomene, `duration_min` zůstane NULL, hodiny běží dál a v historii jsou tréninky po 500 minutách.
+
+### Pravidlo
+- **45 minut bez potvrzené série** → trénink se sám ukončí.
+- **Délka = od začátku tréninku do POSLEDNÍ potvrzené série + 10 min rezerva**, ne do okamžiku ukončení. Čas na gauči s otevřeným tréninkem do tréninku nepatří.
+- V historii dostane takový trénink oranžovou značku **AUTO** (+ vysvětlující pruh v detailu), protože číslo je dopočítané, ne naměřené.
+
+### Rezerva 10 min — proč zrovna tolik
+Po poslední sérii ještě něco trvá: dokončení série, odpočinek, sbalení. Číslo **není odhad od stolu** — trénink **Pull 4. 8. 2026** je čistý kalibrační vzorek (ukončený ručně, bez resume, origin sedí) a mezi poslední sérií a uloženým koncem uběhlo **9,8 min**. Zvažovaná varianta „průměrná pauza mezi sériemi" dává 4,6–5,0 min, tedy zhruba polovinu skutečnosti.
+
+| | do poslední série | + průměrná pauza | + pevných 10 min | reálně |
+|---|---|---|---|---|
+| Pull 4. 8. (kalibrace) | 115,2 | 119,7 | **125,2** | 125 (uloženo ručně) |
+| Legs 1. 8. | 130,0 | 135,0 | 140,0 | ~130 (odhad) |
+| Push 8. 8. | 106,9 | 111,8 | 116,9 | ~140 (odhad) |
+
+U Push chybí i po opravě originu ~33 min, které v datech nejsou (poslední série 8:23 a pak nic) — žádná rozumná rezerva to nepokryje. Rozhodlo, že kalibrace na reálně ukončeném tréninku je pevnější podklad než odhad po paměti.
+
+**Rezerva se přičítá jen tehdy, když je poslední aktivitou SÉRIE.** Trénink bez jediné série (1 min) a trénink, kde poslední aktivitou bylo „Pokračovat" a pak už nic, ji nedostanou — není co dobalovat.
+
+### Origin — začátek se nesmí brát ze `started_at` naslepo
+Reálná chyba nalezená v datech: **Legs 1. 8. 2026** má `started_at` **08:13**, ale `created_at` **07:10** a **14 z 26 sérií leží před `started_at`**. Počítáno od `started_at` vyšlo **67 min místo reálných 130** — první hodina tréninku vypadla. (Že to udělal `resume()`, prozrazuje přesnost: `created_at` má mikrosekundy z Postgresu, `started_at` jen milisekundy, což je tvar z `new Date().toISOString()`.) Pauzy mezi sériemi jsou přitom normální — průměr 5,0 min, nejdelší 14,7 min. Dlouhé pauzy to nebyly.
+
+Řeší to `public.workout_origin()`:
+- `resumed_at` **vyplněné** → posun `started_at` je záměrný (vyřazuje čas mimo posilovnu), věř mu.
+- `resumed_at` **prázdné** → start nemá co být za první sérií; bere se nejstarší ze `started_at` / `created_at` / první série.
+
+Ověřeno, že to nerozbije legitimní resume: trénink vytvořený v 8:00, série 8:05–9:00, resume ve 14:00 (`started_at` 13:00), série do 14:30 → **90 min**, ne 390.
+
+### Kontrola běží při načtení, ne časovačem v prohlížeči
+Appka je zavřená přesně v tu chvíli, kdy by časovač měl spustit. Úklid je proto **jedno RPC** (`auto_finish_stale_workouts`) volané na začátku `load()` na `/trenink` i `/trenink/[id]`. Projde **všechny** běžící tréninky uživatele naráz — i ty, které nikdo neotevřel — a doběhne i po týdnu.
+
+Funkce je `SECURITY INVOKER`, takže ji RLS politika „own workouts" drží na vlastních řádcích; `SECURITY DEFINER` by tu byl zbytečná díra. Když migrace ještě neproběhla, RPC vrátí `PGRST202` a `lib/autoFinish.ts` ho **záměrně přejde mlčky** — jinak by při každém načtení stránky vyskočil červený toast. Jiné chyby se hlásí.
+
+### `resumed_at` — proč sloupec navíc
+Bez něj: trénink se auto-ukončí na 52 min → uživatel dá **Pokračovat** (`started_at` se posune zpět o 52 min) → nic nezapíše → další kontrola vidí jen staré série, spočítá zápornou délku, clamp na 1 min a **52 minut je pryč**. Návrat do tréninku je taky aktivita, takže se ukládá a počítá jako poslední aktivita.
+
+Poslední aktivita = `max(série.created_at)`, jinak `resumed_at`, jinak `started_at`. Série vzniká jako řádek až potvrzením, takže `created_at` série **je** okamžik potvrzení.
+
+**Známé omezení:** úprava už potvrzené série je UPDATE, který `created_at` nemění. Kdo 45 minut jen přepisuje staré série a žádnou novou nepotvrdí, tomu se trénink ukončí. Na to by byl potřeba další sloupec `updated_at` a nestojí to za to.
+
+### Ověřeno proti reálnému Postgresu
+8 scénářů přes `auto_finish_stale_workouts()`:
+
+| případ | výsledek |
+|---|---|
+| zapomenutý (start −5 h, poslední série −4 h) | 70 min (60 + rezerva), auto |
+| aktivní (série před 5 min) | nedotčeno |
+| nečinnost 44 min | nedotčeno (pod limitem) |
+| nečinnost 46 min | 54 min |
+| prázdný trénink bez série | 1 min (bez rezervy) |
+| **po Pokračovat bez nové série** | **52 min zůstalo** (bez rezervy) |
+| jen warm-up série | počítá se jako aktivita |
+| už ukončený (`duration_min` vyplněné) | nedotčeno |
+| **replika Legs 1. 8. (posunutý start)** | **308 → 140 min** |
+| **replika Push 8. 8.** | **545 → 117 min** |
+| legitimní resume (8:00 / 13:00 / 14:30) | 90 min, ne 390 |
+
+V prohlížeči na **1440 i 390**: značka AUTO v historii (desktop i mobil), oranžový pruh „Ukončeno automaticky" v detailu, hodiny na ukončeném tréninku stojí. Ověřeno i to, že `PGRST202` před spuštěním migrace stránku nerozbije.
+
+### Zpětný přepočet (0011)
+`supabase/queries/audit_long_workouts.sql` je **dry run** — vypíše tréninky nad 3 hodiny a nová čísla. Je to schválně **jeden dotaz**: Supabase SQL Editor ukazuje jen výsledek posledního příkazu ve skriptu, takže souhrn je poslední řádek téže tabulky, ne druhý select.
+
+Délku počítá na jednom jediném místě funkce **`workout_duration_estimate()`** (0010) — volá ji automatické ukončení, zpětný přepočet i dry run. Dry run tak nemůže ukázat jiné číslo, než jaké 0011 zapíše; ověřeno tím, že po spuštění 0011 sedí uložené hodnoty na `novy_min` z dry runu a druhý běh auditu už nenajde nic. Teprve pak se pouští `0011`, která je přepočítá stejným pravidlem. Pojistka `new < old`: přepočet má nafouknuté číslo srazit dolů, nikdy zvednout — kdo opravdu cvičil 3,5 h se sériemi přes celou dobu, o nic nepřijde.
+
+Audit nad reálnými daty (9. 8. 2026) našel dva tréninky: **8. 8. Push 545 → 117 min** a **1. 8. Legs 308 → 140 min**. Trénink 4. 8. Pull (125 min) je pod hranicí a nemění se.
+
+Pojistka `new < old` se v testu opravdu uplatnila: syntetický trénink uložený na 190 min by po přičtení rezervy vyšel na 200, takže zůstal nedotčený. Přepočet nikdy nenafoukne.
+
+### Délka se zobrazuje jako „1 h 57 min"
+`fmtDuration()` v `lib/gym.ts`: pod hodinu `47 min`, nad hodinu `1 h 57 min`, celé hodiny bez nuly (`2 h`, ne `2 h 0 min`). Použito v historii (mobil i desktop), v hlavičce ukončeného tréninku a v pruhu o automatickém ukončení. 15 jednotkových testů (hranice 59/60/61, celé hodiny, null/undefined/záporná hodnota → prázdný řetězec).
+
+**Živé stopky u běžícího tréninku zůstávají `mm:ss`** — během tréninku jsou vteřiny k něčemu, `1 h 30 min 12 s` by bylo horší. Přepíná se to až po ukončení, kdy je z toho délka, ne hodiny.
