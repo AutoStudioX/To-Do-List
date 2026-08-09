@@ -8,7 +8,8 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek, fmtDuration } from '@/lib/gym'
 import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
-import { Plus, Dumbbell, ChevronRight, Trash2, TrendingUp } from 'lucide-react'
+import ExportButton from '@/components/gym/ExportButton'
+import { Plus, Dumbbell, ChevronRight, Trash2, TrendingUp, MapPin } from 'lucide-react'
 
 type SetRow = { workout_id: string; exercise_id: string; weight_kg: number | null; reps: number | null; is_warmup: boolean; order_index: number }
 type Derived = { count: number; vol: number; summary: { name: string; set: string }[]; top: string; pr: boolean }
@@ -34,6 +35,7 @@ export default function TreninkPage() {
   const [split, setSplit] = useState<SplitType>('Push')
   const [customMode, setCustomMode] = useState(false)
   const [customName, setCustomName] = useState('')
+  const [otherGym, setOtherGym] = useState(false)
   const [starting, setStarting] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [filter, setFilter] = useState<'Vše' | SplitType>('Vše')
@@ -158,7 +160,7 @@ export default function TreninkPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setStarting(false); return }
-    const { data, error } = await supabase.from('workouts').insert({ user_id: user.id, split_type }).select().single()
+    const { data, error } = await supabase.from('workouts').insert({ user_id: user.id, split_type, other_gym: otherGym }).select().single()
     setStarting(false)
     if (error || !data) return
     router.push(`/trenink/${data.id}`)
@@ -229,6 +231,24 @@ export default function TreninkPage() {
           </div>
         </div>
       )}
+      {/* Jiná posilovna = jiné stroje a jiné váhy. Vypne porovnávání a takový
+          trénink se pak nepoužije jako referenční pro další. */}
+      <button
+        type="button"
+        onClick={() => setOtherGym(v => !v)}
+        aria-pressed={otherGym}
+        style={{
+          width: '100%', minHeight: 48, marginBottom: 12, padding: '0 12px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', touchAction: 'manipulation',
+          border: `1px solid ${otherGym ? '#7c3aed' : 'var(--border)'}`,
+          background: otherGym ? 'rgba(124,58,237,0.12)' : 'var(--input-bg)',
+          color: otherGym ? '#7c3aed' : 'var(--muted)',
+          fontSize: 14, fontWeight: 600, textAlign: 'left',
+        }}>
+        <MapPin size={17} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>Jiná posilovna</span>
+        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{otherGym ? 'bez porovnání' : 'vypnuto'}</span>
+      </button>
       <button onClick={startWorkout} disabled={starting || (customMode && !customName.trim())} style={{ width: '100%', minHeight: isMobile ? 60 : 52, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: isMobile ? 17 : 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', opacity: (starting || (customMode && !customName.trim())) ? 0.6 : 1 }}>
         <Plus size={20} /> {starting ? 'Zakládám…' : customMode ? 'Začít' : `Začít ${split}`}
       </button>
@@ -287,7 +307,10 @@ export default function TreninkPage() {
   const historyBlock = (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>HISTORIE</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>HISTORIE</span>
+          <ExportButton compact={isMobile} />
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['Vše', ...SPLITS] as const).map(f => {
             const active = filter === f
@@ -310,6 +333,9 @@ export default function TreninkPage() {
             const d = derived[w.id]
             // Délka je dopočítaná do poslední série, ne naměřená — ať je to na
             // řádku vidět, jinak číslo vypadá jako změřený čas.
+            const gymBadge = w.other_gym ? (
+              <span title="Jiná posilovna — nepoužívá se jako referenční trénink" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#7c3aed', border: '1px solid rgba(124,58,237,0.45)', borderRadius: 6, padding: '2px 5px', flexShrink: 0 }}><MapPin size={10} /> jiná</span>
+            ) : null
             const autoBadge = w.auto_finished ? (
               <span title={`Ukončeno automaticky po ${IDLE_LIMIT_MIN} min bez série — délka je do poslední série + ${TAIL_MIN} min na dokončení`} style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: '#d97706', border: '1px solid rgba(217,119,6,0.45)', borderRadius: 6, padding: '2px 5px', flexShrink: 0, textTransform: 'uppercase' }}>auto</span>
             ) : null
@@ -325,6 +351,7 @@ export default function TreninkPage() {
                         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)}</span>
                         {w.duration_min && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {fmtDuration(w.duration_min)}</span>}
                         {autoBadge}
+                        {gymBadge}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {d?.count ?? 0} sérií{d?.top ? ` · top: ${d.top}` : ''}
@@ -336,6 +363,7 @@ export default function TreninkPage() {
                       <div style={{ minWidth: 92, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${fmtDuration(w.duration_min)}` : ''}</span></div>
                         {autoBadge}
+                        {gymBadge}
                       </div>
                       {d && d.summary.length > 0 && (
                         <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

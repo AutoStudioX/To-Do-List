@@ -380,3 +380,33 @@ Zhoršení není chyba, je to fakt — proto šedě, nikdy červeně. Červená 
 `setBadge` a `maxPrevWeight` se přestěhovaly z komponenty do `lib/gym.ts`, aby šly testovat. 14 jednotkových testů včetně případu, který dřív hlásil „PR objem" (60 × 20 proti rampě 50/60/70) a teď správně hlásí `+10 rep`.
 
 Ověřeno na **1440 i 390** na reálných datech (Tlaky na ramena, minule 22,5/27,5/37,5): série 1 a 2 `+4,5 kg` zeleně, série 3 `-1,5 kg` šedě, série nad 37,5 `PR váha` červeně, karta **Vs. minule +29,1 %** a `MINULE · 1. 8.` s výpisem sérií.
+
+## Trénink — „Vs. minule" u rozdělaného cviku
+Karta srovnává **objem celého cviku**, takže rozpracovaný cvik byl v mínusu z principu — po první sérii ze tří hlásila −60 %, i když šlo všechno dobře.
+
+Procento se teď ukáže, až má cvik **stejně nebo víc pracovních sérií než minule**. Do té doby tlumené **`po dokončení`**. Ověřeno na 1440: 2 ze 3 sérií → `po dokončení`, 3 ze 3 → `+8,6 %`.
+
+## Trénink — příznak „do selhání" u série (migrace 0012)
+Boolean `workout_sets.to_failure`, default false. Přepínač ve stepper panelu **napravo od „Potvrdit sérii"**, plamínek zůstává vlevo — rozložení je symetrické `plamínek | Potvrdit sérii | blesk`. Stejná velikost i tvar jako plamínek (64×64 na mobilu, 52×52 na desktopu), ikona `Zap`; neaktivní neutrální, aktivní fialový. V seznamu sérií značka `⚡ do selhání` — stejně nenápadná jako `warm-up · nepočítá se`.
+
+**Do statistik, objemu ani PR odznaků zatím nevstupuje** — je to jen záznam. Fialová je schválně jiná než oranžová u warm-upu, ať se ty dva stavy nepletou.
+
+## Trénink — příznak „jiná posilovna" (migrace 0013)
+Boolean `workouts.other_gym`, default false. Přepínač v panelu zakládání tréninku (ikona `MapPin`, vypnuto/`bez porovnání`).
+
+Když je zapnutý, v tréninku se **neporovnává nic**: `previous` se vůbec nestaví, takže naráz zmizí odznaky u sérií, řádek „minule: …" i karta porovnání. Karta pokroku ukazuje jen dnešní čísla (řádek „Vs. minule" se nerenderuje) plus poznámku *Jiná posilovna — bez porovnání s minulem*. Vypnutá je i **rada** — navrhovat váhy na cizích strojích nedává smysl. V historii má takový trénink fialový odznak `jiná`.
+
+**A hlavně se nikdy nepoužije jako referenční trénink.** Filtr `other_gym = false` je na všech čtyřech místech, která hledají „minule": šablona pro „Načíst minulý trénink", per-cvik „minule" v `load()`, předvyplnění v `addExercise()` a historie pro radu. Migrace přidává částečný index přesně na tenhle dotaz.
+
+## Trénink — export dat (CSV + JSON)
+Nenápadné tlačítko vedle nadpisu HISTORIE (na mobilu jen ikona). Modál: rozsah **Vše / Poslední 3 měsíce / Poslední měsíc**, formát **CSV** nebo **JSON**.
+
+**Jedna plochá tabulka**, řádek na sérii, sloupce tréninku se opakují — vnořená struktura se nedá otevřít v Excelu ani vložit do chatu, a přesně k tomu export je. Sloupce: `datum, split, delka_min, jina_posilovna, auto_ukonceni, cvik, poradi_cviku, serie, vaha_kg, opakovani, warm_up, do_selhani, cas_zapisu`.
+
+Detaily, které nejsou samozřejmé:
+- **CSV má středník a BOM.** Česká verze Excelu čte čárku jako oddělovač desetin, takže s čárkou by se sloupce rozsypaly; bez BOM zobrazí háčky rozbitě. Čísla mají desetinnou čárku, aby s nimi Excel počítal.
+- **Warm-up se nečísluje** — sloupec `serie` je prázdný, takže filtr `serie = 1` vrátí první *pracovní* sérii.
+- **Trénink bez jediné série v exportu zůstane** jako řádek s prázdnými sloupci série; jinak by z přehledu zmizel.
+- Rozsah ošetřuje přetečení měsíce: 31. 5. − 3 měsíce je 28. 2., ne 3. 3.
+
+28 jednotkových testů na `lib/gymExport.ts`. Ověřeno v prohlížeči na **1440 i 390** proti reálným datům: CSV 80 řádků se správnou hlavičkou a `72,5` s čárkou, bajty souboru začínají `EF BB BF`, JSON je pole 13klíčových objektů, dotaz obsahuje `date=gte.2026-05-09`. Stahování se při ověřování odchytávalo, takže nic nespadlo do Downloads.

@@ -11,9 +11,9 @@ import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
 import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, setBadge, maxPrevWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
 import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
-import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Timer, Minus, RotateCcw, Dumbbell, X, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
+import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Zap, Timer, Minus, RotateCcw, Dumbbell, X, MapPin, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
-type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; confirmed: boolean; prefilled: boolean }
+type ActiveSet = { key: string; id: string | null; weight: number; reps: number; is_warmup: boolean; to_failure: boolean; confirmed: boolean; prefilled: boolean }
 type ActiveExercise = { exercise: Exercise; previous: { weight_kg: number | null; reps: number | null }[]; prevDate: string | null; sets: ActiveSet[] }
 type Template = { date: string | null; groups: { exercise: Exercise; sets: WorkoutSet[] }[] }
 
@@ -99,7 +99,7 @@ export default function ActiveWorkoutPage() {
     let template: WorkoutSet[] = []
     let templateDate: string | null = null
     if (w.split_type) {
-      const { data: prevW } = await supabase.from('workouts').select('id, date').eq('user_id', user.id).eq('split_type', w.split_type).neq('id', id).order('date', { ascending: false }).order('created_at', { ascending: false }).limit(1)
+      const { data: prevW } = await supabase.from('workouts').select('id, date').eq('user_id', user.id).eq('split_type', w.split_type).eq('other_gym', false).neq('id', id).order('date', { ascending: false }).order('created_at', { ascending: false }).limit(1)
       const prev = (prevW || [])[0]
       if (prev?.id) {
         templateDate = prev.date ?? null
@@ -138,11 +138,16 @@ export default function ActiveWorkoutPage() {
     // navíc opakují napříč splity (Tlaky na ramena jsou v Push i v Legs), takže
     // vázat porovnání na split je i věcně špatně.
     const prevByEx = new Map<string, { sets: { weight_kg: number | null; reps: number | null }[]; date: string | null }>()
-    if (order.length) {
+    // V jiné posilovně se neporovnává vůbec nic — prázdné `previous` shodí
+    // odznaky, řádek „minule:“ i kartu porovnání naráz.
+    if (order.length && !w.other_gym) {
       // Krok 1: ze kterého tréninku je pro každý cvik to „minule".
       const { data: stamps } = await supabase
         .from('workout_sets')
-        .select('exercise_id, workout_id, created_at')
+        // Trénink z jiné posilovny se jako referenční NEPOUŽIJE — jiné stroje,
+        // jiné váhy. Bere se poslední trénink bez toho příznaku.
+        .select('exercise_id, workout_id, created_at, workouts!inner(other_gym)')
+        .eq('workouts.other_gym', false)
         .in('exercise_id', order)
         .neq('workout_id', id)
         .order('created_at', { ascending: false })
@@ -177,7 +182,7 @@ export default function ActiveWorkoutPage() {
       const conf = confG.get(exId) || []
       // `order` vzniká jen z potvrzených sérií, takže `conf` nikdy není prázdné
       // — žádná náhradní prázdná série se sem nedoplňuje.
-      const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: true, prefilled: false }))
+      const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, to_failure: !!s.to_failure, confirmed: true, prefilled: false }))
       const p = prevByEx.get(exId)
       built.push({ exercise: ex, previous: p?.sets ?? [], prevDate: p?.date ?? null, sets })
     }
@@ -212,7 +217,7 @@ export default function ActiveWorkoutPage() {
   async function confirmSet(ex: number, set: number) {
     const it = items[ex]; const s = it?.sets[set]
     if (!it || !s) return
-    const payload = { workout_id: id, exercise_id: it.exercise.id, order_index: ex, weight_kg: s.weight, reps: s.reps, is_warmup: s.is_warmup }
+    const payload = { workout_id: id, exercise_id: it.exercise.id, order_index: ex, weight_kg: s.weight, reps: s.reps, is_warmup: s.is_warmup, to_failure: s.to_failure }
     if (s.confirmed && s.id) {
       await supabase.from('workout_sets').update(payload).eq('id', s.id)
       patchSet(ex, set, { prefilled: false })
@@ -259,7 +264,7 @@ export default function ActiveWorkoutPage() {
           key, id: null,
           weight: fromPrev ? Number(match.weight_kg) : (last?.weight ?? 20),
           reps: fromPrev ? (match.reps ?? last?.reps ?? 8) : (last?.reps ?? 8),
-          is_warmup: false, confirmed: false, prefilled: !!fromPrev,
+          is_warmup: false, to_failure: false, confirmed: false, prefilled: !!fromPrev,
         }],
       }
     }))
@@ -273,6 +278,16 @@ export default function ActiveWorkoutPage() {
     const nv = !s.is_warmup
     patchSet(ex, set, { is_warmup: nv })
     if (s.confirmed && s.id) await supabase.from('workout_sets').update({ is_warmup: nv }).eq('id', s.id)
+  }
+
+  // „Do selhání" je zatím JEN ZÁZNAM — nesahá na objem, na statistiky ani na
+  // odznaky. Až se nasbírají data, rozhodne se, co s ním.
+  async function toggleFailure(ex: number, set: number) {
+    const s = items[ex]?.sets[set]
+    if (!s) return
+    const nv = !s.to_failure
+    patchSet(ex, set, { to_failure: nv })
+    if (s.confirmed && s.id) await supabase.from('workout_sets').update({ to_failure: nv }).eq('id', s.id)
   }
 
   async function addExercise(ex: Exercise) {
@@ -293,10 +308,11 @@ export default function ActiveWorkoutPage() {
     let previous: { weight_kg: number | null; reps: number | null }[] = []
     let prevDate: string | null = null
     let seed = { weight: 20, reps: 8 }
-    if (session?.user) {
+    if (session?.user && !workout?.other_gym) {
       const { data: lastRow } = await supabase
         .from('workout_sets')
-        .select('workout_id, workouts!inner(user_id, date)')
+        .select('workout_id, workouts!inner(user_id, date, other_gym)')
+        .eq('workouts.other_gym', false)
         .eq('exercise_id', ex.id)
         .neq('workout_id', id)
         .order('created_at', { ascending: false })
@@ -321,7 +337,7 @@ export default function ActiveWorkoutPage() {
       }
     }
     setItems(prev => {
-      const next = [...prev, { exercise: ex, previous, prevDate, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, confirmed: false, prefilled: !!previous.length }] }]
+      const next = [...prev, { exercise: ex, previous, prevDate, sets: [{ key: newKey(), id: null, weight: seed.weight, reps: seed.reps, is_warmup: false, to_failure: false, confirmed: false, prefilled: !!previous.length }] }]
       setActiveIdx(next.length - 1)
       return next
     })
@@ -341,7 +357,7 @@ export default function ActiveWorkoutPage() {
       exercise: g.exercise,
       previous: g.sets.filter(s => !s.is_warmup).map(s => ({ weight_kg: s.weight_kg, reps: s.reps })),
       prevDate: tmpl.date,
-      sets: g.sets.map(s => ({ key: newKey(), id: null, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, confirmed: false, prefilled: true })),
+      sets: g.sets.map(s => ({ key: newKey(), id: null, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, to_failure: !!s.to_failure, confirmed: false, prefilled: true })),
     })))
     setActiveIdx(0)
   }
@@ -448,8 +464,15 @@ export default function ActiveWorkoutPage() {
     const todayVol = todaySets.reduce((sum, s) => sum + s.weight * s.reps, 0)
     const prevVol = active.previous.reduce((sum, p) => sum + (Number(p.weight_kg) || 0) * (p.reps || 0), 0)
     const oneRM = epley1RM(todaySets.map(s => ({ weight_kg: s.weight, reps: s.reps, is_warmup: false })))
-    const delta = prevVol > 0 && todayVol > 0 ? Math.round(((todayVol - prevVol) / prevVol) * 1000) / 10 : null
-    return { todayVol, oneRM, delta }
+    // „Vs. minule" srovnává OBJEM CELÉHO CVIKU, takže rozdělaný cvik je vždycky
+    // v mínusu — po první sérii ze tří to hlásilo −60 %, i když šlo všechno
+    // dobře. Procento se ukáže, až je sérií aspoň tolik jako minule; do té doby
+    // „po dokončení".
+    const comparable = prevVol > 0 && todaySets.length >= active.previous.length
+    const delta = comparable && todayVol > 0
+      ? Math.round(((todayVol - prevVol) / prevVol) * 1000) / 10
+      : null
+    return { todayVol, oneRM, delta, pendingCompare: prevVol > 0 && !comparable }
   }, [active])
 
   // Finished workouts show their saved length; the clock only runs while active.
@@ -465,12 +488,14 @@ export default function ActiveWorkoutPage() {
   // workout being logged. Read-only — nothing here ever writes.
   useEffect(() => {
     const ex = items[activeIdx]?.exercise
-    if (!ex) { setAdvice(null); return }
+    // Rada porovnává s historií a navrhuje váhy — na cizích strojích nesedí.
+    if (!ex || workout?.other_gym) { setAdvice(null); return }
     let alive = true
     ;(async () => {
       const { data } = await supabase
         .from('workout_sets')
-        .select('weight_kg, reps, is_warmup, workouts!inner(date)')
+        .select('weight_kg, reps, is_warmup, workouts!inner(date, other_gym)')
+        .eq('workouts.other_gym', false)
         .eq('exercise_id', ex.id)
         .neq('workout_id', id)
       if (!alive) return
@@ -485,7 +510,7 @@ export default function ActiveWorkoutPage() {
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIdx, items[activeIdx]?.exercise.id, targets, id])
+  }, [activeIdx, items[activeIdx]?.exercise.id, targets, id, workout?.other_gym])
 
   async function saveTarget(next: Target | null) {
     const ex = items[activeIdx]?.exercise
@@ -717,6 +742,7 @@ export default function ActiveWorkoutPage() {
                 <button onClick={() => { if (finished) return; setSelectedKey(s.key); setPanelOpen(true) }} disabled={finished} style={{ flex: 1, minWidth: 0, minHeight: 40, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: grey ? 'var(--muted)' : 'var(--text)', fontSize: 18, fontWeight: 700, touchAction: 'manipulation', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{fmtWeight(s.weight)} kg <span style={{ color: 'var(--muted)', fontWeight: 500 }}>×</span> {s.reps}</span>
                   {s.is_warmup && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>warm-up · nepočítá se</span>}
+                  {s.to_failure && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#7c3aed', fontWeight: 600 }}><Zap size={12} /> do selhání</span>}
                   {badge && <span style={{ fontSize: 11, color: badgeColor, fontWeight: 700 }}>{badge.text}</span>}
                 </button>
                 <button onClick={() => confirmSet(activeIdx, setIdx)} disabled={finished} aria-label="Potvrdit sérii" style={{
@@ -794,6 +820,10 @@ export default function ActiveWorkoutPage() {
         <button onClick={() => confirmSet(activeIdx, panelIdx)} style={{ flex: 1, minHeight: isMobile ? 64 : 52, background: '#E8192C', border: 'none', borderRadius: 14, color: '#fff', fontSize: 17, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(232, 25, 44,0.35)', touchAction: 'manipulation' }}>
           <Check size={22} /> Potvrdit sérii
         </button>
+        {/* „Do selhání" napravo od potvrzení — panel je pak symetrický:
+            plamínek | Potvrdit sérii | blesk. Fialová schválně jiná než
+            oranžová u warm-upu, ať se ty dva stavy nepletou. */}
+        <button onClick={() => toggleFailure(activeIdx, panelIdx)} aria-label="Série do selhání" title="Do selhání (zatím jen záznam)" style={{ width: isMobile ? 64 : 52, height: isMobile ? 64 : 52, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, border: `1px solid ${panelSet.to_failure ? '#7c3aed' : 'var(--border)'}`, background: panelSet.to_failure ? 'rgba(124,58,237,0.14)' : 'var(--input-bg)', color: panelSet.to_failure ? '#7c3aed' : 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation' }}><Zap size={22} /></button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
         <button onClick={() => deleteSet(activeIdx, panelIdx)} style={{ minHeight: 36, padding: '0 8px', background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>Smazat sérii</button>
@@ -827,16 +857,30 @@ export default function ActiveWorkoutPage() {
         <ExerciseSparkline exerciseId={active.exercise.id} />
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
-            { k: '1RM est.', v: exStats?.oneRM ? `${exStats.oneRM} kg` : '—', accent: false },
-            { k: 'Objem dnes', v: exStats?.todayVol ? fmtTonnage(exStats.todayVol) : '—', accent: false },
-            { k: 'Vs. minule', v: exStats?.delta == null ? '—' : `${exStats.delta >= 0 ? '+' : ''}${fmtWeight(exStats.delta)} %`, accent: (exStats?.delta ?? 0) > 0 },
+            { k: '1RM est.', v: exStats?.oneRM ? `${exStats.oneRM} kg` : '—', accent: false, muted: false },
+            { k: 'Objem dnes', v: exStats?.todayVol ? fmtTonnage(exStats.todayVol) : '—', accent: false, muted: false },
+            // V jiné posilovně se neporovnává — karta ukazuje jen dnešní čísla.
+            ...(workout.other_gym ? [] : [{
+              k: 'Vs. minule',
+              // Rozdělaný cvik se neporovnává — číslo by bylo záporné z principu.
+              v: exStats?.pendingCompare ? 'po dokončení'
+                : exStats?.delta == null ? '—'
+                : `${exStats.delta >= 0 ? '+' : ''}${fmtWeight(exStats.delta)} %`,
+              accent: (exStats?.delta ?? 0) > 0,
+              muted: !!exStats?.pendingCompare,
+            }]),
           ].map(r => (
-            <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: 'var(--muted)' }}>{r.k}</span>
-              <span style={{ fontWeight: 700, color: r.accent ? '#10b981' : 'var(--text)' }}>{r.v}</span>
+            <div key={r.k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+              <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{r.k}</span>
+              <span style={{ fontWeight: r.muted ? 400 : 700, color: r.accent ? '#10b981' : r.muted ? 'var(--muted)' : 'var(--text)', textAlign: 'right' }}>{r.v}</span>
             </div>
           ))}
         </div>
+        {workout.other_gym && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>
+            <MapPin size={12} style={{ flexShrink: 0 }} /> Jiná posilovna — bez porovnání s minulem.
+          </div>
+        )}
       </div>
 
       {/* Previous session for this exercise */}

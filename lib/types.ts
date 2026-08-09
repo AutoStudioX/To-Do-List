@@ -42,6 +42,8 @@ export interface Workout {
   duration_min: number | null
   /** clock origin; moved back on resume so the timer continues */
   started_at?: string | null
+  /** different gym = different machines; never used as a reference workout */
+  other_gym?: boolean
   /** true = length was derived from the last set, not measured (see migration 0010) */
   auto_finished?: boolean
   /** last "Pokračovat v tréninku"; counts as activity so a resume isn't lost */
@@ -58,6 +60,8 @@ export interface WorkoutSet {
   reps: number | null
   rpe: number | null
   is_warmup: boolean
+  /** taken to failure; record only — no stats or PR impact yet */
+  to_failure?: boolean
   created_at?: string
 }
 
