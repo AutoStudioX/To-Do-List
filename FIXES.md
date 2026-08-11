@@ -613,3 +613,12 @@ Návyk může mít místo jednoho času celý rozsah. Sloupec `cas_do` (time, nu
 **Řazení zůstává podle začátku.**
 
 Ověřeno vykreslené na **1440 i 390**: karty ukazují `6:30 – 7:00`, `7:30 – 8:00`, `12:00` a u návyku bez času nic; řazení podle začátku drží; v editoru je KONEC skrytý, dokud není zvolen začátek, a v modálu je nula prvků `input[type="time"]`. Migrace ověřena proti Postgresu — idempotence a check na konec bez začátku.
+
+## Habits — sjednocené tlačítko splnění u ano/ne i u cíle
+U návyku s cílem bylo tlačítko „hotovo" jiné než u ano/ne: **44×44 místo 88×56**, jiný radius a hlavně **nikdy se nerozsvítilo** — splněný cíl tak vypadal jako nesplněný.
+
+Obě varianty teď kreslí jedna funkce `checkBtn()`. Stejná velikost (desktop 88×56, mobil 56×48), stejný radius (14 / 13), stejná ikona a stejné stavy: nesplněno tlumeně s obrysem, **splněno červeně**. Tlačítko `+krok` zůstalo beze změny vedle.
+
+Chování je taky sjednocené — u splněného cíle tlačítko vrací hodnotu na nulu, stejně jako ano/ne odškrtne zpět. `aria-pressed` odpovídá stavu u obou typů.
+
+Ověřeno měřením na **1440 i 390** ve všech čtyřech kombinacích (ano/ne × cíl, splněno × nesplněno): shodných 88×56 / radius 14 na desktopu a 56×48 / radius 13 na mobilu, `rgb(232,25,44)` u obou splněných, nic nepřetéká.

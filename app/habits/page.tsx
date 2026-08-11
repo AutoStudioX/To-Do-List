@@ -241,21 +241,13 @@ export default function NavykyPage() {
 
     // Trénink se neodškrtává — místo tlačítka je statický indikátor bez
     // borderu a bez hoveru, aby nevypadal jako něco, na co se dá ťuknout.
-    const boolControl = ro ? (
-      <div
-        title="Doplňuje se z tréninkové sekce"
-        style={{
-          width: isMobile ? 56 : 88, height: isMobile ? 48 : 56, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius: isMobile ? 13 : 14, background: 'transparent',
-          color: done ? C.accent : C.muted, opacity: done ? 1 : 0.45,
-        }}>
-        <Check size={isMobile ? 20 : 24} />
-      </div>
-    ) : (
+    // Jedno tlačítko splnění pro ANO/NE i pro CÍL — stejná velikost, tvar
+    // i chování. U cíle se po splnění rozsvítí červeně stejně jako u ano/ne,
+    // dřív zůstávalo malé a šedé, takže splněný cíl vypadal nesplněně.
+    const checkBtn = (onClick: () => void, label: string) => (
       <button
-        onClick={() => toggle(h)}
-        aria-label={done ? `${h.nazev} — zrušit splnění` : `${h.nazev} — splnit`}
+        onClick={onClick}
+        aria-label={label}
         aria-pressed={done}
         style={{
           width: isMobile ? 56 : 88, height: isMobile ? 48 : 56, flexShrink: 0,
@@ -271,6 +263,22 @@ export default function NavykyPage() {
       </button>
     )
 
+    const boolControl = ro ? (
+      <div
+        title="Doplňuje se z tréninkové sekce"
+        style={{
+          width: isMobile ? 56 : 88, height: isMobile ? 48 : 56, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: isMobile ? 13 : 14, background: 'transparent',
+          color: done ? C.accent : C.muted, opacity: done ? 1 : 0.45,
+        }}>
+        <Check size={isMobile ? 20 : 24} />
+      </div>
+    ) : checkBtn(
+      () => toggle(h),
+      done ? `${h.nazev} — zrušit splnění` : `${h.nazev} — splnit`,
+    )
+
     const stepBtn = (
       <button onClick={() => addStep(h)} style={{
         height: 44, minWidth: isMobile ? undefined : 112, padding: isMobile ? '0 14px' : '0 18px',
@@ -280,12 +288,10 @@ export default function NavykyPage() {
         cursor: 'pointer', touchAction: 'manipulation',
       }}><Plus size={16} />+{fmtNum(Number(h.krok))} {h.jednotka}</button>
     )
-    const doneBtn = (
-      <button onClick={() => complete(h)} aria-label={`${h.nazev} — nastavit na cíl`} style={{
-        width: 44, height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1px solid ${C.border}`, background: C.sunken, color: C.muted,
-        borderRadius: isMobile ? 12 : 11, cursor: 'pointer', touchAction: 'manipulation',
-      }}><Check size={20} /></button>
+    // Splněný cíl se dá odškrtnout zpět na nulu, stejně jako ano/ne.
+    const doneBtn = checkBtn(
+      () => done ? write(h, 0, `${h.nazev} vynulováno`) : complete(h),
+      done ? `${h.nazev} — vynulovat` : `${h.nazev} — nastavit na cíl`,
     )
 
     if (isMobile) {
