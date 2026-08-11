@@ -622,3 +622,10 @@ Obě varianty teď kreslí jedna funkce `checkBtn()`. Stejná velikost (desktop 
 Chování je taky sjednocené — u splněného cíle tlačítko vrací hodnotu na nulu, stejně jako ano/ne odškrtne zpět. `aria-pressed` odpovídá stavu u obou typů.
 
 Ověřeno měřením na **1440 i 390** ve všech čtyřech kombinacích (ano/ne × cíl, splněno × nesplněno): shodných 88×56 / radius 14 na desktopu a 56×48 / radius 13 na mobilu, `rgb(232,25,44)` u obou splněných, nic nepřetéká.
+
+### Splněný cíl se neodškrtává omylem
+Tap na splněný cíl vracel hodnotu na nulu. U vody na 2500 ml by jedno ťuknutí smazalo celý den, takže je tlačítko ve splněném stavu **bez akce** (`disabled`, kurzor `default`) — barvu a tvar si drží. Ano/ne se dál přepíná normálně, tam není co ztratit.
+
+Snížit hodnotu jde **tapem na číslo** („1250 z 2000 ml" / „1250 ml"), který otevře stepper s libovolnou hodnotou včetně nuly. Bez toho by po zneaktivnění tlačítka nešla přepočítaná hodnota opravit vůbec.
+
+**Cestou opravena chyba:** tlačítko hodnoty bylo na mobilu vnořené uvnitř tlačítka, které otevírá detail. Vnořená tlačítka jsou neplatné HTML a tap na číslo probublal — místo editace se otevřel detail návyku. Navigační tlačítko teď obaluje jen název, hodnota je jeho sourozenec. Ověřeno: `button button` = 0 na obou šířkách.

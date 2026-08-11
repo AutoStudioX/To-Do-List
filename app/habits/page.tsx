@@ -6,6 +6,7 @@ import { Toast, useToast } from '@/components/Toast'
 import Modal from '@/components/Modal'
 import HabitIcon from '@/components/habits/HabitIcon'
 import HabitForm from '@/components/habits/HabitForm'
+import StepperField from '@/components/gym/StepperField'
 import { useConfirm } from '@/components/ConfirmDialog'
 import {
   metOn, ratio, streaks, dayWord, habitWord, lastDays, dayKey, dayStats,
@@ -42,6 +43,7 @@ export default function NavykyPage() {
   const [isMobile, setIsMobile] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Habit | null>(null)
+  const [editValue, setEditValue] = useState<{ habit: Habit; value: number } | null>(null)
   const [editMode, setEditMode] = useState(false)
   const { confirm, dialog } = useConfirm()
   const { toast, showToast, hideToast } = useToast()
@@ -212,6 +214,17 @@ export default function NavykyPage() {
     cursor: 'pointer', touchAction: 'manipulation',
   }
 
+  /** Tap na číslo otevře stepper — jediná cesta, jak jít s hodnotou dolů. */
+  function valueButton(h: Habit, text: string, style: React.CSSProperties) {
+    return (
+      <button
+        onClick={() => setEditValue({ habit: h, value: values[h.id] ?? 0 })}
+        aria-label={`${h.nazev} — upravit hodnotu`}
+        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', ...style }}
+      >{text}</button>
+    )
+  }
+
   function habitCard(h: Habit) {
     const v = values[h.id] ?? 0
     const done = metOn(h, v)
@@ -244,15 +257,17 @@ export default function NavykyPage() {
     // Jedno tlačítko splnění pro ANO/NE i pro CÍL — stejná velikost, tvar
     // i chování. U cíle se po splnění rozsvítí červeně stejně jako u ano/ne,
     // dřív zůstávalo malé a šedé, takže splněný cíl vypadal nesplněně.
-    const checkBtn = (onClick: () => void, label: string) => (
+    const checkBtn = (onClick: () => void, label: string, inert = false) => (
       <button
-        onClick={onClick}
+        onClick={inert ? undefined : onClick}
+        disabled={inert}
         aria-label={label}
         aria-pressed={done}
         style={{
+          cursor: inert ? 'default' : 'pointer',
           width: isMobile ? 56 : 88, height: isMobile ? 48 : 56, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius: isMobile ? 13 : 14, cursor: 'pointer', touchAction: 'manipulation',
+          borderRadius: isMobile ? 13 : 14, touchAction: 'manipulation',
           border: `1px solid ${done ? C.accent : C.border}`,
           background: done ? C.accent : C.sunken,
           color: done ? '#fff' : C.muted,
@@ -288,10 +303,12 @@ export default function NavykyPage() {
         cursor: 'pointer', touchAction: 'manipulation',
       }}><Plus size={16} />+{fmtNum(Number(h.krok))} {h.jednotka}</button>
     )
-    // Splněný cíl se dá odškrtnout zpět na nulu, stejně jako ano/ne.
+    // Splněný cíl je bez akce. Jedno ťuknutí u vody na 2500 ml by jinak
+    // smazalo celý den; snížit hodnotu jde přes tap na číslo.
     const doneBtn = checkBtn(
-      () => done ? write(h, 0, `${h.nazev} vynulováno`) : complete(h),
-      done ? `${h.nazev} — vynulovat` : `${h.nazev} — nastavit na cíl`,
+      () => complete(h),
+      done ? `${h.nazev} — splněno` : `${h.nazev} — nastavit na cíl`,
+      done,
     )
 
     if (isMobile) {
@@ -302,15 +319,22 @@ export default function NavykyPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {chip}
-            <button onClick={() => router.push(`/habits/${h.id}`)} style={{ flex: 1, minWidth: 0, minHeight: 44, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
-              <div style={{ fontSize: 15, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
-                {h.nazev}{h.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Navigační tlačítko obaluje jen název. Hodnota je vlastní
+                tlačítko a vnořená tlačítka jsou neplatné HTML — tap na číslo
+                dřív probublal a otevřel detail místo editace. */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <button onClick={() => router.push(`/habits/${h.id}`)} style={{ display: 'block', width: '100%', minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
+                  {h.nazev}{h.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
+                </div>
+              </button>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, minHeight: 20 }}>
                 {ro && <Link2 size={11} style={{ flexShrink: 0 }} />}
-                {h.typ === 'cil' ? `${fmtNum(v)} z ${fmtNum(Number(h.cil))} ${h.jednotka}` : h.podtitul}
+                {h.typ === 'cil'
+                  ? valueButton(h, `${fmtNum(v)} z ${fmtNum(Number(h.cil))} ${h.jednotka}`, { fontSize: 12, color: C.muted, minHeight: 20 })
+                  : h.podtitul}
               </div>
-            </button>
+            </div>
             {editMode ? editBar : (h.typ === 'bool' && boolControl)}
           </div>
           {h.typ === 'cil' && (
@@ -344,7 +368,7 @@ export default function NavykyPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <div style={{ width: 260 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-                <span style={{ fontSize: 18, fontWeight: 600, color: done ? C.accent : C.text }}>{fmtNum(v)} {h.jednotka}</span>
+                {valueButton(h, `${fmtNum(v)} ${h.jednotka}`, { fontSize: 18, fontWeight: 600, color: done ? C.accent : C.text })}
                 <span style={{ fontSize: 13, color: C.muted }}>z {fmtNum(Number(h.cil))} {h.jednotka}</span>
               </div>
               <div style={{ height: 8, borderRadius: 99, background: C.track, overflow: 'hidden' }}>
@@ -451,6 +475,36 @@ export default function NavykyPage() {
           fontSize: 15, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
         }}><Plus size={16} /> Přidat návyk</button>
       )}
+
+      <Modal isOpen={!!editValue} onClose={() => setEditValue(null)} title={editValue?.habit.nazev ?? ''}>
+        {editValue && (
+          <div>
+            <div style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+              Cíl {fmtNum(Number(editValue.habit.cil))} {editValue.habit.jednotka}. Nastav libovolnou hodnotu, i nulu.
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <StepperField
+                label={editValue.habit.jednotka ?? ''}
+                value={editValue.value}
+                step={Number(editValue.habit.krok ?? 1)}
+                min={0}
+                decimal
+                onChange={val => setEditValue(e => e && { ...e, value: val })}
+              />
+            </div>
+            <button
+              onClick={() => {
+                const { habit, value } = editValue
+                setEditValue(null)
+                write(habit, value, `${habit.nazev}: ${fmtNum(value)} ${habit.jednotka ?? ''}`.trim())
+              }}
+              style={{
+                width: '100%', minHeight: 52, background: C.accent, border: 'none', borderRadius: 12,
+                color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+              }}>Uložit</button>
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={!!editing} onClose={() => setEditing(null)} title={`Upravit — ${editing?.nazev ?? ''}`}>
         {editing && (
