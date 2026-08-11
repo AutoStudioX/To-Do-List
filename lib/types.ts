@@ -165,3 +165,31 @@ export interface Debt {
   status: 'splaceno' | 'nesplaceno'
   created_at: string
 }
+
+export interface Habit {
+  id: string
+  user_id: string
+  /** stable slug for the default set; NULL for user-created habits */
+  klic: string | null
+  nazev: string
+  podtitul: string | null
+  typ: 'bool' | 'cil'
+  cil: number | null
+  jednotka: string | null
+  krok: number | null
+  /** lucide component name */
+  ikona: string
+  poradi: number
+  /** 'trenink' = value is derived from `workouts`, never written here */
+  zdroj: 'rucne' | 'trenink'
+  archivovany: boolean
+  created_at?: string
+}
+
+export interface HabitEntry {
+  id: string
+  user_id: string
+  habit_id: string
+  datum: string
+  hodnota: number
+}

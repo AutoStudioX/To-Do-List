@@ -128,6 +128,10 @@ a:hover {
 
   /* Headings */
   h1 { font-size: 22px !important; }
+  /* Návyky mají velikosti H1 dané designem a liší se obrazovku od obrazovky
+     (Dnes 26px, Detail 20px). Třída přebije obecné `h1 !important` výš,
+     konkrétní hodnotu si stránka podstrčí přes --habits-h1. */
+  h1.habits-h1 { font-size: var(--habits-h1, 26px) !important; }
 
   /* Goal cards grid */
   .goal-grid { grid-template-columns: 1fr !important; }

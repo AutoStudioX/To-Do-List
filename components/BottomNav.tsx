@@ -1,12 +1,14 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, Dumbbell } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, Dumbbell, Crosshair, Flame } from 'lucide-react'
 
 const navItems = [
   { href: '/prehled', label: 'Přehled', icon: LayoutDashboard },
   { href: '/finance', label: 'Finance', icon: TrendingUp },
   { href: '/ukoly', label: 'Úkoly', icon: CheckSquare },
+  { href: '/focus', label: 'Focus', icon: Crosshair },
+  { href: '/navyky', label: 'Návyky', icon: Flame },
   { href: '/trenink', label: 'Trénink', icon: Dumbbell },
   { href: '/goaly', label: 'Goals', icon: Target },
 ]
@@ -24,13 +26,20 @@ export default function BottomNav() {
       {navItems.map(({ href, label, icon: Icon }) => {
         const isActive = pathname === href || pathname.startsWith(href + '/')
         return (
+          // Se sedmi položkami už `padding: 0 12px` na 390px přetékalo o 8 px
+          // a „Goals" se ořízlo. Položky se teď dělí o šířku rovným dílem
+          // a smrsknou se, místo aby vytlačily poslední z obrazovky.
           <Link key={href} href={href} style={{
+            flex: 1, minWidth: 0,
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            textDecoration: 'none', padding: '4px 12px',
+            textDecoration: 'none', padding: '4px 2px',
             color: isActive ? '#E8192C' : 'var(--muted)',
           }}>
             <Icon size={22} />
-            <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{label}</span>
+            <span style={{
+              fontSize: 10, fontWeight: isActive ? 600 : 400,
+              maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{label}</span>
           </Link>
         )
       })}

@@ -38,6 +38,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 | `/finance` | Income/expense/fixed costs, 6-month bar chart, 1M progress bar |
 | `/casovy-plan` | Weekly calendar grid (Mon-Sun, 06:00-22:00), colored time blocks |
 | `/trenink` | Gym: new workout (split Push/Pull/Legs, prefill from last same-split workout), 2-tap set logging, history + per-exercise max-weight chart |
+| `/focus` | Focus timer: goal + 25/45/60/90/custom, live countdown, self-set 0-100 % progress, pause/cancel/finish |
 | `/dluhy` | Debts split into "mine" / "owed to me", toggle status |
 | `/login` | Email + password auth |
 
@@ -287,4 +288,5 @@ Bez potvrzení uživatel neví, jestli se akce provedla. V této appce: `useToas
 - **Gym progression is judged on the TOP SET, not on every set.** The user ramps up (50/60/70), so sets 1–2 are a run-up the app does not evaluate: `targetMet()` needs enough working sets plus the target reps on the heaviest one, advice text says "top série: …", and the advice line renders under the heaviest row only. Prefilling a new exercise takes the FIRST working set of the last session (where the ramp started) — never the newest row, which is the ramp's peak — and `previous` must be in performed order, ascending, from one single past workout.
 - **A workout flagged `other_gym` is never a reference.** Different gym, different machines — every query that looks for "last time" (the split template, per-exercise previous, new-exercise prefill, advice history) filters `other_gym = false`. Inside such a workout nothing is compared at all: `previous` is left empty, which drops the set badges, the "minule:" line and the comparison card in one go, and advice is suppressed.
 - **`to_failure` on a set is a record only.** It must not feed volume, stats or PR badges until there is enough data to decide what it means.
+- **A running focus is computed from `started_at`, never from a browser countdown.** The interval only repaints; remaining time is always derived, so a focus survives closing the app or a sleeping phone. Pause needs `paused_at` + `paused_sec` — without them an overnight pause would "run" the focus to completion. A partial unique index allows at most one open focus per user. No stats or history by design (rows are kept, just not shown).
 - **Manual-% goals: steps are a checklist only.** For `typ === 'manual'` goals, progress comes from the slider (`goal.progress`), NOT from checking milestones. When such a goal has steps, show the note that ticking steps doesn't change the % (they're independent). Don't wire milestone completion into manual-% progress.

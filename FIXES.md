@@ -410,3 +410,105 @@ Detaily, které nejsou samozřejmé:
 - Rozsah ošetřuje přetečení měsíce: 31. 5. − 3 měsíce je 28. 2., ne 3. 3.
 
 28 jednotkových testů na `lib/gymExport.ts`. Ověřeno v prohlížeči na **1440 i 390** proti reálným datům: CSV 80 řádků se správnou hlavičkou a `72,5` s čárkou, bajty souboru začínají `EF BB BF`, JSON je pole 13klíčových objektů, dotaz obsahuje `date=gte.2026-05-09`. Stahování se při ověřování odchytávalo, takže nic nespadlo do Downloads.
+
+## Focus — časovač na soustředěnou práci (migrace 0014)
+Nová sekce `/focus`, v postranním menu i ve spodní navigaci (ikona `Crosshair`).
+
+### Založení
+Cíl jako text + čas jako button group **25 / 45 / 60 / 90** a **Vlastní** s číselným polem. Bez cíle je spuštění zablokované — focus bez cíle nedává smysl. Vlastní čas se ořezává na 1–480 minut, takže překlep typu `90000` skončí na 8 h, ne na nesmyslu v databázi.
+
+### Během běhu
+Nahoře cíl, pod ním velký odpočet, proužek uplynulého času a hlavní bar podle **vlastního progresu 0–100 %**. Progres jde měnit kdykoli — posuvníkem (krok 5 %) i tlačítky 0/25/50/75/100. Ukládá se s 500ms zpožděním, jinak by tažení posuvníkem poslalo desítky zápisů za vteřinu.
+
+**Proužek času** je 6 px a bere barvu z `--text` (0,6 opacity), ne z `--muted` — šedá na šedé se na tmavém pozadí prakticky ztrácela. Zůstává neutrální, aby si nekonkuroval s červeným barem progresu, který je ten hlavní.
+
+**Editace progresu je sbalená** pod tlačítkem „Upravit progres" se šipkou; hlavní bar je vidět pořád. Rozbaluje se animovaně přes `max-height` (`height: auto` se animovat nedá) a šipka se otáčí. Strop je 130 px, těsně nad skutečnou výškou obsahu (98 px na 390 i 1440) — se stropem 260 px animace „dojela" dřív, než skončila, a působila useknutě. Na finální obrazovce je ovládání otevřené rovnou, protože kvůli němu ta obrazovka je.
+
+Ovládání **Pauza / Zrušit / Hotovo**. Zrušení jde přes `useConfirm` s konkrétním předmětem, ne přes nativní `confirm()`.
+
+### Konec
+Dvojtón přes Web Audio (žádný soubor ke stažení, funguje offline) a systémové upozornění. O svolení k upozornění se říká **až při spuštění focusu**, protože mimo gesto uživatele ho prohlížeč zahodí; bez svolení zůstane zvuk a obrazovka.
+
+Pak přijde dotaz na finální stav splnění — **jen když progres není na 100 %**, tam už není co doplňovat a focus se zavře rovnou.
+
+### Přežití zavření
+**Zdroj pravdy je `started_at` v databázi, ne odpočet v prohlížeči.** Interval v komponentě jen překresluje číslo; kolik zbývá, se vždycky dopočítá z časů. Focus proto doběhne správně i po zavření appky nebo uspání telefonu — po otevření rovnou vyskočí obrazovka s dotazem na splnění.
+
+Pauza má vlastní sloupce `paused_at` + `paused_sec`. Bez nich by pauza přes noc focus „dopočítala" do konce; s nimi se v pauze čas zastaví a po návratu se dluh odečte.
+
+Unikátní částečný index drží **nejvýš jeden otevřený focus na uživatele**, takže dvojklik na Spustit nezaloží dva.
+
+### Co tam schválně není
+Žádné statistiky ani historie, podle zadání. Řádky se ale nemažou — uzavřené focusy jen zmizí z obrazovky, aby bylo z čeho stavět, až na to přijde řada.
+
+### Ověřeno
+29 jednotkových testů na `lib/focus.ts`: výpočet z času spuštění, zavřená appka na 3 hodiny → vypršelo (ne „zbývá 25 min"), pauza přes den focus nedožene, dluh z pauzy, formáty hodin, ořezy vstupů, kdy se ptát na finální stav.
+
+Migrace ověřená proti reálnému Postgresu: dvakrát po sobě (idempotence), druhý aktivní focus spadne na `focus_one_active_idx`, po uzavření prvního další projde, `progress=150` i `duration_min=999` narazí na check constraint, RLS zapnutá s politikou `own focus`.
+
+V prohlížeči na **1440 i 390**, ve světlém i tmavém režimu: zakládání (výchozí 25 min, vlastní čas 90000 → 8 h), běžící focus (hodiny tikají, tlačítka i posuvník mění bar), pauza (hodiny stojí na 41:00, tlačítko se mění na Pokračovat), finální obrazovka s dotazem. Spodní navigace uveze šest položek po 48 px, stránka nikde nepřetéká.
+
+⚠️ **Spusť `supabase/migrations/0014_focus_sessions.sql`** — bez ní se focus nezaloží.
+
+## Návyky — krok 1: data (migrace 0015)
+Nová sekce podle design balíčku *Habit Tracker*. Postupuje se po krocích: data → obrazovka Dnes → Přehled a Detail.
+
+**`habits`**: `nazev`, `podtitul`, `typ` (`bool`/`cil`), `cil`, `jednotka`, `krok`, `ikona` (název lucide), `poradi`, `zdroj`, `archivovany`. **`habit_entries`**: `habit_id`, `datum`, `hodnota`, unikát na `(habit_id, datum)`.
+
+Tři sloupce nad rámec zadání a proč:
+- **`podtitul`** — design má pod názvem druhý řádek („Ráno i večer"), jinak by se zadrátoval do kódu.
+- **`klic`** — stabilní slug výchozí sady. Podle jména to nejde: uživatel si návyk přejmenuje a znovunaplnění sady i hledání „tréninku" se rozbije.
+- **`zdroj`** (`rucne` / `trenink`) — dělá návyk read-only.
+
+Check hlídá, že návyk s cílem má `cil` i `krok` — bez nich by nešel vyhodnotit ani inkrementovat.
+
+**Napojení na trénink čtením, ne zápisem.** Pro `zdroj = 'trenink'` se do `habit_entries` nezapisuje nic; `trainingValues()` jen přečte, které dny mají trénink v `workouts`. Žádný trigger, žádná synchronizace, jediná pravda je trénink sám.
+
+**Odvozená data se neukládají** — série, procenta, sytosti i úspěšnost počítá `lib/habits.ts` za běhu podle README. Dvě vědomé odchylky od prototypu: `dayLevel` má dělitel = počet návyků (prototyp měl natvrdo `/5`, s šestým návykem by se sytost rozjela) a `dayKey` používá místní čas (`toISOString()` by po 22:00 zapsal návyk na zítřek).
+
+Zachováno naopak přesně: `streaks().cur` se počítá od předposledního dne dozadu a dnešek se přičte až nakonec — rozdělané ráno sérii nesrazí, teprve zítra.
+
+43 testů na `lib/habits.ts`, migrace ověřená proti reálnému Postgresu (idempotence, všechny checky, cascade delete, RLS).
+
+## Návyky — krok 2: obrazovka Dnes
+Route `/navyky`, položka v postranním menu i ve spodní navigaci (ikona `Flame`).
+
+**Rozměry, rozestupy a radiusy přesně z designu; barvy přes proměnné appky** (`--card`, `--border`, `--accent`, …), aby sekce držela s motivem a fungovala i ve světlém režimu. Fonty zůstávají projektové (Geist), Space Grotesk a DM Sans se nepřidávaly.
+
+Navigační chrome z prototypu (vlastní sidebar a tab bar) se **nepřebíral** — appka má svoji navigaci, jinak by byly dvě přes sebe.
+
+Ověřeno měřením proti README na 1440: karta `min-height 88`, `padding 18/22`, `radius 14`, `gap 20`, seznam `gap 10`, chip `44×44/12`, bool tlačítko `88×56/14`, cílový blok `260`, krok `h44/minW112/r11`, check `44×44/11`, H1 34px, datum 13px `.1em` uppercase, bar hlavičky `180×8/99`, hint `16/22` dashed. Na 390: karta `14/16`, `gap 8`, bool `56×48/13`, krok `h44/0 14/r12`, check `44×44/12`, název 15px, podtitul 12px (u cílů „1250 z 2000 ml"), Přidat návyk `h46/r12`.
+
+**Trénink** nemá na kartě žádné tlačítko (ověřeno: `0` tlačítek) — jen statický indikátor a ikona `Link2` u podtitulu „Doplní se sám z tréninků".
+
+**Opraveno oproti prototypu:** hint psal „Splň ještě 1 návyky". Doplněno skloňování `habitWord()` — 1 → návyk, 2–4 → návyky, 5+ → návyků.
+
+**Dvě věci, které si vyžádaly zásah mimo sekci:**
+1. Globální `h1 { font-size: 22px !important }` v mobilním media query přebíjelo inline 26px z designu. Přidána třída `h1.habits-h1` s `!important` (stejný trik jako u `.stepper-input`).
+2. Sedmá položka spodní navigace přetékala o 8 px a ořezávala „Goals". Položky teď mají `flex: 1`, `min-width: 0` a `padding 0 2px` — sedm položek po 56 px se vejde přesně do 390.
+
+## Návyky — krok 3: Přehled a Detail
+Route `/navyky/prehled` a `/navyky/[id]`. Rozměry z designu, barvy přes proměnné appky.
+
+**Přehled** — přepínač 7 / 30 / Rok (`padding 5`, `radius 12`, tlačítka `h44/0 22/r9`), karta mřížky (`28 30`, `radius 16`), dlaždice `repeat(4,1fr)` `min-height 150`.
+- **Rok** = contribution graph `53 × 13px`, `gap 4`, `radius 3`, vlevo popisky Po/St/Pá
+- **7 / 30 dní** = matice `230px 1fr 64px`, `gap 16`; buňky `radius 5`, `gap 8` / `6`, u 7 dní výška `44px`, u 30 `aspect-ratio 1`; skóre barevně podle plnění (≥80 % akcent, ≥50 % text, jinak tlumeně); dole **Souhrn dne** za `border-top`
+- mobil: přepínač `flex 1`, matice `26px 1fr 38px`, buňky `radius 6`/`1` a `gap 6`/`1`, rok `5px`/`gap 1`, dlaždice 2×2 `min-height 118`
+
+**Detail** — hlavička `44` zpět + `52` chip + H1 30px + pill `{n} dní v řadě`; 4 dlaždice (`18 20`, `radius 14`); „Rok po dnech" se sytostí podle plnění **tohoto** návyku; „Posledních 14 dní" se škálováním **k maximu v okně, ne k cíli**, u ano/ne mají nesplněné sloupce 28 % výšky.
+
+### Odchylky od prototypu — vědomé
+- **Série v detailu sjednocena s Přehledem.** Prototyp počítal zpětně včetně dneška a lámal se hned, takže návyk nesplněný dnes ukazoval „0 dní v řadě" i s týdnem za sebou. `habitStreaks()` teď jede přes stejný `streaks()` jako Přehled — rozdělaný dnešek sérii nesrazí.
+- **„letos na jaře" nahrazeno skutečným obdobím.** `longestStreakSpan()` najde, kde nejdelší série ležela, `fmtMonthSpan()` z toho udělá „duben – květen".
+- **Odsazení roční mřížky se počítá.** Prototyp má natvrdo 6 prázdných buněk; `yearGridOffset()` bere skutečný den v týdnu prvního dne okna, jinak by mřížka seděla na špatných řádcích.
+- **Popisky dnů u 7denní matice jsou skutečné dny okna** (St–Út), ne fixní Po–Ne.
+- **Tlačítko nastavení otevírá úpravu návyku** (název, podtitul, typ, cíl/jednotka/krok, ikona) + archivaci. Návyk „trénink" archivaci nenabízí — bez něj by zmizel návyk, ale tréninky ne. Archivace místo mazání, historie v `habit_entries` zůstává.
+- **Přepínač návyků je vodorovný pás chipů**, protože sidebar z designu nepřebíráme.
+
+### Chyby nalezené při ověřování
+1. **Graf 14 dní byl prázdný.** Sloupce měly `height: 100%` proti řádku s `align-items: flex-end`, takže se procentní výška neměla oč opřít a spadla na nulu (naměřeno: řádek 133 px, sloupec 0 px). Řádek teď nechává výchozí `stretch` a zarovnává se uvnitř sloupce.
+2. **H1 v Detailu mělo na mobilu 26 px místo 20.** Třída `habits-h1` z kroku 2 měla velikost natvrdo; teď bere `var(--habits-h1)`, kterou si každá obrazovka nastaví sama.
+
+12 nových testů (série návyku, období nejdelší série, odsazení mřížky, barva skóre) — celkem **55** na `lib/habits.ts`.
+
+Ověřeno měřením na **1440 i 390** ve všech třech rozsazích: přepínač, matice, roční mřížka, dlaždice, hlavička detailu, pill, graf i mini mřížka sedí na hodnoty z README; nic nepřetéká a všechny tap targety jsou ≥ 44 px.

@@ -1,0 +1,152 @@
+'use client'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { isReadOnly, type Habit } from '@/lib/habits'
+import HabitIcon, { ICON_CHOICES } from './HabitIcon'
+import { Check, Archive } from 'lucide-react'
+
+/**
+ * Nový návyk. Typ i ikona jsou button groupy, ne dropdowny — pravidlo projektu
+ * pro pole s malým počtem voleb.
+ */
+export default function HabitForm({
+  habit, poradi, onDone, onError, onArchived,
+}: {
+  /** vyplněné = úprava, prázdné = nový návyk */
+  habit?: Habit
+  poradi: number
+  onDone: (msg: string) => void
+  onError: (msg: string) => void
+  onArchived?: (msg: string) => void
+}) {
+  const edit = !!habit
+  const [nazev, setNazev] = useState(habit?.nazev ?? '')
+  const [podtitul, setPodtitul] = useState(habit?.podtitul ?? '')
+  const [typ, setTyp] = useState<'bool' | 'cil'>(habit?.typ ?? 'bool')
+  const [cil, setCil] = useState(habit?.cil != null ? String(habit.cil) : '2000')
+  const [jednotka, setJednotka] = useState(habit?.jednotka ?? 'ml')
+  const [krok, setKrok] = useState(habit?.krok != null ? String(habit.krok) : '250')
+  const [ikona, setIkona] = useState<string>(habit?.ikona ?? 'circle')
+  const [saving, setSaving] = useState(false)
+  const { confirm, dialog } = useConfirm()
+
+  const cilNum = Number(cil.replace(',', '.'))
+  const krokNum = Number(krok.replace(',', '.'))
+  const cilOk = typ === 'bool' || (cilNum > 0 && krokNum > 0 && jednotka.trim().length > 0)
+  const canSave = nazev.trim().length > 0 && cilOk && !saving
+
+  async function save() {
+    if (!canSave) return
+    setSaving(true)
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setSaving(false); onError('Nejsi přihlášený'); return }
+    const payload = {
+      nazev: nazev.trim(),
+      podtitul: podtitul.trim() || null,
+      typ,
+      cil: typ === 'cil' ? cilNum : null,
+      jednotka: typ === 'cil' ? jednotka.trim() : null,
+      krok: typ === 'cil' ? krokNum : null,
+      ikona,
+    }
+    const { error } = edit
+      ? await supabase.from('habits').update(payload).eq('id', habit!.id)
+      : await supabase.from('habits').insert({ ...payload, user_id: user.id, poradi })
+    setSaving(false)
+    if (error) { onError(`${edit ? 'Uložení' : 'Založení'} selhalo: ${error.message}`); return }
+    onDone(`Návyk „${nazev.trim()}" ${edit ? 'upraven' : 'založen'}`)
+  }
+
+  /** Archivace místo mazání — historie v `habit_entries` má zůstat. */
+  async function archive() {
+    if (!habit) return
+    if (!await confirm(`Archivovat návyk „${habit.nazev}"? Zmizí ze seznamu, historie zůstane.`, 'Archivovat')) return
+    const supabase = createClient()
+    const { error } = await supabase.from('habits').update({ archivovany: true }).eq('id', habit.id)
+    if (error) { onError(`Archivace selhala: ${error.message}`); return }
+    onArchived?.(`Návyk „${habit.nazev}" archivován`)
+  }
+
+  const label = (t: string) => (
+    <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>{t}</div>
+  )
+  const input: React.CSSProperties = {
+    width: '100%', minHeight: 48, padding: '0 14px', borderRadius: 12,
+    border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)',
+    fontSize: 16, boxSizing: 'border-box',
+  }
+
+  return (
+    <div>
+      {label('NÁZEV')}
+      <input value={nazev} onChange={e => setNazev(e.target.value)} placeholder="Např. Čtení" maxLength={80} style={{ ...input, marginBottom: 16 }} />
+
+      {label('PODTITUL (nepovinný)')}
+      <input value={podtitul} onChange={e => setPodtitul(e.target.value)} placeholder="Např. 20 stran denně" maxLength={120} style={{ ...input, marginBottom: 16 }} />
+
+      {label('TYP')}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+        {([['bool', 'Ano / ne'], ['cil', 'S cílem']] as const).map(([v, t]) => (
+          <button key={v} onClick={() => setTyp(v)} style={{
+            minHeight: 48, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
+            border: `1px solid ${typ === v ? 'var(--accent)' : 'var(--border)'}`,
+            background: typ === v ? 'var(--accent)' : 'var(--input-bg)',
+            color: typ === v ? '#fff' : 'var(--text)',
+          }}>{t}</button>
+        ))}
+      </div>
+
+      {typ === 'cil' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+          <div>
+            {label('CÍL')}
+            <input value={cil} onChange={e => setCil(e.target.value)} inputMode="decimal" style={input} />
+          </div>
+          <div>
+            {label('JEDNOTKA')}
+            <input value={jednotka} onChange={e => setJednotka(e.target.value)} maxLength={12} style={input} />
+          </div>
+          <div>
+            {label('KROK')}
+            <input value={krok} onChange={e => setKrok(e.target.value)} inputMode="decimal" style={input} />
+          </div>
+        </div>
+      )}
+
+      {label('IKONA')}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, minmax(0,1fr))', gap: 6, marginBottom: 20 }}>
+        {ICON_CHOICES.map(n => {
+          const on = ikona === n
+          return (
+            <button key={n} onClick={() => setIkona(n)} aria-label={n} style={{
+              height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', touchAction: 'manipulation',
+              border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+              background: on ? 'rgba(232,25,44,0.12)' : 'var(--input-bg)',
+              color: on ? 'var(--accent)' : 'var(--muted)',
+            }}><HabitIcon name={n} size={18} /></button>
+          )
+        })}
+      </div>
+
+      <button onClick={save} disabled={!canSave} style={{
+        width: '100%', minHeight: 52, background: 'var(--accent)', border: 'none', borderRadius: 12,
+        color: '#fff', fontSize: 16, fontWeight: 700, cursor: canSave ? 'pointer' : 'default',
+        opacity: canSave ? 1 : 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      }}><Check size={18} /> {saving ? 'Ukládám…' : edit ? 'Uložit změny' : 'Založit návyk'}</button>
+
+      {/* Trénink se archivovat nedá — bez něj by návyk zmizel, ale tréninky ne. */}
+      {edit && !isReadOnly(habit!) && (
+        <button onClick={archive} style={{
+          width: '100%', minHeight: 44, marginTop: 10, background: 'transparent', border: 'none',
+          color: 'var(--muted)', fontSize: 13, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}><Archive size={15} /> Archivovat návyk</button>
+      )}
+      {dialog}
+    </div>
+  )
+}

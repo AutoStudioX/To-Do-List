@@ -1,0 +1,202 @@
+// Návyky — odvozená data.
+//
+// NIC Z TOHOTO SE NEUKLÁDÁ. Série, procenta, sytosti i úspěšnost se počítají
+// za běhu z `habit_entries` podle README (sekce State Management). Uložená
+// derivace by se rozešla s daty při první ruční opravě záznamu.
+
+export type HabitType = 'bool' | 'cil'
+export type HabitSource = 'rucne' | 'trenink'
+
+export type Habit = {
+  id: string
+  klic: string | null
+  nazev: string
+  podtitul: string | null
+  typ: HabitType
+  cil: number | null
+  jednotka: string | null
+  krok: number | null
+  ikona: string
+  poradi: number
+  zdroj: HabitSource
+  archivovany: boolean
+}
+
+/** „Splněný den" pro série a souhrn = aspoň tolik splněných návyků (README). */
+export const DAY_DONE_THRESHOLD = 4
+
+/** Sytost mřížky 0→4. */
+export const LEVEL_COLORS = ['#1C1D21', '#4A1A1D', '#7A2126', '#B02A30', '#E5484D'] as const
+
+export const DAY_LABELS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'] as const
+
+/** 1 → „den", 2–4 → „dny", jinak „dní". */
+export function dayWord(n: number): string {
+  return n === 1 ? 'den' : (n >= 2 && n <= 4 ? 'dny' : 'dní')
+}
+
+/**
+ * 1 → „návyk", 2–4 → „návyky", jinak „návyků".
+ *
+ * Prototyp má v hintu natvrdo „Splň ještě {k} návyky", takže při k=1 psal
+ * „Splň ještě 1 návyky". README skloňování řeší u dnů, ale u návyků na to
+ * zapomněl.
+ */
+export function habitWord(n: number): string {
+  return n === 1 ? 'návyk' : (n >= 2 && n <= 4 ? 'návyky' : 'návyků')
+}
+
+export function metOn(h: Pick<Habit, 'typ' | 'cil'>, v: number): boolean {
+  return h.typ === 'bool' ? v >= 1 : v >= (h.cil ?? Infinity)
+}
+
+export function ratio(h: Pick<Habit, 'typ' | 'cil'>, v: number): number {
+  if (h.typ === 'bool') return v >= 1 ? 1 : 0
+  const cil = h.cil ?? 0
+  return cil > 0 ? Math.min(1, v / cil) : 0
+}
+
+export function level(r: number): 0 | 1 | 2 | 3 | 4 {
+  return r >= 1 ? 4 : r >= 0.75 ? 3 : r >= 0.5 ? 2 : r > 0 ? 1 : 0
+}
+
+/**
+ * Sytost souhrnného řádku dne: podíl splněných návyků přepočtený na 0–4.
+ * Prototyp má dělitel natvrdo 5 (tolik měl návyků) — tady je to počet návyků,
+ * aby to sedělo i po přidání dalšího.
+ */
+export function dayLevel(count: number, habitCount: number): 0 | 1 | 2 | 3 | 4 {
+  if (count <= 0 || habitCount <= 0) return 0
+  return Math.max(1, Math.round(count / habitCount * 4)) as 1 | 2 | 3 | 4
+}
+
+/**
+ * Série z denních počtů (nejstarší → nejnovější).
+ *
+ * `cur` se schválně počítá od PŘEDPOSLEDNÍHO dne dozadu a dnešek se přičte až
+ * nakonec — den, který ještě neskončil, tak sérii nesrazí. Nesplněné dnešní
+ * ráno neznamená, že o sérii přicházíš; teprve zítra.
+ */
+export function streaks(counts: number[]): { cur: number; longest: number } {
+  const ok = counts.map(c => c >= DAY_DONE_THRESHOLD)
+  let longest = 0, run = 0
+  for (const v of ok) { run = v ? run + 1 : 0; if (run > longest) longest = run }
+  let cur = 0
+  for (let i = ok.length - 2; i >= 0; i--) { if (ok[i]) cur++; else break }
+  if (ok[ok.length - 1]) cur++
+  return { cur, longest }
+}
+
+/** Kolik návyků bylo splněno v každém dni okna. */
+export function dayCounts(habits: Habit[], valuesByDay: Record<string, number>[]): number[] {
+  return valuesByDay.map(vals => habits.reduce((c, h) => c + (metOn(h, vals[h.id] ?? 0) ? 1 : 0), 0))
+}
+
+/** Úspěšnost návyku v okně: podíl dnů, kdy byl splněn. */
+export function successRate(h: Habit, values: number[]): number {
+  if (!values.length) return 0
+  return values.filter(v => metOn(h, v)).length / values.length
+}
+
+/** Nejslabší návyk okna. Návyky bez historie se neposuzují. */
+export function weakestHabit(habits: Habit[], valuesByHabit: Record<string, number[]>): { habit: Habit; rate: number } | null {
+  let best: { habit: Habit; rate: number } | null = null
+  for (const h of habits) {
+    const vals = valuesByHabit[h.id]
+    if (!vals?.length) continue
+    const rate = successRate(h, vals)
+    if (!best || rate < best.rate) best = { habit: h, rate }
+  }
+  return best
+}
+
+// ---- Datum ----
+
+/** `2026-08-11` v místním čase. `toISOString()` by u večerních hodin ujel o den. */
+export function dayKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** Klíče posledních `n` dnů, nejstarší → dnešek. */
+export function lastDays(n: number, today = new Date()): string[] {
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const out: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(base)
+    d.setDate(d.getDate() - i)
+    out.push(dayKey(d))
+  }
+  return out
+}
+
+/** Po=0 … Ne=6 (README má popisky Po–Ne). */
+export function weekdayIndex(key: string): number {
+  const [y, m, d] = key.split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
+}
+
+// ---- Návyk napojený na trénink ----
+
+/**
+ * Hodnoty návyku „trénink" se NEČTOU z `habit_entries` — dopočítají se z dnů,
+ * kdy existuje trénink. Čtení, ne zápis: jediná pravda je trénink sám, takže
+ * se nemá co rozejít a nic se nemusí synchronizovat.
+ */
+export function trainingValues(days: string[], workoutDates: Set<string>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const d of days) out[d] = workoutDates.has(d) ? 1 : 0
+  return out
+}
+
+/** Návyk, na který se v UI nedá ťuknout — hodnota je odjinud. */
+export function isReadOnly(h: Pick<Habit, 'zdroj'>): boolean {
+  return h.zdroj !== 'rucne'
+}
+
+/**
+ * Série jednoho návyku. Schválně jede přes `streaks()` na převedeném poli,
+ * aby platilo TOTÉŽ pravidlo jako v Přehledu — včetně toho, že rozdělaný
+ * dnešek sérii nesrazí. Prototyp měl v detailu vlastní počítání, které se
+ * lámalo hned na dnešku, a návyk s týdnem za sebou ukazoval „0 dní v řadě".
+ */
+export function habitStreaks(h: Pick<Habit, 'typ' | 'cil'>, values: number[]): { cur: number; longest: number } {
+  return streaks(values.map(v => (metOn(h, v) ? DAY_DONE_THRESHOLD : 0)))
+}
+
+/** Kde nejdelší série ležela — kvůli notě „duben – květen" místo natvrdo psaného textu. */
+export function longestStreakSpan(counts: number[], days: string[]): { length: number; from: string; to: string } | null {
+  let best = 0, bestEnd = -1, run = 0
+  counts.forEach((c, i) => {
+    run = c >= DAY_DONE_THRESHOLD ? run + 1 : 0
+    if (run > best) { best = run; bestEnd = i }
+  })
+  if (!best || bestEnd < 0) return null
+  return { length: best, from: days[bestEnd - best + 1], to: days[bestEnd] }
+}
+
+const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec']
+
+/** „duben – květen" / „srpen" — nota k nejdelší sérii. */
+export function fmtMonthSpan(from: string, to: string): string {
+  const a = MONTHS[Number(from.slice(5, 7)) - 1]
+  const b = MONTHS[Number(to.slice(5, 7)) - 1]
+  return a === b ? a : `${a} – ${b}`
+}
+
+/**
+ * Kolik prázdných buněk předchází prvnímu dni v roční mřížce.
+ * Prototyp má natvrdo 6 (sedělo to na jeho generovaná data) — u reálných dat
+ * to musí vyjít ze skutečného dne v týdnu, jinak mřížka sedí na špatné řádky.
+ */
+export function yearGridOffset(firstDay: string): number {
+  return weekdayIndex(firstDay)
+}
+
+/** Barva skóre v matici: ≥80 % akcent, ≥50 % běžný text, jinak tlumeně. */
+export function scoreTone(hit: number, total: number): 'accent' | 'text' | 'muted' {
+  if (!total) return 'muted'
+  const r = hit / total
+  return r >= 0.8 ? 'accent' : r >= 0.5 ? 'text' : 'muted'
+}
