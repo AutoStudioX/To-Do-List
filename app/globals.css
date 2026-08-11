@@ -83,6 +83,12 @@ a:hover {
   opacity: 0.75;
 }
 
+/* Vodorovné pásy (chipy, mřížky) mají scrollovat, ale bez viditelné lišty —
+   na macOS s „Show scroll bars: Always" překrývá obsah tlustým pruhem.
+   Scrollování myší i tahem zůstává. */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Mobile helpers */
 .bottom-nav { display: none; }
 .mobile-only { display: none !important; }

@@ -1,59 +1,63 @@
 'use client'
 import { useState } from 'react'
+import StepperField from '@/components/gym/StepperField'
 
-// Optional time-of-day picker for a task deadline. Value is 'HH:MM' or '' (no time).
-// Pill quick-choices + a "Vlastní čas" toggle revealing a native time input.
+// Volitelný čas 'HH:MM' nebo '' (bez času).
+//
+// ŽÁDNÝ `input type="time"`. Nativní výběr času vypadá jako cizí prvek —
+// světlý panel se systémovým chrome, který ignoruje tmavý motiv a na každé
+// platformě vypadá jinak. Rychlé volby jsou pilulky, vlastní čas dva steppery.
 const QUICK = [
-  { value: '08:00', label: 'Ráno 8:00' },
-  { value: '12:00', label: 'Poledne 12:00' },
-  { value: '15:00', label: 'Odpoledne 15:00' },
-  { value: '18:00', label: 'Večer 18:00' },
+  { value: '06:30', label: '6:30' },
+  { value: '08:00', label: '8:00' },
+  { value: '12:00', label: '12:00' },
+  { value: '18:00', label: '18:00' },
 ]
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const clamp = (v: number, max: number) => Math.min(max, Math.max(0, Math.round(v)))
 
 export default function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const norm = (value || '').slice(0, 5)
   const isQuick = QUICK.some(q => q.value === norm)
   const [custom, setCustom] = useState(norm !== '' && !isQuick)
 
-  const pill = (key: string, label: string, active: boolean, onClick: () => void): React.ReactNode => (
+  const [h, m] = norm ? norm.split(':').map(Number) : [8, 0]
+
+  const set = (hh: number, mm: number) => onChange(`${pad(clamp(hh, 23))}:${pad(clamp(mm, 59))}`)
+
+  const pill = (key: string, label: string, active: boolean, onClick: () => void) => (
     <button
-      key={key}
-      type="button"
-      onClick={onClick}
+      key={key} type="button" onClick={onClick}
       style={{
-        padding: '8px 12px',
-        borderRadius: 8,
-        border: `1px solid ${active ? '#E8192C' : 'var(--border)'}`,
-        background: active ? '#E8192C' : 'var(--input-bg)',
+        minHeight: 44, padding: '0 14px', borderRadius: 10,
+        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+        background: active ? 'var(--accent)' : 'var(--input-bg)',
         color: active ? '#fff' : 'var(--text)',
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
+        fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
         touchAction: 'manipulation',
       }}
-    >
-      {label}
-    </button>
+    >{label}</button>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {pill('none', 'Bez času', norm === '' && !custom, () => { setCustom(false); onChange('') })}
         {QUICK.map(q => pill(q.value, q.label, !custom && norm === q.value, () => { setCustom(false); onChange(q.value) }))}
-        {pill('custom', 'Vlastní čas', custom, () => setCustom(true))}
+        {pill('custom', 'Vlastní', custom, () => { setCustom(true); if (!norm) set(8, 0) })}
       </div>
+
       {custom && (
-        <input
-          type="time"
-          value={norm}
-          onChange={e => onChange(e.target.value)}
-          style={{
-            width: 'fit-content', background: 'var(--input-bg)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: 14, outline: 'none',
-          }}
-        />
+        <div style={{
+          display: 'flex', gap: 12, padding: 12, borderRadius: 12,
+          border: '1px solid var(--border)', background: 'var(--input-bg)',
+        }}>
+          <StepperField label="Hodina" value={h} step={1} min={0}
+            onChange={v => set(v > 23 ? 0 : v, m)} />
+          <StepperField label="Minuta" value={m} step={5} min={0}
+            onChange={v => set(h, v > 59 ? 0 : v)} />
+        </div>
       )}
     </div>
   )

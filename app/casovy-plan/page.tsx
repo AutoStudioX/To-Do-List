@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { TimeBlock } from '@/lib/types'
 import Modal from '@/components/Modal'
 import Select from '@/components/Select'
+import TimePicker from '@/components/TimePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { useLiveData } from '@/lib/useLiveData'
@@ -171,10 +172,10 @@ export default function CasovyPlanPage() {
             <label style={labelStyle}>Den</label>
             <Select value={String(form.den)} onChange={val => setForm({ ...form, den: Number(val) })} options={DAYS.map((d, i) => ({ value: String(i), label: d }))} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div><label style={labelStyle}>Od</label><input type="time" style={inputStyle} value={form.od} onChange={e => setForm({ ...form, od: e.target.value })} /></div>
-            <div><label style={labelStyle}>Do</label><input type="time" style={inputStyle} value={form.do} onChange={e => setForm({ ...form, do: e.target.value })} /></div>
-          </div>
+          {/* Vlastní výběr času, ne `input type="time"` — nativní panel je světlý
+              a na každé platformě jiný. */}
+          <div><label style={labelStyle}>Od</label><TimePicker value={form.od} onChange={v => setForm({ ...form, od: v })} /></div>
+          <div><label style={labelStyle}>Do</label><TimePicker value={form.do} onChange={v => setForm({ ...form, do: v })} /></div>
           <div><label style={labelStyle}>Kategorie</label><input style={inputStyle} value={form.kategorie} onChange={e => setForm({ ...form, kategorie: e.target.value })} /></div>
           <div>
             <label style={labelStyle}>Barva</label>

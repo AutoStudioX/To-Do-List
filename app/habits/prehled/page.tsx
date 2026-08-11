@@ -9,7 +9,7 @@ import { loadWindow, slice, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayLevel, streaks, dayWord, scoreTone, weekdayIndex,
   yearGridOffset, longestStreakSpan, fmtMonthSpan, DAY_LABELS,
-  dayStats, appliesOn, successRateOn, sortHabits, fmtTime,
+  dayStats, appliesOn, existsOn, tracksOn, successRateOn, sortHabits, fmtTime,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Trophy, CalendarCheck, TrendingDown } from 'lucide-react'
 
@@ -80,7 +80,10 @@ export default function PrehledPage() {
         habit: h,
         // `null` = návyk ten den neplatil; vykreslí se jako prázdné místo,
         // ne jako nesplněný den.
-        cells: cut.days.map((d, i) => appliesOn(h, d) ? level(ratio(h, vals[i] ?? 0)) : null),
+        // `undefined` = den mimo existenci návyku (nekreslí se vůbec),
+        // `null` = existoval, ale ten den neplatil (čárkovaně).
+        cells: cut.days.map((d, i) =>
+          !existsOn(h, d) ? undefined : appliesOn(h, d) ? level(ratio(h, vals[i] ?? 0)) : null),
         score: `${hit}/${total}`,
         tone: scoreTone(hit, total),
       }
@@ -92,7 +95,7 @@ export default function PrehledPage() {
 
     return {
       habits, R, rows, cut, countsCut, countsAll, allDays,
-      dayLevels: statsCut.map(x => dayLevel(x.met, x.applicable)),
+      dayLevels: statsCut.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
       yearLevels: statsAll.map(x => dayLevel(x.met, x.applicable)),
       rangeScore: `${countsCut.filter(c => c >= 4).length}/${R}`,
       summary: `Průměrně ${avg} návyků denně · ${full}× kompletní den`,
@@ -115,8 +118,8 @@ export default function PrehledPage() {
   // narůst nad návrhovou velikost — když se matice do sloupce nevejde,
   // zmenší se, ale nikdy se nenatáhne do obdélníku.
   const CELL = isMobile
-    ? (range === 7 ? 38 : range === 30 ? 20 : 5)
-    : (range === 7 ? 48 : range === 30 ? 26 : 13)
+    ? (range === 7 ? 38 : range === 30 ? 7 : 5)
+    : (range === 7 ? 44 : range === 30 ? 19 : 13)
   const GAP = isMobile
     ? (range === 7 ? 6 : 1)
     : (range === 7 ? 8 : range === 30 ? 6 : 4)
@@ -133,18 +136,22 @@ export default function PrehledPage() {
   const toneColor = (t: 'accent' | 'text' | 'muted') =>
     t === 'accent' ? 'var(--accent)' : t === 'text' ? 'var(--text)' : 'var(--muted)'
 
-  const matrixCells = (cells: (number | null)[]) => (
+  // Pevná velikost buňky a pevná mezera, zarovnáno doleva — řádek klidně
+  // skončí v půlce šířky. Sloupců je vždy tolik, kolik má okno dnů, aby si
+  // řádky odpovídaly datem; buňky mimo existenci návyku se jen nevykreslí.
+  const matrixCells = (cells: (number | null | undefined)[]) => (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(${view.R}, minmax(0, ${CELL}px))`,
+      gridTemplateColumns: `repeat(${view.R}, ${CELL}px)`,
       gap: GAP, justifyContent: 'start',
     }}>
       {cells.map((l, i) => (
         <div key={i} style={{
-          borderRadius: cellRadius, aspectRatio: '1',
-          // Neplatný den zůstává prázdný — nesmí vypadat jako nesplněný.
+          width: CELL, height: CELL, borderRadius: cellRadius,
           background: l == null ? 'transparent' : LEVEL_BG[l],
-          border: l == null ? '1px dashed var(--border)' : undefined,
+          // `undefined` (návyk ještě neexistoval) nekreslíme vůbec,
+          // `null` (neplatil) čárkovaně.
+          border: l === null ? '1px dashed var(--border)' : undefined,
         }} />
       ))}
     </div>
@@ -214,7 +221,7 @@ export default function PrehledPage() {
             <div style={{ display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center' }}>
               <span />
               {range === 7 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, minmax(0, ${CELL}px))`, gap: GAP, justifyContent: 'start' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, ${CELL}px)`, gap: GAP, justifyContent: 'start' }}>
                   {view.cut.days.map(d => (
                     <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>{DAY_LABELS[weekdayIndex(d)]}</div>
                   ))}

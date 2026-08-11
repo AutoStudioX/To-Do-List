@@ -655,7 +655,7 @@ export default function ActiveWorkoutPage() {
   const exerciseStrip = items.length > 0 && (
     // top/paddingTop offset covers <main>'s own padding so rows don't peek above the strip
     <div style={{ position: 'sticky', top: -16, zIndex: 20, background: 'var(--bg)', paddingTop: 16, paddingBottom: 8, marginBottom: 6 }}>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+      <div className="hide-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
         {items.map((it, i) => {
           const isActive = i === activeIdx
           const done = it.sets.filter(s => s.confirmed && !s.is_warmup).length

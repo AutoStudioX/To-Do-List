@@ -10,7 +10,7 @@ import YearGrid, { Legend } from '@/components/habits/YearGrid'
 import { loadWindow, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayWord, yearGridOffset, weekdayIndex, DAY_LABELS,
-  isReadOnly, habitStreaksOn, successRateOn, appliesOn, sortHabits, fmtTime,
+  isReadOnly, habitStreaksOn, successRateOn, appliesOn, existsOn, tracksOn, sortHabits, fmtTime,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Settings, Link2 } from 'lucide-react'
 
@@ -64,7 +64,7 @@ export default function HabitDetailPage() {
       : 1
     const bars = winVals.map((v, i) => {
       // Den, kdy návyk neplatil, nemá sloupec — jen prázdné místo.
-      if (!appliesOn(habit, winDays[i])) {
+      if (!tracksOn(habit, winDays[i])) {
         return { h: '0%', ok: false, off: true, label: '', day: DAY_LABELS[weekdayIndex(winDays[i])] }
       }
       const ok = metOn(habit, v)
@@ -80,7 +80,7 @@ export default function HabitDetailPage() {
 
     return {
       habit, vals, st, rate, todayVal, bars,
-      yearLevels: win.days.map((d, i) => appliesOn(habit, d) ? level(ratio(habit, vals[i] ?? 0)) : null),
+      yearLevels: win.days.map((d, i) => tracksOn(habit, d) ? level(ratio(habit, vals[i] ?? 0)) : null),
       axisNote: habit.typ === 'cil'
         ? `Cíl ${habit.cil} ${habit.jednotka} · maximum ${maxInWindow} ${habit.jednotka}`
         : 'Splněno / nesplněno',
@@ -158,7 +158,7 @@ export default function HabitDetailPage() {
       </div>
 
       {/* přepínač návyků — design ho má v sidebaru, který nepřebíráme */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+      <div className="hide-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
         {sortHabits(win!.habits).map(h => {
           const on = h.id === habit.id
           return (

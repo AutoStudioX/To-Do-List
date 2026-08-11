@@ -64,10 +64,13 @@ export default function YearGrid({
   if (!labels) return grid
 
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', overflowX: 'auto' }}>
+    // `overflow-x: auto` si podle specifikace vynutí i `overflow-y: auto`,
+    // takže stačilo přetečení o jeden pixel a vyskočila svislá lišta.
+    // Svislý směr je proto natvrdo `hidden` — mřížka má pevnou výšku.
+    <div className="hide-scrollbar" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', overflowX: 'auto', overflowY: 'hidden' }}>
       <div style={{
         display: 'grid', gridTemplateRows: `repeat(7, ${cell}px)`, gap,
-        fontSize: 10, color: 'var(--muted)', paddingTop: 1, flexShrink: 0,
+        fontSize: 10, color: 'var(--muted)', flexShrink: 0,
       }}>
         {DAY_LABELS.map((d, i) => <span key={d}>{i % 2 === 0 ? d : ''}</span>)}
       </div>

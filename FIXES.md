@@ -544,3 +544,26 @@ Rozsah počítá `lastDays(n)`, který **končí dneškem** (kryto testy). Ročn
 Co ten dojem nejspíš dělalo: do téhle úpravy se **den, kdy návyk neplatil, kreslil jako šedá nula**, k nerozeznání od „nic jsem neudělal". S novou sadou (Focus dopoledne po/st/pá/ne, Trénink út/čt/so) je takových dnů v každém řádku většina. To je opravené výše.
 
 12 nových testů (čas, dny platnosti, řazení, statistiky přes platné dny) — celkem **71** na `lib/habits.ts`. Migrace 0016 ověřena proti reálnému Postgresu: idempotence, rozsah `dny` 1–7, sada 9 návyků se správnými časy a dny, cizí účet nedotčený.
+
+## Habits — mřížka od založení návyku, pevné buňky, vlastní výběr času
+### Matice začíná až vznikem návyku
+Den před vznikem návyku není „nesplněno", ale „neexistovalo". `existsOn()` porovná den s `created_at` a `tracksOn()` = existoval **a** platil ten den v týdnu. Statistiky i mřížky jedou přes `tracksOn`, takže návyk založený dnes má v řádku jednu buňku a skóre `0/1`, ne třicet prázdných polí.
+
+Tři stavy buňky: **neexistoval** → nekreslí se vůbec, **existoval, ale ten den neplatil** → čárkovaně, **existoval a platil** → barva podle plnění. Platí v Přehledu (matice i souhrn dne), v ročním pohledu i v Detailu (mřížka i graf 14 dní).
+
+### Pevné buňky místo roztahování
+Buňky měly `minmax(0, N)` a roztahovaly se do šířky sloupce. Teď mají **pevnou velikost i mezeru** a `justify-content: start` — řádek smí skončit v půlce šířky.
+
+Hodnoty vzaté **změřením prototypu**, ne z hlavy: desktop 30 dní 18,5 px / gap 6 → 19/6, mobil 30 dní 6,7 px / gap 1 → 7/1, rok 13/4.
+
+Poznámka k původnímu dojmu „roztažených mezer": prototyp má na plných 30 dnech prakticky stejné rozměry jako naše verze. Roztaženě to působilo tím, že 29 z 30 buněk byly prázdné výplně za dobu, kdy návyk ještě neexistoval — což řeší bod výše.
+
+### Scrollbary
+Dvě lišty, každá z jiné příčiny:
+1. **Vodorovná pod pásem návyků** — běžná lišta u `overflow-x: auto`, na macOS s „Show scroll bars: Always" překrývá obsah tlustým pruhem. Přidána třída `.hide-scrollbar` (schová lištu, scrollování zůstává), nasazená i na stejný pás v tréninku.
+2. **Svislá v kartě „Rok po dnech"** — skutečná chyba: `overflow-x: auto` si podle specifikace vynutí i `overflow-y: auto` a mřížka přetékala o 2 px kvůli `padding-top: 1` na sloupci popisků. Padding pryč, svislý směr natvrdo `hidden`. Ověřeno: obě lišty 0 px, mřížka se nekrátí (rám i mřížka 115 px).
+
+### Výběr času je vlastní, nikde nativní
+`input type="time"` otevírá systémový panel — světlý, s cizím chrome, na každé platformě jiný. Nahrazen na **třech místech**: formulář návyku, sdílený `TimePicker` (Úkoly, Přehled) a pole Od/Do v Časovém plánu.
+
+`TimePicker` má teď rychlé volby jako pilulky (`Bez času`, 6:30, 8:00, 12:00, 18:00, `Vlastní`) a pro vlastní čas **dva steppery** postavené na `StepperField` z tréninku — tap na číslo umožní přímé zadání, dlouhý stisk skáče po pěti krocích. Žádný nativní prvek v appce nezůstal.

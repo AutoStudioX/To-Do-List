@@ -24,6 +24,8 @@ export type Habit = {
   cas: string | null
   /** dny platnosti 1=Po … 7=Ne; NULL nebo prázdné = každý den */
   dny: number[] | null
+  /** kdy návyk vznikl — dřívější dny se nekreslí ani nepočítají */
+  created_at?: string
 }
 
 /** „Splněný den" pro série a souhrn = aspoň tolik splněných návyků (README). */
@@ -234,6 +236,20 @@ export function sortHabits(list: Habit[]): Habit[] {
 }
 
 /**
+ * Existoval návyk v ten den? Den před jeho vznikem není „nesplněno", ale
+ * „neexistovalo" — nesmí se kreslit ani počítat do skóre.
+ */
+export function existsOn(h: Pick<Habit, 'created_at'>, day: string): boolean {
+  if (!h.created_at) return true
+  return day >= h.created_at.slice(0, 10)
+}
+
+/** Den, který se u návyku vůbec sleduje: existoval A platil. */
+export function tracksOn(h: Pick<Habit, 'dny' | 'created_at'>, day: string): boolean {
+  return existsOn(h, day) && appliesOn(h, day)
+}
+
+/**
  * Za každý den okna: kolik návyků ten den PLATILO a kolik jich bylo splněno.
  *
  * Den, kdy návyk neplatil, se nesmí počítat jako nesplněný — jinak by úterní
@@ -245,7 +261,7 @@ export function dayStats(
   return days.map((d, i) => {
     let applicable = 0, met = 0
     for (const h of habits) {
-      if (!appliesOn(h, d)) continue
+      if (!tracksOn(h, d)) continue
       applicable++
       if (metOn(h, byHabit[h.id]?.[i] ?? 0)) met++
     }
@@ -257,7 +273,7 @@ export function dayStats(
 export function successRateOn(h: Habit, days: string[], values: number[]): { hit: number; total: number } {
   let hit = 0, total = 0
   days.forEach((d, i) => {
-    if (!appliesOn(h, d)) return
+    if (!tracksOn(h, d)) return
     total++
     if (metOn(h, values[i] ?? 0)) hit++
   })
@@ -268,7 +284,7 @@ export function successRateOn(h: Habit, days: string[], values: number[]): { hit
 export function habitStreaksOn(h: Habit, days: string[], values: number[]): { cur: number; longest: number } {
   const applicable: number[] = []
   days.forEach((d, i) => {
-    if (!appliesOn(h, d)) return
+    if (!tracksOn(h, d)) return
     applicable.push(metOn(h, values[i] ?? 0) ? DAY_DONE_THRESHOLD : 0)
   })
   return streaks(applicable)

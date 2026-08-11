@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { isReadOnly, type Habit } from '@/lib/habits'
+import TimePicker from '@/components/TimePicker'
 import HabitIcon, { ICON_CHOICES } from './HabitIcon'
 import { Check, Archive } from 'lucide-react'
 
@@ -129,10 +130,9 @@ export default function HabitForm({
       )}
 
       {label('ČAS (nepovinný)')}
-      <input
-        type="time" value={cas} onChange={e => setCas(e.target.value)}
-        style={{ ...input, marginBottom: 16 }}
-      />
+      <div style={{ marginBottom: 16 }}>
+        <TimePicker value={cas} onChange={setCas} />
+      </div>
 
       {label('PLATÍ VE DNY')}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 6, marginBottom: 6 }}>
