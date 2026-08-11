@@ -9,8 +9,8 @@ import HabitForm from '@/components/habits/HabitForm'
 import YearGrid, { Legend } from '@/components/habits/YearGrid'
 import { loadWindow, type HabitWindow } from '@/lib/habitsData'
 import {
-  metOn, ratio, level, habitStreaks, dayWord, successRate, yearGridOffset,
-  weekdayIndex, DAY_LABELS, isReadOnly,
+  metOn, ratio, level, dayWord, yearGridOffset, weekdayIndex, DAY_LABELS,
+  isReadOnly, habitStreaksOn, successRateOn, appliesOn, sortHabits, fmtTime,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Settings, Link2 } from 'lucide-react'
 
@@ -50,9 +50,10 @@ export default function HabitDetailPage() {
     const habit = win.habits.find(h => h.id === id)
     if (!habit) return null
     const vals = win.byHabit[habit.id]
-    const st = habitStreaks(habit, vals)
-    const last30 = vals.slice(-30)
-    const rate = Math.round(successRate(habit, last30) * 100)
+    // Série i úspěšnost jen přes dny, kdy návyk platil.
+    const st = habitStreaksOn(habit, win.days, vals)
+    const r30 = successRateOn(habit, win.days.slice(-30), vals.slice(-30))
+    const rate = r30.total ? Math.round(r30.hit / r30.total * 100) : 0
     const todayVal = vals[vals.length - 1] ?? 0
 
     const winVals = vals.slice(-CHART_DAYS)
@@ -62,12 +63,16 @@ export default function HabitDetailPage() {
       ? Math.max(Number(habit.cil ?? 1), ...winVals)
       : 1
     const bars = winVals.map((v, i) => {
+      // Den, kdy návyk neplatil, nemá sloupec — jen prázdné místo.
+      if (!appliesOn(habit, winDays[i])) {
+        return { h: '0%', ok: false, off: true, label: '', day: DAY_LABELS[weekdayIndex(winDays[i])] }
+      }
       const ok = metOn(habit, v)
       // U ano/ne mají nesplněné sloupce 28 %, aby z grafu nezmizely.
       const r = habit.typ === 'cil' ? (maxInWindow ? v / maxInWindow : 0) : (ok ? 1 : 0.28)
       return {
         h: `${Math.max(3, Math.round(r * 100))}%`,
-        ok,
+        ok, off: false,
         label: habit.typ === 'cil' ? String(v) : '',
         day: DAY_LABELS[weekdayIndex(winDays[i])],
       }
@@ -75,7 +80,7 @@ export default function HabitDetailPage() {
 
     return {
       habit, vals, st, rate, todayVal, bars,
-      yearLevels: vals.map(v => level(ratio(habit, v))),
+      yearLevels: win.days.map((d, i) => appliesOn(habit, d) ? level(ratio(habit, vals[i] ?? 0)) : null),
       axisNote: habit.typ === 'cil'
         ? `Cíl ${habit.cil} ${habit.jednotka} · maximum ${maxInWindow} ${habit.jednotka}`
         : 'Splněno / nesplněno',
@@ -107,7 +112,7 @@ export default function HabitDetailPage() {
     <div style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: 24, display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20 }}>
       {/* hlavička */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 18 }}>
-        <button onClick={() => router.push('/navyky')} aria-label="Zpět" style={{
+        <button onClick={() => router.push('/habits')} aria-label="Zpět" style={{
           width: 44, height: 44, flexShrink: 0, borderRadius: 12, border: '1px solid var(--border)',
           background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--muted)', cursor: 'pointer',
@@ -124,7 +129,10 @@ export default function HabitDetailPage() {
             letterSpacing: '-.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>{habit.nazev}</h1>
           <div style={{ fontSize: isMobile ? 12 : 14, color: 'var(--muted)', marginTop: isMobile ? 0 : 4, display: 'flex', alignItems: 'center', gap: 5 }}>
-            {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}{habit.podtitul}
+            {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}
+            {habit.cas && <span>{fmtTime(habit.cas)}</span>}
+            {habit.cas && habit.podtitul && <span>·</span>}
+            {habit.podtitul}
           </div>
         </div>
         {!isMobile && (
@@ -151,10 +159,10 @@ export default function HabitDetailPage() {
 
       {/* přepínač návyků — design ho má v sidebaru, který nepřebíráme */}
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-        {win!.habits.map(h => {
+        {sortHabits(win!.habits).map(h => {
           const on = h.id === habit.id
           return (
-            <button key={h.id} onClick={() => router.push(`/navyky/${h.id}`)} style={{
+            <button key={h.id} onClick={() => router.push(`/habits/${h.id}`)} style={{
               flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px',
               borderRadius: 999, cursor: 'pointer', touchAction: 'manipulation',
               border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
@@ -216,9 +224,11 @@ export default function HabitDetailPage() {
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
               {!isMobile && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{b.label}</div>}
               <div style={{
-                width: '100%', height: b.h,
+                width: '100%', height: b.off ? '100%' : b.h,
                 borderRadius: isMobile ? '4px 4px 1px 1px' : '6px 6px 2px 2px',
-                background: b.ok ? 'var(--accent)' : 'rgba(232,25,44,0.22)',
+                background: b.off ? 'transparent' : b.ok ? 'var(--accent)' : 'rgba(232,25,44,0.22)',
+                border: b.off ? '1px dashed var(--border)' : undefined,
+                opacity: b.off ? 0.5 : 1,
               }} />
             </div>
           ))}
@@ -238,7 +248,7 @@ export default function HabitDetailPage() {
           poradi={habit.poradi}
           onDone={(msg) => { setEditOpen(false); showToast(msg); load() }}
           onError={(msg) => showToast(msg, 'error')}
-          onArchived={(msg) => { setEditOpen(false); showToast(msg); router.push('/navyky') }}
+          onArchived={(msg) => { setEditOpen(false); showToast(msg); router.push('/habits') }}
         />
       </Modal>
 

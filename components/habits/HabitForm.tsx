@@ -6,6 +6,8 @@ import { isReadOnly, type Habit } from '@/lib/habits'
 import HabitIcon, { ICON_CHOICES } from './HabitIcon'
 import { Check, Archive } from 'lucide-react'
 
+const DNY_LABELS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
+
 /**
  * Nový návyk. Typ i ikona jsou button groupy, ne dropdowny — pravidlo projektu
  * pro pole s malým počtem voleb.
@@ -28,8 +30,12 @@ export default function HabitForm({
   const [jednotka, setJednotka] = useState(habit?.jednotka ?? 'ml')
   const [krok, setKrok] = useState(habit?.krok != null ? String(habit.krok) : '250')
   const [ikona, setIkona] = useState<string>(habit?.ikona ?? 'circle')
+  const [cas, setCas] = useState(habit?.cas ? habit.cas.slice(0, 5) : '')
+  const [dny, setDny] = useState<number[]>(habit?.dny ?? [])
   const [saving, setSaving] = useState(false)
   const { confirm, dialog } = useConfirm()
+  // Trénink je ano/ne řízené z tréninků — typ u něj měnit nedává smysl.
+  const typLocked = !!habit && isReadOnly(habit)
 
   const cilNum = Number(cil.replace(',', '.'))
   const krokNum = Number(krok.replace(',', '.'))
@@ -51,6 +57,10 @@ export default function HabitForm({
       jednotka: typ === 'cil' ? jednotka.trim() : null,
       krok: typ === 'cil' ? krokNum : null,
       ikona,
+      cas: cas.trim() ? cas.trim() : null,
+      // Prázdné pole ukládáme jako NULL — obojí znamená „každý den", ale NULL
+      // je jednoznačnější a index s ním umí líp.
+      dny: dny.length ? [...dny].sort((a, b) => a - b) : null,
     }
     const { error } = edit
       ? await supabase.from('habits').update(payload).eq('id', habit!.id)
@@ -90,8 +100,10 @@ export default function HabitForm({
       {label('TYP')}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
         {([['bool', 'Ano / ne'], ['cil', 'S cílem']] as const).map(([v, t]) => (
-          <button key={v} onClick={() => setTyp(v)} style={{
-            minHeight: 48, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
+          <button key={v} onClick={() => !typLocked && setTyp(v)} disabled={typLocked} title={typLocked ? 'Trénink je řízený z tréninkové sekce' : undefined} style={{
+            opacity: typLocked && typ !== v ? 0.4 : 1,
+            cursor: typLocked ? 'default' : 'pointer',
+            minHeight: 48, borderRadius: 12, fontSize: 15, fontWeight: 600, touchAction: 'manipulation',
             border: `1px solid ${typ === v ? 'var(--accent)' : 'var(--border)'}`,
             background: typ === v ? 'var(--accent)' : 'var(--input-bg)',
             color: typ === v ? '#fff' : 'var(--text)',
@@ -115,6 +127,31 @@ export default function HabitForm({
           </div>
         </div>
       )}
+
+      {label('ČAS (nepovinný)')}
+      <input
+        type="time" value={cas} onChange={e => setCas(e.target.value)}
+        style={{ ...input, marginBottom: 16 }}
+      />
+
+      {label('PLATÍ VE DNY')}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 6, marginBottom: 6 }}>
+        {DNY_LABELS.map((d, i) => {
+          const n = i + 1
+          const on = dny.includes(n)
+          return (
+            <button key={n} onClick={() => setDny(p => on ? p.filter(x => x !== n) : [...p, n])} style={{
+              minHeight: 44, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
+              border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+              background: on ? 'var(--accent)' : 'var(--input-bg)',
+              color: on ? '#fff' : 'var(--text)',
+            }}>{d}</button>
+          )
+        })}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>
+        {dny.length ? `Zobrazí se jen ve vybrané dny.` : 'Nevybráno nic = platí každý den.'}
+      </div>
 
       {label('IKONA')}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, minmax(0,1fr))', gap: 6, marginBottom: 20 }}>

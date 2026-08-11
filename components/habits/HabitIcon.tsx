@@ -2,6 +2,7 @@
 import {
   Droplets, Utensils, MonitorOff, GlassWater, Timer, Dumbbell, Circle,
   BookOpen, Moon, Footprints, Pill, Brush, Sprout, Wallet, Music, Phone,
+  Sunrise, Coffee, ShowerHead,
 } from 'lucide-react'
 
 /**
@@ -10,7 +11,10 @@ import {
  * těch pár ikon, které opravdu používáme, a neznámý název nespadne.
  */
 const MAP = {
+  'sunrise': Sunrise,
   'droplets': Droplets,
+  'coffee': Coffee,
+  'shower-head': ShowerHead,
   'utensils': Utensils,
   'monitor-off': MonitorOff,
   'glass-water': GlassWater,

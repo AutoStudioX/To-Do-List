@@ -20,6 +20,10 @@ export type Habit = {
   poradi: number
   zdroj: HabitSource
   archivovany: boolean
+  /** „06:30" — nepovinný čas návyku; NULL = bez času */
+  cas: string | null
+  /** dny platnosti 1=Po … 7=Ne; NULL nebo prázdné = každý den */
+  dny: number[] | null
 }
 
 /** „Splněný den" pro série a souhrn = aspoň tolik splněných návyků (README). */
@@ -199,4 +203,73 @@ export function scoreTone(hit: number, total: number): 'accent' | 'text' | 'mute
   if (!total) return 'muted'
   const r = hit / total
   return r >= 0.8 ? 'accent' : r >= 0.5 ? 'text' : 'muted'
+}
+
+// ---- Čas a dny platnosti ----
+
+/** „06:30:00" → „6:30". Bez času prázdný řetězec. */
+export function fmtTime(cas: string | null | undefined): string {
+  if (!cas) return ''
+  return cas.slice(0, 5).replace(/^0/, '')
+}
+
+/** Platí návyk v daný den? Prázdné `dny` = každý den. */
+export function appliesOn(h: Pick<Habit, 'dny'>, day: string): boolean {
+  if (!h.dny || h.dny.length === 0) return true
+  return h.dny.includes(weekdayIndex(day) + 1)
+}
+
+/**
+ * Řazení hlavní stránky: nejdřív návyky S ČASEM vzestupně, pod nimi ostatní
+ * podle ručního pořadí. Šipky proto přeuspořádávají jen tu druhou skupinu —
+ * u návyku s časem rozhoduje čas, ne `poradi`.
+ */
+export function sortHabits(list: Habit[]): Habit[] {
+  return [...list].sort((a, b) => {
+    if (a.cas && b.cas) return a.cas.localeCompare(b.cas) || a.poradi - b.poradi
+    if (a.cas) return -1
+    if (b.cas) return 1
+    return a.poradi - b.poradi
+  })
+}
+
+/**
+ * Za každý den okna: kolik návyků ten den PLATILO a kolik jich bylo splněno.
+ *
+ * Den, kdy návyk neplatil, se nesmí počítat jako nesplněný — jinak by úterní
+ * návyk táhl statistiku dolů za všechny ostatní dny v týdnu.
+ */
+export function dayStats(
+  habits: Habit[], days: string[], byHabit: Record<string, number[]>,
+): { applicable: number; met: number }[] {
+  return days.map((d, i) => {
+    let applicable = 0, met = 0
+    for (const h of habits) {
+      if (!appliesOn(h, d)) continue
+      applicable++
+      if (metOn(h, byHabit[h.id]?.[i] ?? 0)) met++
+    }
+    return { applicable, met }
+  })
+}
+
+/** Úspěšnost návyku jen přes dny, kdy platil. */
+export function successRateOn(h: Habit, days: string[], values: number[]): { hit: number; total: number } {
+  let hit = 0, total = 0
+  days.forEach((d, i) => {
+    if (!appliesOn(h, d)) return
+    total++
+    if (metOn(h, values[i] ?? 0)) hit++
+  })
+  return { hit, total }
+}
+
+/** Série návyku jen přes dny, kdy platil — vynechané dny sérii nelámou. */
+export function habitStreaksOn(h: Habit, days: string[], values: number[]): { cur: number; longest: number } {
+  const applicable: number[] = []
+  days.forEach((d, i) => {
+    if (!appliesOn(h, d)) return
+    applicable.push(metOn(h, values[i] ?? 0) ? DAY_DONE_THRESHOLD : 0)
+  })
+  return streaks(applicable)
 }

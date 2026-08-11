@@ -512,3 +512,35 @@ Route `/navyky/prehled` a `/navyky/[id]`. Rozměry z designu, barvy přes promě
 12 nových testů (série návyku, období nejdelší série, odsazení mřížky, barva skóre) — celkem **55** na `lib/habits.ts`.
 
 Ověřeno měřením na **1440 i 390** ve všech třech rozsazích: přepínač, matice, roční mřížka, dlaždice, hlavička detailu, pill, graf i mini mřížka sedí na hodnoty z README; nic nepřetéká a všechny tap targety jsou ≥ 44 px.
+
+## Habits — přejmenování, režim úprav, čas a dny (migrace 0016)
+### Přejmenování na Habits
+Route `/navyky` → `/habits` (i podstránky), navigace i nadpisy. Staré adresy přesměrované v `next.config.ts` (`/navyky` i `/navyky/:path*`), aby záložky fungovaly dál — stejné pravidlo jako u `/goals` → `/goaly`.
+
+**i18n klíče přejmenovat nešlo — appka žádnou i18n vrstvu nemá**, všechny texty jsou napsané přímo v komponentách. Zůstalo tedy u navigace, nadpisů a routy.
+
+### Režim úprav
+Tlačítko s tužkou vedle „Přidat návyk" (na mobilu ikona vedle Přehledu). Po zapnutí karta místo ovládání splnění ukazuje: šipky nahoru/dolů, úpravu obsahu a koš. Vypnutí vrátí normální zobrazení.
+
+Mazání jde přes `useConfirm` s konkrétním předmětem a upozorněním, že zmizí i historie. Každá akce končí toastem. **Návyk „trénink" nemá koš a nejde u něj přepnout typ** — je řízený z tréninkové sekce.
+
+**Šipky přeskupují jen návyky bez času.** U návyku s časem rozhoduje čas, takže by přehození `poradi` nebylo vidět; tlačítka jsou proto zašedlá s vysvětlením v titulku.
+
+### Čas a dny platnosti
+`cas` (time, nullable) a `dny` (int[], 1 = pondělí; NULL nebo prázdné = každý den).
+
+Řazení hlavní stránky: **nejdřív návyky s časem vzestupně, pod nimi ostatní podle ručního pořadí**. Čas se vypisuje nenápadně vedle názvu, bez času se nezobrazuje nic.
+
+**Den, kdy návyk neplatil, se nesmí počítat jako nesplněný** — jinak by úterní návyk táhl statistiku dolů za všechny ostatní dny v týdnu. Proto `dayStats()`, `successRateOn()` a `habitStreaksOn()` procházejí jen platné dny; skóre v matici je `hit/platné dny`, ne `hit/30`. V matici i v grafu se neplatný den kreslí jako **prázdné místo s čárkovaným okrajem**, ne jako šedý čtvereček.
+
+Nová výchozí sada (0016) **smaže a nahradí** návyky jednoho účtu — je zúžená přes e-mail, ostatní uživatelé si své nechají.
+
+### Matice: čtvercové buňky a stejné mezery
+Buňky se roztahovaly do šířky a svislá mezera (8 px) nesouhlasila s vodorovnou (6 px). Teď mají `aspect-ratio 1`, šířku `minmax(0, N)` s návrhovou velikostí jako stropem (desktop 48/26/13 px, mobil 38/20/5 px) a `justify-content: start`, takže se nikdy nenatáhnou do obdélníku — a když se matice do sloupce nevejde, zmenší se. Svislá mezera se rovná vodorovné. Naměřeno na 1440: buňka 19×19, `column-gap` i `row-gap` 6 px.
+
+### Budoucí dny — prověřeno, mřížka je v pořádku
+Rozsah počítá `lastDays(n)`, který **končí dneškem** (kryto testy). Roční mřížka změřena na vykreslené stránce: 371 buněk, 1 prázdná na začátku (odsazení podle dne v týdnu) a **5 prázdných na konci** — přesně zbytek aktuálního týdne, když je dnes úterý. Budoucí dny tedy nejsou šedé, ale průhledné.
+
+Co ten dojem nejspíš dělalo: do téhle úpravy se **den, kdy návyk neplatil, kreslil jako šedá nula**, k nerozeznání od „nic jsem neudělal". S novou sadou (Focus dopoledne po/st/pá/ne, Trénink út/čt/so) je takových dnů v každém řádku většina. To je opravené výše.
+
+12 nových testů (čas, dny platnosti, řazení, statistiky přes platné dny) — celkem **71** na `lib/habits.ts`. Migrace 0016 ověřena proti reálnému Postgresu: idempotence, rozsah `dny` 1–7, sada 9 návyků se správnými časy a dny, cizí účet nedotčený.

@@ -11,7 +11,7 @@ const navItems = [
   { href: '/finance', label: 'Finance', icon: TrendingUp },
   { href: '/ukoly', label: 'Úkoly', icon: CheckSquare },
   { href: '/focus', label: 'Focus', icon: Crosshair },
-  { href: '/navyky', label: 'Návyky', icon: Flame },
+  { href: '/habits', label: 'Habits', icon: Flame },
   { href: '/trenink', label: 'Trénink', icon: Dumbbell },
   { href: '/goaly', label: 'Goals', icon: Target },
 ]

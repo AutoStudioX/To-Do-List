@@ -8,7 +8,8 @@ import YearGrid, { Legend, LEVEL_BG } from '@/components/habits/YearGrid'
 import { loadWindow, slice, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayLevel, streaks, dayWord, scoreTone, weekdayIndex,
-  yearGridOffset, longestStreakSpan, fmtMonthSpan, successRate, DAY_LABELS,
+  yearGridOffset, longestStreakSpan, fmtMonthSpan, DAY_LABELS,
+  dayStats, appliesOn, successRateOn, sortHabits, fmtTime,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Trophy, CalendarCheck, TrendingDown } from 'lucide-react'
 
@@ -47,44 +48,52 @@ export default function PrehledPage() {
 
   const view = useMemo(() => {
     if (!win) return null
-    const { habits, days: allDays, byHabit: allBy } = win
+    const habits = sortHabits(win.habits)
+    const { days: allDays, byHabit: allBy } = win
     const cut = slice(win, range)
     const R = cut.days.length
 
-    // Denní počty pro celé okno i pro výřez.
-    const countsAll = allDays.map((_, i) => habits.reduce((n, h) => n + (metOn(h, allBy[h.id][i]) ? 1 : 0), 0))
+    // Den, kdy návyk neplatil, se do jeho statistiky nezapočítá.
+    const statsAll = dayStats(habits, allDays, allBy)
+    const countsAll = statsAll.map(x => x.met)
+    const statsCut = statsAll.slice(statsAll.length - R)
     const countsCut = countsAll.slice(countsAll.length - R)
 
     const st = streaks(countsAll)
     const span = longestStreakSpan(countsAll, allDays)
     const active = countsAll.filter(c => c > 0).length
 
-    // Nejslabší návyk se posuzuje z posledních 30 dnů (jako v prototypu).
+    // Nejslabší návyk se posuzuje z posledních 30 dnů, jen přes platné dny.
     const last30 = slice(win, 30)
     let weak: { name: string; rate: number } | null = null
     for (const h of habits) {
-      const r = successRate(h, last30.byHabit[h.id])
+      const { hit, total } = successRateOn(h, last30.days, last30.byHabit[h.id])
+      if (!total) continue
+      const r = hit / total
       if (!weak || r < weak.rate) weak = { name: h.nazev, rate: r }
     }
 
     const rows = habits.map(h => {
       const vals = cut.byHabit[h.id]
-      const hit = vals.filter(v => metOn(h, v)).length
+      const { hit, total } = successRateOn(h, cut.days, vals)
       return {
         habit: h,
-        cells: vals.map(v => level(ratio(h, v))),
-        score: `${hit}/${R}`,
-        tone: scoreTone(hit, R),
+        // `null` = návyk ten den neplatil; vykreslí se jako prázdné místo,
+        // ne jako nesplněný den.
+        cells: cut.days.map((d, i) => appliesOn(h, d) ? level(ratio(h, vals[i] ?? 0)) : null),
+        score: `${hit}/${total}`,
+        tone: scoreTone(hit, total),
       }
     })
 
     const avg = R ? (countsCut.reduce((a, b) => a + b, 0) / R).toFixed(1).replace('.', ',') : '0'
-    const full = countsCut.filter(c => c === habits.length).length
+    // „Kompletní den" = splněno všechno, co ten den platilo.
+    const full = statsCut.filter(x => x.applicable > 0 && x.met === x.applicable).length
 
     return {
       habits, R, rows, cut, countsCut, countsAll, allDays,
-      dayLevels: countsCut.map(c => dayLevel(c, habits.length)),
-      yearLevels: countsAll.map(c => dayLevel(c, habits.length)),
+      dayLevels: statsCut.map(x => dayLevel(x.met, x.applicable)),
+      yearLevels: statsAll.map(x => dayLevel(x.met, x.applicable)),
       rangeScore: `${countsCut.filter(c => c >= 4).length}/${R}`,
       summary: `Průměrně ${avg} návyků denně · ${full}× kompletní den`,
       tiles: [
@@ -102,7 +111,15 @@ export default function PrehledPage() {
   }
 
   const isYear = range === 365
-  const cellGap = range === 7 ? 8 : 6
+  // Rozměry buněk z designu. Buňka je čtverec a `minmax(0, N)` ji nenechá
+  // narůst nad návrhovou velikost — když se matice do sloupce nevejde,
+  // zmenší se, ale nikdy se nenatáhne do obdélníku.
+  const CELL = isMobile
+    ? (range === 7 ? 38 : range === 30 ? 20 : 5)
+    : (range === 7 ? 48 : range === 30 ? 26 : 13)
+  const GAP = isMobile
+    ? (range === 7 ? 6 : 1)
+    : (range === 7 ? 8 : range === 30 ? 6 : 4)
   const card: React.CSSProperties = {
     background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16,
     padding: isMobile ? 18 : '28px 30px', display: 'flex', flexDirection: 'column',
@@ -111,18 +128,23 @@ export default function PrehledPage() {
   const COL = isMobile ? '26px 1fr 38px' : '230px 1fr 64px'
   const COL_GAP = isMobile ? 10 : 16
   const cellRadius = isMobile ? (range === 7 ? 6 : 1) : 5
-  const cellGapM = isMobile ? (range === 7 ? 6 : 1) : cellGap
-  const rowGap = isMobile ? (range === 7 ? 6 : 2) : 8
+  // Svislá mezera mezi řádky matice = vodorovná mezera mezi čtverečky.
+  const rowGap = GAP
   const toneColor = (t: 'accent' | 'text' | 'muted') =>
     t === 'accent' ? 'var(--accent)' : t === 'text' ? 'var(--text)' : 'var(--muted)'
 
-  const matrixCells = (cells: number[]) => (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${view.R}, minmax(0,1fr))`, gap: cellGapM }}>
+  const matrixCells = (cells: (number | null)[]) => (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${view.R}, minmax(0, ${CELL}px))`,
+      gap: GAP, justifyContent: 'start',
+    }}>
       {cells.map((l, i) => (
         <div key={i} style={{
-          borderRadius: cellRadius, background: LEVEL_BG[l],
-          height: !isMobile && range === 7 ? 44 : undefined,
-          aspectRatio: !isMobile && range === 7 ? undefined : '1',
+          borderRadius: cellRadius, aspectRatio: '1',
+          // Neplatný den zůstává prázdný — nesmí vypadat jako nesplněný.
+          background: l == null ? 'transparent' : LEVEL_BG[l],
+          border: l == null ? '1px dashed var(--border)' : undefined,
         }} />
       ))}
     </div>
@@ -133,7 +155,7 @@ export default function PrehledPage() {
       {/* hlavička */}
       {isMobile ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <button onClick={() => router.push('/navyky')} aria-label="Zpět" style={{
+          <button onClick={() => router.push('/habits')} aria-label="Zpět" style={{
             width: 44, height: 44, flexShrink: 0, borderRadius: 12, border: '1px solid var(--border)',
             background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--muted)', cursor: 'pointer',
@@ -143,7 +165,7 @@ export default function PrehledPage() {
       ) : (
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
-            <button onClick={() => router.push('/navyky')} aria-label="Zpět" style={{
+            <button onClick={() => router.push('/habits')} aria-label="Zpět" style={{
               width: 44, height: 44, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--card)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', cursor: 'pointer',
             }}><ChevronLeft size={22} /></button>
@@ -151,7 +173,7 @@ export default function PrehledPage() {
               <div style={{ fontSize: 13, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>
                 {fmtSpan(view.allDays[0], view.allDays[view.allDays.length - 1])}
               </div>
-              <h1 style={{ margin: 0, fontSize: 34, fontWeight: 600, color: 'var(--text)', letterSpacing: '-.02em' }}>Přehled návyků</h1>
+              <h1 style={{ margin: 0, fontSize: 34, fontWeight: 600, color: 'var(--text)', letterSpacing: '-.02em' }}>Přehled Habits</h1>
             </div>
           </div>
           {rangeSwitch()}
@@ -192,7 +214,7 @@ export default function PrehledPage() {
             <div style={{ display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center' }}>
               <span />
               {range === 7 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, minmax(0,1fr))`, gap: cellGapM }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, minmax(0, ${CELL}px))`, gap: GAP, justifyContent: 'start' }}>
                   {view.cut.days.map(d => (
                     <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>{DAY_LABELS[weekdayIndex(d)]}</div>
                   ))}
@@ -208,7 +230,7 @@ export default function PrehledPage() {
             {view.rows.map(r => (
               <div key={r.habit.id} style={{ display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center' }}>
                 <button
-                  onClick={() => router.push(`/navyky/${r.habit.id}`)}
+                  onClick={() => router.push(`/habits/${r.habit.id}`)}
                   title={r.habit.nazev}
                   style={{
                     display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 10, minWidth: 0, minHeight: 44,
@@ -219,6 +241,7 @@ export default function PrehledPage() {
                   {!isMobile && (
                     <span style={{ fontSize: 14, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.habit.nazev}
+                      {r.habit.cas && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--muted)' }}>{fmtTime(r.habit.cas)}</span>}
                     </span>
                   )}
                 </button>

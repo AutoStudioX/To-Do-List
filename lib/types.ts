@@ -183,6 +183,10 @@ export interface Habit {
   /** 'trenink' = value is derived from `workouts`, never written here */
   zdroj: 'rucne' | 'trenink'
   archivovany: boolean
+  /** optional time of day, "06:30:00"; NULL = no time */
+  cas: string | null
+  /** days it applies to, 1=Mon … 7=Sun; NULL or empty = every day */
+  dny: number[] | null
   created_at?: string
 }
 
