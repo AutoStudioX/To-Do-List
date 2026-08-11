@@ -629,3 +629,26 @@ Tap na splněný cíl vracel hodnotu na nulu. U vody na 2500 ml by jedno ťuknut
 Snížit hodnotu jde **tapem na číslo** („1250 z 2000 ml" / „1250 ml"), který otevře stepper s libovolnou hodnotou včetně nuly. Bez toho by po zneaktivnění tlačítka nešla přepočítaná hodnota opravit vůbec.
 
 **Cestou opravena chyba:** tlačítko hodnoty bylo na mobilu vnořené uvnitř tlačítka, které otevírá detail. Vnořená tlačítka jsou neplatné HTML a tap na číslo probublal — místo editace se otevřel detail návyku. Navigační tlačítko teď obaluje jen název, hodnota je jeho sourozenec. Ověřeno: `button button` = 0 na obou šířkách.
+
+## Habits — roční páska začíná dnem vzniku, ne rokem prázdna
+Roční mřížka kreslila natvrdo 53 sloupců přes celých 365 dnů okna. U návyku, který existuje pár měsíců, tak ležela celá historie **až u pravého okraje** a před ní byl rok prázdných buněk — přesně opačně, než platí u 7 a 30 dní.
+
+Teď se roční okno ořízne stejným `windowStart()`: začíná dnem, kdy vznikl (nejstarší) návyk, a **roste doprava**. Sloupců je tolik, kolik jich historie zabere (`ceil((offset + dnů) / 7)`, max 53), mřížka je zarovnaná `start`. Nadpis nelže — místo „Posledních 12 měsíců" se u kratší historie píše „Posledních 120 dní". Platí pro Přehled i Detail.
+
+Ověřeno vykreslené na **1440 i 390** proti 10 návykům se 120 dny historie: **18** sloupců místo 53, `justify-content: start`, 120 vybarvených buněk od indexu 1 (offset = den v týdnu prvního dne) do 120, nadpis „Posledních 120 dní".
+
+## Habits — skrývání místo mazání
+V režimu úprav je místo koše **oko** (`eye-off`). Skrytý návyk zmizí ze seznamu Dnes, z Přehledu i z Detailu a **nepočítá se do skóre, sérií ani statistik** (`dayStats` i denní součet po zápisu jdou jen přes neskryté; `loadWindow` skryté nečte). Historie v `habit_entries` zůstává, takže po vrácení návyk pokračuje tam, kde skončil — mazání ji bralo s sebou a nešlo to vrátit.
+
+V režimu úprav jsou skryté návyky **zašedle na konci seznamu** pod hlavičkou „SKRYTÉ (n)", čárkovaný obrys, popisek „Skrytý — nepočítá se do skóre ani sérií" a **oko** pro vrácení. Mimo režim úprav nejsou vidět vůbec. Duplicitní „Archivovat návyk" ve formuláři je pryč — jedno místo, jeden způsob.
+
+Ověřeno vykreslené na **1440 i 390**: 10 tlačítek „Skrýt návyk", **0** mazacích; po skrytí dvou návyků čítač spadl z „8 z 10" na „6 z 8", objevilo se „SKRYTÉ (2)" a obě karty leží pod všemi aktivními (opacity 0,55, dashed); po vrácení jednoho „7 z 9" a „SKRYTÉ (1)". Tlačítka 44×44.
+
+## Habits — Přehled se vejde na obrazovku, scrolluje jen matice
+S deseti návyky byla matice vyšší než okno a scrollovala se celá stránka — dlaždice pod ní nebyly vidět. Teď má matice **vlastní maximální výšku a scrolluje uvnitř karty**: záhlaví s popisky dnů je přilepené nahoře, řádek „Souhrn dne" dole, lišta schovaná přes `.hide-scrollbar`.
+
+Výška se **měří, nehádá**: `below` je vzdálenost od spodku matice ke konci stránky (souhrn, dlaždice, mezery) a ta se změnou výšky matice nemění, takže měření nekmitá; limit bere spodek `.main-content` mínus jeho `padding-bottom` (na mobilu 80 px kvůli spodní navigaci).
+
+Ověřeno vykreslené s **10 návyky**:
+- **1440×900** — stránka `scrollHeight === clientHeight` (nescrolluje), matice `max-height 340px` a scrolluje uvnitř, po odscrollování o 150 px je záhlaví 0 px od horní hrany a „Souhrn dne" 0 px od spodní, dlaždice končí na 745 px v okně vysokém 900.
+- **390×844** — stránka nescrolluje, matice `max-height 157px`, záhlaví i „Den | 30/30" přilepené, dlaždice končí na 656 px, spodní navigace začíná na 775 px, nic nepřetéká do stran, lišta neubírá šířku (`offsetWidth − clientWidth = 0`).

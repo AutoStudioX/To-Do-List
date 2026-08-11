@@ -23,12 +23,17 @@ export function Legend({ min, max }: { min: string; max: string }) {
 }
 
 /**
- * Contribution graph: 53 sloupců × 7 řádků, plněno po sloupcích.
+ * Contribution graph: 7 řádků, plněno po sloupcích.
  *
  * `offset` je počet prázdných buněk před prvním dnem — musí vyjít ze
  * skutečného dne v týdnu, ne z konstanty. Prototyp má natvrdo 6, což sedělo
  * jen na jeho generovaná data; s reálným datem by mřížka ležela na špatných
  * řádcích.
+ *
+ * Sloupců je tolik, kolik jich skutečná historie zabere — ne natvrdo 53.
+ * S pevnými 53 sloupci ležela u čerstvého návyku jediná buňka až u pravého
+ * okraje roční pásky, protože zbytek roku před jeho vznikem se nekreslí.
+ * Stejné pravidlo jako u 7 a 30 dní: první den historie vlevo, roste doprava.
  */
 export default function YearGrid({
   levels, offset, cell, gap, radius, labels = false,
@@ -41,7 +46,8 @@ export default function YearGrid({
   radius: number
   labels?: boolean
 }) {
-  const total = 53 * 7
+  const cols = Math.min(53, Math.max(1, Math.ceil((offset + levels.length) / 7)))
+  const total = cols * 7
   const cells: (number | null)[] = [
     ...Array(offset).fill(null),
     ...levels,
@@ -51,9 +57,9 @@ export default function YearGrid({
   const grid = (
     <div style={{
       display: 'grid', gridAutoFlow: 'column',
-      gridTemplateColumns: `repeat(53, ${cell}px)`,
+      gridTemplateColumns: `repeat(${cols}, ${cell}px)`,
       gridTemplateRows: `repeat(7, ${cell}px)`,
-      gap, justifyContent: labels ? undefined : 'center',
+      gap, justifyContent: 'start', flexShrink: 0,
     }}>
       {cells.map((l, i) => (
         <div key={i} style={{ borderRadius: radius, background: l == null ? 'transparent' : LEVEL_BG[l] }} />

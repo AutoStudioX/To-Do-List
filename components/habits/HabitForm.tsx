@@ -1,11 +1,10 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useConfirm } from '@/components/ConfirmDialog'
 import { isReadOnly, fmtTimeRange, type Habit } from '@/lib/habits'
 import TimePicker from '@/components/TimePicker'
 import HabitIcon, { ICON_CHOICES } from './HabitIcon'
-import { Check, Archive } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 const DNY_LABELS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
@@ -14,14 +13,13 @@ const DNY_LABELS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
  * pro pole s malým počtem voleb.
  */
 export default function HabitForm({
-  habit, poradi, onDone, onError, onArchived,
+  habit, poradi, onDone, onError,
 }: {
   /** vyplněné = úprava, prázdné = nový návyk */
   habit?: Habit
   poradi: number
   onDone: (msg: string) => void
   onError: (msg: string) => void
-  onArchived?: (msg: string) => void
 }) {
   const edit = !!habit
   const [nazev, setNazev] = useState(habit?.nazev ?? '')
@@ -35,7 +33,6 @@ export default function HabitForm({
   const [casDo, setCasDo] = useState(habit?.cas_do ? habit.cas_do.slice(0, 5) : '')
   const [dny, setDny] = useState<number[]>(habit?.dny ?? [])
   const [saving, setSaving] = useState(false)
-  const { confirm, dialog } = useConfirm()
   // Trénink je ano/ne řízené z tréninků — typ u něj měnit nedává smysl.
   const typLocked = !!habit && isReadOnly(habit)
 
@@ -72,16 +69,6 @@ export default function HabitForm({
     setSaving(false)
     if (error) { onError(`${edit ? 'Uložení' : 'Založení'} selhalo: ${error.message}`); return }
     onDone(`Návyk „${nazev.trim()}" ${edit ? 'upraven' : 'založen'}`)
-  }
-
-  /** Archivace místo mazání — historie v `habit_entries` má zůstat. */
-  async function archive() {
-    if (!habit) return
-    if (!await confirm(`Archivovat návyk „${habit.nazev}"? Zmizí ze seznamu, historie zůstane.`, 'Archivovat')) return
-    const supabase = createClient()
-    const { error } = await supabase.from('habits').update({ archivovany: true }).eq('id', habit.id)
-    if (error) { onError(`Archivace selhala: ${error.message}`); return }
-    onArchived?.(`Návyk „${habit.nazev}" archivován`)
   }
 
   const label = (t: string) => (
@@ -189,15 +176,8 @@ export default function HabitForm({
         opacity: canSave ? 1 : 0.55, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       }}><Check size={18} /> {saving ? 'Ukládám…' : edit ? 'Uložit změny' : 'Založit návyk'}</button>
 
-      {/* Trénink se archivovat nedá — bez něj by návyk zmizel, ale tréninky ne. */}
-      {edit && !isReadOnly(habit!) && (
-        <button onClick={archive} style={{
-          width: '100%', minHeight: 44, marginTop: 10, background: 'transparent', border: 'none',
-          color: 'var(--muted)', fontSize: 13, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}><Archive size={15} /> Archivovat návyk</button>
-      )}
-      {dialog}
+      {/* Skrývání je v režimu úprav na seznamu (ikona oka) — druhé místo pro
+          totéž by jen mátlo, tady zůstává čisté uložení změn. */}
     </div>
   )
 }

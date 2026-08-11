@@ -11,6 +11,7 @@ import { loadWindow, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayWord, yearGridOffset, weekdayIndex, DAY_LABELS,
   isReadOnly, habitStreaksOn, successRateOn, appliesOn, existsOn, tracksOn, sortHabits, fmtTimeRange,
+  windowStart,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Settings, Link2 } from 'lucide-react'
 
@@ -56,6 +57,9 @@ export default function HabitDetailPage() {
     const rate = r30.total ? Math.round(r30.hit / r30.total * 100) : 0
     const todayVal = vals[vals.length - 1] ?? 0
 
+    const yearFrom = windowStart([habit], win.days)
+    const yearDays = win.days.slice(yearFrom)
+
     const winVals = vals.slice(-CHART_DAYS)
     const winDays = win.days.slice(-CHART_DAYS)
     // Výška se škáluje k MAXIMU V OKNĚ, ne k cíli — vysoký den tak nepřeteče.
@@ -80,7 +84,12 @@ export default function HabitDetailPage() {
 
     return {
       habit, vals, st, rate, todayVal, bars,
-      yearLevels: win.days.map((d, i) => tracksOn(habit, d) ? level(ratio(habit, vals[i] ?? 0)) : null),
+      // Páska začíná dnem vzniku návyku a roste doprava — stejné pravidlo jako
+      // v Přehledu. S celými 365 dny ležela u čerstvého návyku jediná buňka
+      // až u pravého okraje a před ní byl rok prázdna.
+      yearDays,
+      yearLevels: yearDays.map((d, i) =>
+        tracksOn(habit, d) ? level(ratio(habit, vals[yearFrom + i] ?? 0)) : null),
       axisNote: habit.typ === 'cil'
         ? `Cíl ${habit.cil} ${habit.jednotka} · maximum ${maxInWindow} ${habit.jednotka}`
         : 'Splněno / nesplněno',
@@ -200,7 +209,7 @@ export default function HabitDetailPage() {
         </div>
         <YearGrid
           levels={view.yearLevels}
-          offset={yearGridOffset(win!.days[0])}
+          offset={yearGridOffset(view.yearDays[0])}
           cell={isMobile ? 5 : 13}
           gap={isMobile ? 1 : 4}
           radius={isMobile ? 1 : 3}
@@ -248,7 +257,6 @@ export default function HabitDetailPage() {
           poradi={habit.poradi}
           onDone={(msg) => { setEditOpen(false); showToast(msg); load() }}
           onError={(msg) => showToast(msg, 'error')}
-          onArchived={(msg) => { setEditOpen(false); showToast(msg); router.push('/habits') }}
         />
       </Modal>
 

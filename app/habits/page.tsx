@@ -7,13 +7,12 @@ import Modal from '@/components/Modal'
 import HabitIcon from '@/components/habits/HabitIcon'
 import HabitForm from '@/components/habits/HabitForm'
 import StepperField from '@/components/gym/StepperField'
-import { useConfirm } from '@/components/ConfirmDialog'
 import {
   metOn, ratio, streaks, dayWord, habitWord, lastDays, dayKey, dayStats,
   trainingValues, isReadOnly, sortHabits, appliesOn, fmtTimeRange,
   DAY_DONE_THRESHOLD, type Habit,
 } from '@/lib/habits'
-import { Plus, Check, BarChart3, Flame, Link2, Pencil, Trash2, ArrowUp, ArrowDown, SlidersHorizontal } from 'lucide-react'
+import { Plus, Check, BarChart3, Flame, Link2, Pencil, Eye, EyeOff, ArrowUp, ArrowDown, SlidersHorizontal } from 'lucide-react'
 
 // Rozměry, rozestupy a radiusy jsou přesně z designu. Barvy jdou přes
 // proměnné appky, aby sekce držela s motivem a přepínala se do světlého.
@@ -45,7 +44,6 @@ export default function NavykyPage() {
   const [editing, setEditing] = useState<Habit | null>(null)
   const [editValue, setEditValue] = useState<{ habit: Habit; value: number } | null>(null)
   const [editMode, setEditMode] = useState(false)
-  const { confirm, dialog } = useConfirm()
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -66,7 +64,9 @@ export default function NavykyPage() {
     const from = days[0]
 
     const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }] = await Promise.all([
-      supabase.from('habits').select('*').eq('user_id', user.id).eq('archivovany', false).order('poradi'),
+      // Skryté návyky se načtou taky — v režimu úprav je vidět na konci
+      // seznamu, aby šly vrátit. Do skóre, sérií ani statistik nejdou.
+      supabase.from('habits').select('*').eq('user_id', user.id).order('poradi'),
       supabase.from('habit_entries').select('habit_id, datum, hodnota').eq('user_id', user.id).gte('datum', from),
       // Návyk „trénink" se ČTE odsud — do habit_entries se pro něj nikdy nezapisuje.
       supabase.from('workouts').select('date').eq('user_id', user.id).gte('date', from),
@@ -86,8 +86,10 @@ export default function NavykyPage() {
     const perHabit: Record<string, number[]> = {}
     for (const h of list) perHabit[h.id] = days.map(d => byHabit[h.id]?.[d] ?? 0)
     setHabits(sortHabits(list))
-    // Den, kdy návyk neplatil, se nesmí počítat jako nesplněný.
-    setCounts(dayStats(list, days, perHabit).map(s => s.met))
+    // Den, kdy návyk neplatil, se nesmí počítat jako nesplněný. Skrytý návyk
+    // do denního součtu nevstupuje vůbec — jinak by série stála na návyku,
+    // který uživatel nevidí.
+    setCounts(dayStats(list.filter(h => !h.archivovany), days, perHabit).map(s => s.met))
     setValues(Object.fromEntries(list.map(h => [h.id, byHabit[h.id]?.[today] ?? 0])))
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,7 +122,7 @@ export default function NavykyPage() {
       const next = [...c]
       const vals = { ...values, [h.id]: hodnota }
       next[next.length - 1] = habits
-        .filter(x => appliesOn(x, today))
+        .filter(x => !x.archivovany && appliesOn(x, today))
         .reduce((n, x) => n + (metOn(x, vals[x.id] ?? 0) ? 1 : 0), 0)
       return next
     })
@@ -157,20 +159,24 @@ export default function NavykyPage() {
     showToast('Pořadí uloženo')
   }
 
-  /** Smazání i s historií — archivace je v úpravě návyku, tohle je natvrdo. */
-  async function remove(h: Habit) {
-    if (isReadOnly(h)) return
-    if (!await confirm(
-      `Smazat návyk „${h.nazev}" i s celou historií? Nejde to vrátit.`, 'Smazat')) return
-    const { error } = await supabase.from('habits').delete().eq('id', h.id)
-    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
-    setHabits(prev => prev.filter(x => x.id !== h.id))
-    showToast(`Návyk „${h.nazev}" smazán`)
+  /**
+   * Skrytí místo mazání. Historie v `habit_entries` zůstává, takže po vrácení
+   * návyk pokračuje tam, kde skončil — smazání by ji vzalo s sebou a nešlo by
+   * to vrátit. Skrytý návyk nikde není a nepočítá se do skóre ani sérií;
+   * v režimu úprav je zašedle na konci seznamu.
+   */
+  async function setHidden(h: Habit, hide: boolean) {
+    const { error } = await supabase.from('habits').update({ archivovany: hide }).eq('id', h.id)
+    if (error) { showToast(`${hide ? 'Skrytí' : 'Vrácení'} selhalo: ${error.message}`, 'error'); return }
+    setHabits(prev => prev.map(x => x.id === h.id ? { ...x, archivovany: hide } : x))
+    showToast(hide ? `Návyk „${h.nazev}" skrytý` : `Návyk „${h.nazev}" vrácený`)
+    load()   // skóre i série se musí přepočítat bez skrytého návyku
   }
 
   // ---------- odvozené ----------
-  // Hlavní stránka ukazuje jen návyky platné pro dnešek.
-  const dnesni = habits.filter(h => appliesOn(h, today))
+  // Hlavní stránka ukazuje jen návyky platné pro dnešek — a nikdy skryté.
+  const dnesni = habits.filter(h => !h.archivovany && appliesOn(h, today))
+  const skryte = habits.filter(h => h.archivovany)
   const total = dnesni.length
   const doneCount = dnesni.filter(h => metOn(h, values[h.id] ?? 0)).length
   const donePct = total ? Math.round(doneCount / total * 100) : 0
@@ -241,7 +247,7 @@ export default function NavykyPage() {
         <button onClick={() => move(h, -1)} disabled={!bezCasu} aria-label="Posunout nahoru" title={bezCasu ? 'Posunout nahoru' : 'Pořadí určuje čas'} style={{ ...iconBtn, opacity: bezCasu ? 1 : 0.35, cursor: bezCasu ? 'pointer' : 'default' }}><ArrowUp size={16} /></button>
         <button onClick={() => move(h, 1)} disabled={!bezCasu} aria-label="Posunout dolů" title={bezCasu ? 'Posunout dolů' : 'Pořadí určuje čas'} style={{ ...iconBtn, opacity: bezCasu ? 1 : 0.35, cursor: bezCasu ? 'pointer' : 'default' }}><ArrowDown size={16} /></button>
         <button onClick={() => setEditing(h)} aria-label="Upravit návyk" style={iconBtn}><SlidersHorizontal size={16} /></button>
-        {!ro && <button onClick={() => remove(h)} aria-label="Smazat návyk" style={{ ...iconBtn, color: C.accent, borderColor: 'rgba(232,25,44,0.4)', background: 'rgba(232,25,44,0.10)' }}><Trash2 size={16} /></button>}
+        <button onClick={() => setHidden(h, true)} aria-label="Skrýt návyk" title="Skrýt návyk" style={{ ...iconBtn, color: C.accent, borderColor: 'rgba(232,25,44,0.4)', background: 'rgba(232,25,44,0.10)' }}><EyeOff size={16} /></button>
       </div>
     )
 
@@ -382,6 +388,34 @@ export default function NavykyPage() {
     )
   }
 
+  /** Skrytý návyk: zašedlý řádek s okem pro vrácení. Nic se u něj neodškrtává. */
+  function hiddenCard(h: Habit) {
+    return (
+      <div key={h.id} style={{
+        display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 20,
+        padding: isMobile ? '12px 16px' : '14px 22px',
+        background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14, opacity: 0.55,
+      }}>
+        <div style={{
+          width: 44, height: 44, flexShrink: 0, borderRadius: 12, background: C.nested,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted,
+        }}><HabitIcon name={h.ikona} size={20} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: isMobile ? 15 : 17, fontWeight: 500, color: C.text,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{h.nazev}</div>
+          <div style={{ fontSize: isMobile ? 12 : 13, color: C.muted, marginTop: 2 }}>
+            Skrytý — nepočítá se do skóre ani sérií
+          </div>
+        </div>
+        <button onClick={() => setHidden(h, false)} aria-label="Vrátit návyk" title="Vrátit návyk" style={iconBtn}>
+          <Eye size={16} />
+        </button>
+      </div>
+    )
+  }
+
   if (loading) return <div style={{ color: C.muted, padding: 24 }}>Načítání…</div>
 
   const hint = (
@@ -464,6 +498,17 @@ export default function NavykyPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 10 }}>
         {dnesni.map(habitCard)}
+
+        {/* Skryté návyky — jen v režimu úprav, zašedle na konci seznamu. */}
+        {editMode && skryte.length > 0 && (
+          <>
+            <div style={{
+              marginTop: isMobile ? 8 : 14, fontSize: 11, letterSpacing: 0.6,
+              fontWeight: 700, color: C.muted,
+            }}>SKRYTÉ ({skryte.length})</div>
+            {skryte.map(hiddenCard)}
+          </>
+        )}
       </div>
 
       <div style={{ marginTop: isMobile ? 12 : 28 }}>{hint}</div>
@@ -513,7 +558,6 @@ export default function NavykyPage() {
             poradi={editing.poradi}
             onDone={(msg) => { setEditing(null); showToast(msg); load() }}
             onError={(msg) => showToast(msg, 'error')}
-            onArchived={(msg) => { setEditing(null); showToast(msg); load() }}
           />
         )}
       </Modal>
@@ -526,7 +570,6 @@ export default function NavykyPage() {
         />
       </Modal>
 
-      {dialog}
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )

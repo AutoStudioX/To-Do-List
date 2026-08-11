@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Toast, useToast } from '@/components/Toast'
@@ -25,6 +25,9 @@ export default function PrehledPage() {
   const [range, setRange] = useState<Range>(30)
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
+  const [matrixMax, setMatrixMax] = useState<number | null>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -59,6 +62,8 @@ export default function PrehledPage() {
       byHabit: Object.fromEntries(Object.keys(raw.byHabit).map(id => [id, raw.byHabit[id].slice(from)])),
     }
     const R = cut.days.length
+    const yearFrom = windowStart(habits, allDays)
+    const yearDays = allDays.slice(yearFrom)
 
     // Den, kdy návyk neplatil, se do jeho statistiky nezapočítá.
     const statsAll = dayStats(habits, allDays, allBy)
@@ -104,9 +109,15 @@ export default function PrehledPage() {
     return {
       habits, R, rows, cut, countsCut, countsAll, allDays, prvniDen,
       dayLevels: statsCut.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
+      // Roční páska se řídí stejným pravidlem jako 7 a 30 dní: začíná dnem,
+      // kdy vznikl nejstarší návyk, a roste doprava. Dokud se kreslilo celých
+      // 365 dní, ležela u čerstvého návyku jediná buňka až na pravém konci
+      // pásky a před ní byl rok prázdna.
       // `applicable === 0` = ten den ještě neexistoval žádný návyk (nebo žádný
       // neplatil) → prázdná buňka, ne šedá nula.
-      yearLevels: statsAll.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
+      yearDays,
+      yearLevels: statsAll.slice(yearFrom)
+        .map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
       rangeScore: `${countsCut.filter(c => c >= 4).length}/${R}`,
       summary: `Průměrně ${avg} návyků denně · ${full}× kompletní den`,
       tiles: [
@@ -117,6 +128,29 @@ export default function PrehledPage() {
       ],
     }
   }, [win, range])
+
+  /**
+   * Matice si bere jen tolik výšky, kolik po ní ve viewportu zbude — dlaždice
+   * pod ní musí být vidět bez scrollování stránky. Výška se měří, ne hádá:
+   * `below` je vzdálenost od spodku matice ke konci stránky (souhrn, dlaždice,
+   * mezery) a ta se změnou výšky matice nemění, takže měření nekmitá.
+   */
+  useLayoutEffect(() => {
+    const calc = () => {
+      const box = boxRef.current, page = pageRef.current
+      if (!box || !page) return
+      const main = box.closest('.main-content') as HTMLElement | null
+      const pad = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 0
+      const limit = (main ? main.getBoundingClientRect().bottom : window.innerHeight) - pad
+      const b = box.getBoundingClientRect()
+      const below = page.getBoundingClientRect().bottom - b.bottom
+      const next = Math.max(140, Math.round(limit - b.top - below))
+      setMatrixMax(prev => (prev != null && Math.abs(prev - next) < 4 ? prev : next))
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [view, range, isMobile])
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání…</div>
   if (!view || !view.habits.length) {
@@ -181,7 +215,7 @@ export default function PrehledPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: 24 }}>
+    <div ref={pageRef} style={{ maxWidth: 1120, margin: '0 auto', paddingBottom: 24 }}>
       {/* hlavička */}
       {isMobile ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -216,7 +250,10 @@ export default function PrehledPage() {
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: isMobile ? 15 : 19, fontWeight: 600, color: 'var(--text)' }}>
-              {isYear ? 'Posledních 12 měsíců'
+              {isYear
+                ? (view.yearDays.length >= 365 ? 'Posledních 12 měsíců'
+                  : view.yearDays.length === 1 ? 'Dnes'
+                  : `Posledních ${view.yearDays.length} ${dayWord(view.yearDays.length)}`)
                 : view.R >= range ? `Posledních ${range} dní`
                 : view.R === 1 ? 'Dnes' : `Posledních ${view.R} ${dayWord(view.R)}`}
             </div>
@@ -234,16 +271,26 @@ export default function PrehledPage() {
         {isYear ? (
           <YearGrid
             levels={view.yearLevels}
-            offset={yearGridOffset(view.allDays[0])}
+            offset={yearGridOffset(view.yearDays[0])}
             cell={isMobile ? 5 : 13}
             gap={isMobile ? 1 : 4}
             radius={isMobile ? 1 : 3}
             labels={!isMobile}
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: rowGap }}>
+          // Scrolluje matice, ne stránka. Záhlaví se lepí nahoru, souhrn dne
+          // dolů — obojí musí být uvnitř téhož scrollovacího prvku, jinak by
+          // se lepilo k viewportu a ne ke kartě.
+          <div ref={boxRef} className="hide-scrollbar" style={{
+            display: 'flex', flexDirection: 'column', gap: rowGap,
+            overflowY: 'auto', overflowX: 'hidden',
+            maxHeight: matrixMax ?? undefined,
+          }}>
             {/* popisky dnů */}
-            <div style={{ display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center' }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center',
+              position: 'sticky', top: 0, zIndex: 2, background: 'var(--card)', paddingBottom: 4,
+            }}>
               <span />
               {range === 7 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, minmax(0, 1fr))`, gap: GAP }}>
@@ -285,10 +332,11 @@ export default function PrehledPage() {
               </div>
             ))}
 
-            {/* souhrn dne */}
+            {/* souhrn dne — přilepený dole, ať je vidět i uprostřed scrollu */}
             <div style={{
               display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center',
-              marginTop: 6, paddingTop: 14, borderTop: '1px solid var(--border)',
+              position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--card)',
+              marginTop: 6, paddingTop: 14, paddingBottom: 2, borderTop: '1px solid var(--border)',
             }}>
               <div style={{ fontSize: isMobile ? 11 : 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {isMobile ? 'Den' : 'Souhrn dne'}
