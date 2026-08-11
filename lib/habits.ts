@@ -289,3 +289,22 @@ export function habitStreaksOn(h: Habit, days: string[], values: number[]): { cu
   })
   return streaks(applicable)
 }
+
+/**
+ * Index prvního dne okna, který má smysl kreslit — nikdy dřív, než vznikl
+ * nejstarší z návyků.
+ *
+ * Bez toho měl řádek u návyku založeného dnes třicet buněk, z toho 29
+ * prázdných výplní, a skóre 0/30 místo 0/1.
+ */
+export function windowStart(habits: Pick<Habit, 'created_at'>[], days: string[]): number {
+  if (!habits.length) return 0
+  let earliest: string | null = null
+  for (const h of habits) {
+    const d = h.created_at?.slice(0, 10)
+    if (!d) return 0                       // neznámý vznik → okno neomezujeme
+    if (!earliest || d < earliest) earliest = d
+  }
+  const i = days.findIndex(d => d >= earliest!)
+  return i < 0 ? Math.max(0, days.length - 1) : i
+}

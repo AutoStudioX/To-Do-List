@@ -9,7 +9,7 @@ import { loadWindow, slice, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayLevel, streaks, dayWord, scoreTone, weekdayIndex,
   yearGridOffset, longestStreakSpan, fmtMonthSpan, DAY_LABELS,
-  dayStats, appliesOn, existsOn, tracksOn, successRateOn, sortHabits, fmtTime,
+  dayStats, appliesOn, existsOn, tracksOn, successRateOn, sortHabits, fmtTime, windowStart,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Trophy, CalendarCheck, TrendingDown } from 'lucide-react'
 
@@ -50,7 +50,14 @@ export default function PrehledPage() {
     if (!win) return null
     const habits = sortHabits(win.habits)
     const { days: allDays, byHabit: allBy } = win
-    const cut = slice(win, range)
+    const raw = slice(win, range)
+    // Okno nikdy nesahá před vznik nejstaršího návyku — jinak by řádek
+    // u návyku založeného dnes měl 30 buněk a skóre 0/30 místo 0/1.
+    const from = windowStart(habits, raw.days)
+    const cut = {
+      days: raw.days.slice(from),
+      byHabit: Object.fromEntries(Object.keys(raw.byHabit).map(id => [id, raw.byHabit[id].slice(from)])),
+    }
     const R = cut.days.length
 
     // Den, kdy návyk neplatil, se do jeho statistiky nezapočítá.
@@ -58,6 +65,7 @@ export default function PrehledPage() {
     const countsAll = statsAll.map(x => x.met)
     const statsCut = statsAll.slice(statsAll.length - R)
     const countsCut = countsAll.slice(countsAll.length - R)
+    const prvniDen = cut.days[0]
 
     const st = streaks(countsAll)
     const span = longestStreakSpan(countsAll, allDays)
@@ -94,9 +102,11 @@ export default function PrehledPage() {
     const full = statsCut.filter(x => x.applicable > 0 && x.met === x.applicable).length
 
     return {
-      habits, R, rows, cut, countsCut, countsAll, allDays,
+      habits, R, rows, cut, countsCut, countsAll, allDays, prvniDen,
       dayLevels: statsCut.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
-      yearLevels: statsAll.map(x => dayLevel(x.met, x.applicable)),
+      // `applicable === 0` = ten den ještě neexistoval žádný návyk (nebo žádný
+      // neplatil) → prázdná buňka, ne šedá nula.
+      yearLevels: statsAll.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
       rangeScore: `${countsCut.filter(c => c >= 4).length}/${R}`,
       summary: `Průměrně ${avg} návyků denně · ${full}× kompletní den`,
       tiles: [
@@ -139,15 +149,28 @@ export default function PrehledPage() {
   // Pevná velikost buňky a pevná mezera, zarovnáno doleva — řádek klidně
   // skončí v půlce šířky. Sloupců je vždy tolik, kolik má okno dnů, aby si
   // řádky odpovídaly datem; buňky mimo existenci návyku se jen nevykreslí.
+  // 7 dní: obdélníky přes celou šířku řádku — sedm sloupců se do šířky vejde,
+  // roztahování tam nevadí. 30 dní a rok mají pevnou velikost i mezeru
+  // a zarovnávají se doleva.
   const matrixCells = (cells: (number | null | undefined)[]) => (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(${view.R}, ${CELL}px)`,
-      gap: GAP, justifyContent: 'start',
+      // Buňky rostou ZLEVA: první den historie vlevo, dnešek vpravo.
+      // U 7 dní zůstává sedm stop, aby si buňka držela šířku i při kratší
+      // historii — jeden den jinak natáhne lištu přes celou obrazovku.
+      // U 30 dní a roku je stop tolik, kolik je dnů, takže řádek skončí tam,
+      // kde končí historie.
+      gridTemplateColumns: range === 7
+        ? `repeat(7, minmax(0, 1fr))`
+        : `repeat(${view.R}, ${CELL}px)`,
+      gap: GAP,
+      justifyContent: range === 7 ? undefined : 'start',
     }}>
       {cells.map((l, i) => (
         <div key={i} style={{
-          width: CELL, height: CELL, borderRadius: cellRadius,
+          width: range === 7 ? undefined : CELL,
+          height: range === 7 ? CELL : CELL,
+          borderRadius: cellRadius,
           background: l == null ? 'transparent' : LEVEL_BG[l],
           // `undefined` (návyk ještě neexistoval) nekreslíme vůbec,
           // `null` (neplatil) čárkovaně.
@@ -193,7 +216,9 @@ export default function PrehledPage() {
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: isMobile ? 15 : 19, fontWeight: 600, color: 'var(--text)' }}>
-              {isYear ? 'Posledních 12 měsíců' : `Posledních ${range} dní`}
+              {isYear ? 'Posledních 12 měsíců'
+                : view.R >= range ? `Posledních ${range} dní`
+                : view.R === 1 ? 'Dnes' : `Posledních ${view.R} ${dayWord(view.R)}`}
             </div>
             {!isMobile && (
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
@@ -221,14 +246,15 @@ export default function PrehledPage() {
             <div style={{ display: 'grid', gridTemplateColumns: COL, gap: COL_GAP, alignItems: 'center' }}>
               <span />
               {range === 7 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, ${CELL}px)`, gap: GAP, justifyContent: 'start' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, minmax(0, 1fr))`, gap: GAP }}>
                   {view.cut.days.map(d => (
                     <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>{DAY_LABELS[weekdayIndex(d)]}</div>
                   ))}
                 </div>
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)' }}>
-                  <span>před {range} dny</span><span>dnes</span>
+                  <span>{view.R >= range ? `před ${range} dny` : fmtDen(view.prvniDen)}</span>
+                  {view.R > 1 && <span>dnes</span>}
                 </div>
               )}
               <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--muted)' }}>Splněno</div>
@@ -333,6 +359,12 @@ export default function PrehledPage() {
 
 const MONTHS_SHORT = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
   'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec']
+
+/** „11. 8." */
+function fmtDen(k: string): string {
+  if (!k) return ''
+  return `${Number(k.slice(8, 10))}. ${Number(k.slice(5, 7))}.`
+}
 
 /** „Srpen 2025 — srpen 2026" */
 function fmtSpan(from: string, to: string): string {

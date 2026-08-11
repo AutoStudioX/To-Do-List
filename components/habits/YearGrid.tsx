@@ -33,8 +33,8 @@ export function Legend({ min, max }: { min: string; max: string }) {
 export default function YearGrid({
   levels, offset, cell, gap, radius, labels = false,
 }: {
-  /** `null` = den, kdy návyk neplatil — zůstane prázdný */
-  levels: (number | null)[]
+  /** `null`/`undefined` = den, který se nesleduje — zůstane prázdný */
+  levels: (number | null | undefined)[]
   offset: number
   cell: number
   gap: number

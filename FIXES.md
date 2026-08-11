@@ -567,3 +567,36 @@ Dvě lišty, každá z jiné příčiny:
 `input type="time"` otevírá systémový panel — světlý, s cizím chrome, na každé platformě jiný. Nahrazen na **třech místech**: formulář návyku, sdílený `TimePicker` (Úkoly, Přehled) a pole Od/Do v Časovém plánu.
 
 `TimePicker` má teď rychlé volby jako pilulky (`Bez času`, 6:30, 8:00, 12:00, 18:00, `Vlastní`) a pro vlastní čas **dva steppery** postavené na `StepperField` z tréninku — tap na číslo umožní přímé zadání, dlouhý stisk skáče po pěti krocích. Žádný nativní prvek v appce nezůstal.
+
+## Habits — okno matice podle skutečné historie
+### Buňky rostou zleva, šířka řádku = počet existujících dnů
+Matice zarovnávala poslední sloupec na „dnes", takže při jednom dni historie visela jediná buňka na konci řádku a před ní bylo prázdno. `windowStart()` teď okno ořízne na den vzniku nejstaršího návyku — první den historie je vlevo, dnešek vpravo, řádek končí tam, kde končí historie.
+
+Platí pro **všechny tři rozsahy**:
+- **7 dní** — sedm stop zůstává (aby si buňka držela šířku 1/7 řádku), ale vykreslí se jen tolik buněk, kolik je dnů. Jeden den = jeden obdélník 98×44 vlevo, ne lišta přes celou obrazovku.
+- **30 dní** — stop je tolik, kolik je dnů; buňky pevné 19 px (mobil 7 px), zarovnané doleva.
+- **Rok** — kalendář zůstává 53×7, dny před vznikem jsou prázdné.
+
+### Jmenovatel skóre i souhrnu dne
+Skóre návyku i **Souhrn dne** teď dělí počtem dnů, které existují. Návyky založené dnes dávají `0/1`, ne `0/30`.
+
+### Popisek rozsahu
+`před 30 dny` se ukáže jen tehdy, když historie skutečně 30 dní má. Jinak datum prvního dne (`11. 8.`). Titulek karty stejně: `Dnes` / `Posledních N dní` / `Posledních 30 dní`.
+
+### 7 dní zpět na obdélníky
+Buňky sedmidenního pohledu se vrátily na obdélníky dělící šířku řádku (98×44 na 1440). Pevná velikost platí jen pro 30 dní a rok.
+
+### Chyba nalezená při ověřování
+Roční mřížka kreslila **365 šedých buněk** i u návyků založených dnes. Opravu na „nesledovaný den = prázdno" jsem předtím aplikoval jen na souhrn dne (`dayLevels`), ale ne na `yearLevels`, kde `dayLevel(0, 0)` vracelo 0 = šedou. Po opravě: 370 prázdných, 1 obarvená.
+
+### Ověřeno vykreslené
+Změřeno na stránce s návyky, které mají `created_at` = dnes (stejná struktura jako reálný stav po založení sady):
+
+| pohled | buněk v řádku | rozměr | zleva | skóre | souhrn dne |
+|---|---|---|---|---|---|
+| 7 dní | 1 ze 7 stop | 98×44 obdélník | 0 px | 0/1 | 0/1 |
+| 30 dní | 1 | 19×19 | 0 px | 0/1 | 0/1 |
+| 30 dní (mobil) | 1 | 7×7 | 0 px | 0/1 | — |
+| Rok | 1 obarvená z 371 | 13×13 | — | — | — |
+
+11 nových testů (`existsOn`, `tracksOn`, `windowStart`) — celkem **82** na `lib/habits.ts`.
