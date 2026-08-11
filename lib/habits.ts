@@ -20,8 +20,10 @@ export type Habit = {
   poradi: number
   zdroj: HabitSource
   archivovany: boolean
-  /** „06:30" — nepovinný čas návyku; NULL = bez času */
+  /** „06:30" — nepovinný začátek; NULL = bez času */
   cas: string | null
+  /** „08:00" — nepovinný konec rozsahu; bez `cas` nedává smysl */
+  cas_do: string | null
   /** dny platnosti 1=Po … 7=Ne; NULL nebo prázdné = každý den */
   dny: number[] | null
   /** kdy návyk vznikl — dřívější dny se nekreslí ani nepočítají */
@@ -213,6 +215,17 @@ export function scoreTone(hit: number, total: number): 'accent' | 'text' | 'mute
 export function fmtTime(cas: string | null | undefined): string {
   if (!cas) return ''
   return cas.slice(0, 5).replace(/^0/, '')
+}
+
+/**
+ * „7:30 – 8:00" s rozsahem, „7:30" jen se začátkem, prázdno bez času.
+ * Pomlčka je půlčtverčíková (–), ne spojovník.
+ */
+export function fmtTimeRange(cas: string | null | undefined, casDo: string | null | undefined): string {
+  const od = fmtTime(cas)
+  if (!od) return ''
+  const doK = fmtTime(casDo)
+  return doK ? `${od} – ${doK}` : od
 }
 
 /** Platí návyk v daný den? Prázdné `dny` = každý den. */

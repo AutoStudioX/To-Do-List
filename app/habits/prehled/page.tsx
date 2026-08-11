@@ -9,7 +9,7 @@ import { loadWindow, slice, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayLevel, streaks, dayWord, scoreTone, weekdayIndex,
   yearGridOffset, longestStreakSpan, fmtMonthSpan, DAY_LABELS,
-  dayStats, appliesOn, existsOn, tracksOn, successRateOn, sortHabits, fmtTime, windowStart,
+  dayStats, appliesOn, existsOn, tracksOn, successRateOn, sortHabits, fmtTimeRange, windowStart,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Trophy, CalendarCheck, TrendingDown } from 'lucide-react'
 
@@ -274,7 +274,7 @@ export default function PrehledPage() {
                   {!isMobile && (
                     <span style={{ fontSize: 14, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.habit.nazev}
-                      {r.habit.cas && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--muted)' }}>{fmtTime(r.habit.cas)}</span>}
+                      {r.habit.cas && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--muted)' }}>{fmtTimeRange(r.habit.cas, r.habit.cas_do)}</span>}
                     </span>
                   )}
                 </button>

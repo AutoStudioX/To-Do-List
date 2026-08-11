@@ -9,7 +9,7 @@ import HabitForm from '@/components/habits/HabitForm'
 import { useConfirm } from '@/components/ConfirmDialog'
 import {
   metOn, ratio, streaks, dayWord, habitWord, lastDays, dayKey, dayStats,
-  trainingValues, isReadOnly, sortHabits, appliesOn, fmtTime,
+  trainingValues, isReadOnly, sortHabits, appliesOn, fmtTimeRange,
   DAY_DONE_THRESHOLD, type Habit,
 } from '@/lib/habits'
 import { Plus, Check, BarChart3, Flame, Link2, Pencil, Trash2, ArrowUp, ArrowDown, SlidersHorizontal } from 'lucide-react'
@@ -298,7 +298,7 @@ export default function NavykyPage() {
             {chip}
             <button onClick={() => router.push(`/habits/${h.id}`)} style={{ flex: 1, minWidth: 0, minHeight: 44, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
               <div style={{ fontSize: 15, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
-                {h.nazev}{h.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted }}>{fmtTime(h.cas)}</span>}
+                {h.nazev}{h.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
               </div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                 {ro && <Link2 size={11} style={{ flexShrink: 0 }} />}
@@ -328,7 +328,7 @@ export default function NavykyPage() {
         {chip}
         <button onClick={() => router.push(`/habits/${h.id}`)} style={{ flex: 1, minWidth: 0, minHeight: 44, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
           <div style={{ fontSize: 17, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
-            {h.nazev}{h.cas && <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: C.muted }}>{fmtTime(h.cas)}</span>}
+            {h.nazev}{h.cas && <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
             {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}{h.podtitul}

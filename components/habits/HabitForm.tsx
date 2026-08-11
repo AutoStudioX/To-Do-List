@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { isReadOnly, type Habit } from '@/lib/habits'
+import { isReadOnly, fmtTimeRange, type Habit } from '@/lib/habits'
 import TimePicker from '@/components/TimePicker'
 import HabitIcon, { ICON_CHOICES } from './HabitIcon'
 import { Check, Archive } from 'lucide-react'
@@ -32,6 +32,7 @@ export default function HabitForm({
   const [krok, setKrok] = useState(habit?.krok != null ? String(habit.krok) : '250')
   const [ikona, setIkona] = useState<string>(habit?.ikona ?? 'circle')
   const [cas, setCas] = useState(habit?.cas ? habit.cas.slice(0, 5) : '')
+  const [casDo, setCasDo] = useState(habit?.cas_do ? habit.cas_do.slice(0, 5) : '')
   const [dny, setDny] = useState<number[]>(habit?.dny ?? [])
   const [saving, setSaving] = useState(false)
   const { confirm, dialog } = useConfirm()
@@ -59,6 +60,8 @@ export default function HabitForm({
       krok: typ === 'cil' ? krokNum : null,
       ikona,
       cas: cas.trim() ? cas.trim() : null,
+      // Konec bez začátku není rozsah — a hlídá to i check v databázi.
+      cas_do: cas.trim() && casDo.trim() ? casDo.trim() : null,
       // Prázdné pole ukládáme jako NULL — obojí znamená „každý den", ale NULL
       // je jednoznačnější a index s ním umí líp.
       dny: dny.length ? [...dny].sort((a, b) => a - b) : null,
@@ -129,10 +132,21 @@ export default function HabitForm({
         </div>
       )}
 
-      {label('ČAS (nepovinný)')}
+      {label('ZAČÁTEK (nepovinný)')}
       <div style={{ marginBottom: 16 }}>
-        <TimePicker value={cas} onChange={setCas} />
+        <TimePicker value={cas} onChange={v => { setCas(v); if (!v) setCasDo('') }} />
       </div>
+
+      {/* Konec dává smysl jen k začátku, jinak se nenabízí. */}
+      {cas && <>
+        {label('KONEC (nepovinný)')}
+        <div style={{ marginBottom: 8 }}>
+          <TimePicker value={casDo} onChange={setCasDo} />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+          {casDo ? `Zobrazí se jako ${fmtTimeRange(cas, casDo)}.` : `Zobrazí se jako ${fmtTimeRange(cas, null)}.`}
+        </div>
+      </>}
 
       {label('PLATÍ VE DNY')}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 6, marginBottom: 6 }}>

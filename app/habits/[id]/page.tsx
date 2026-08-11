@@ -10,7 +10,7 @@ import YearGrid, { Legend } from '@/components/habits/YearGrid'
 import { loadWindow, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayWord, yearGridOffset, weekdayIndex, DAY_LABELS,
-  isReadOnly, habitStreaksOn, successRateOn, appliesOn, existsOn, tracksOn, sortHabits, fmtTime,
+  isReadOnly, habitStreaksOn, successRateOn, appliesOn, existsOn, tracksOn, sortHabits, fmtTimeRange,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Settings, Link2 } from 'lucide-react'
 
@@ -130,7 +130,7 @@ export default function HabitDetailPage() {
           }}>{habit.nazev}</h1>
           <div style={{ fontSize: isMobile ? 12 : 14, color: 'var(--muted)', marginTop: isMobile ? 0 : 4, display: 'flex', alignItems: 'center', gap: 5 }}>
             {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}
-            {habit.cas && <span>{fmtTime(habit.cas)}</span>}
+            {habit.cas && <span style={{ whiteSpace: 'nowrap' }}>{fmtTimeRange(habit.cas, habit.cas_do)}</span>}
             {habit.cas && habit.podtitul && <span>·</span>}
             {habit.podtitul}
           </div>

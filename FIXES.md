@@ -600,3 +600,16 @@ Změřeno na stránce s návyky, které mají `created_at` = dnes (stejná struk
 | Rok | 1 obarvená z 371 | 13×13 | — | — | — |
 
 11 nových testů (`existsOn`, `tracksOn`, `windowStart`) — celkem **82** na `lib/habits.ts`.
+
+## Habits — časový rozsah místo jednoho času (migrace 0017)
+Návyk může mít místo jednoho času celý rozsah. Sloupec `cas_do` (time, nullable), stávající `cas` se stal **začátkem** — nic se nepřevádělo, návyk jen se začátkem se zobrazuje dál stejně.
+
+**Zobrazení** přes `fmtTimeRange()`: s rozsahem `7:30 – 8:00`, jen se začátkem `7:30`, bez času nic. Pomlčka je půlčtverčíková (–), ne spojovník. Nasazeno na kartách Dnes, v hlavičce Detailu i v řádku matice Přehledu.
+
+**Editor** má dva výběry — ZAČÁTEK a KONEC. Konec se nabídne až po zvolení začátku a při jeho zrušení se sám vyprázdní; pod ním je náhled („Zobrazí se jako 7:30 – 8:00"). Obojí přes stejný stepper picker, **žádný nativní vstup**.
+
+**Konec bez začátku není rozsah** — hlídá to check v databázi, ne jen formulář.
+
+**Řazení zůstává podle začátku.**
+
+Ověřeno vykreslené na **1440 i 390**: karty ukazují `6:30 – 7:00`, `7:30 – 8:00`, `12:00` a u návyku bez času nic; řazení podle začátku drží; v editoru je KONEC skrytý, dokud není zvolen začátek, a v modálu je nula prvků `input[type="time"]`. Migrace ověřena proti Postgresu — idempotence a check na konec bez začátku.
