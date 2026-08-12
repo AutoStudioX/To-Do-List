@@ -9,10 +9,13 @@ import HabitForm from '@/components/habits/HabitForm'
 import StepperField from '@/components/gym/StepperField'
 import {
   metOn, ratio, streaks, dayWord, habitWord, lastDays, dayKey, dayStats,
-  trainingValues, isReadOnly, sortHabits, appliesOn, fmtTimeRange,
+  trainingValues, isReadOnly, sortHabits, tracksOn, shiftDay, fmtTimeRange,
   DAY_DONE_THRESHOLD, type Habit,
 } from '@/lib/habits'
-import { Plus, Check, BarChart3, Flame, Link2, Pencil, Eye, EyeOff, ArrowUp, ArrowDown, SlidersHorizontal } from 'lucide-react'
+import {
+  Plus, Check, BarChart3, Flame, Link2, Pencil, Eye, EyeOff, ArrowUp, ArrowDown,
+  SlidersHorizontal, ChevronLeft, ChevronRight, History,
+} from 'lucide-react'
 
 // Rozměry, rozestupy a radiusy jsou přesně z designu. Barvy jdou přes
 // proměnné appky, aby sekce držela s motivem a přepínala se do světlého.
@@ -36,8 +39,9 @@ export default function NavykyPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [habits, setHabits] = useState<Habit[]>([])
-  const [values, setValues] = useState<Values>({})
-  const [counts, setCounts] = useState<number[]>([])
+  // Celé okno, ne jen dnešek — přepínání dne pak nemusí nic donačítat.
+  const [entries, setEntries] = useState<Record<string, Record<string, number>>>({})
+  const [days, setDays] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -54,6 +58,9 @@ export default function NavykyPage() {
   }, [])
 
   const today = dayKey(new Date())
+  // Zobrazený den. Nikdy nesmí přeskočit dnešek — do budoucnosti se nechodí.
+  const [viewDay, setViewDay] = useState(today)
+  const isToday = viewDay === today
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -83,49 +90,40 @@ export default function NavykyPage() {
       if (h.zdroj === 'trenink') byHabit[h.id] = trainingValues(days, workoutDays)
     }
 
-    const perHabit: Record<string, number[]> = {}
-    for (const h of list) perHabit[h.id] = days.map(d => byHabit[h.id]?.[d] ?? 0)
     setHabits(sortHabits(list))
-    // Den, kdy návyk neplatil, se nesmí počítat jako nesplněný. Skrytý návyk
-    // do denního součtu nevstupuje vůbec — jinak by série stála na návyku,
-    // který uživatel nevidí.
-    setCounts(dayStats(list.filter(h => !h.archivovany), days, perHabit).map(s => s.met))
-    setValues(Object.fromEntries(list.map(h => [h.id, byHabit[h.id]?.[today] ?? 0])))
+    setEntries(byHabit)
+    setDays(days)
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, today])
+  }, [supabase])
 
   useEffect(() => { load() }, [load])
 
-  /** Zápis dnešní hodnoty. Návyk z tréninku sem nikdy nedojde. */
+  /**
+   * Zápis hodnoty ZOBRAZENÉHO dne — zpětné odškrtnutí je povolené. Návyk
+   * z tréninku sem nikdy nedojde. Série i skóre se dopočítají z `entries`,
+   * takže se po zápisu nemusí nic donačítat.
+   */
   async function write(h: Habit, hodnota: number, hlaska: string) {
     if (isReadOnly(h)) return
-    const prev = values[h.id] ?? 0
-    setValues(v => ({ ...v, [h.id]: hodnota }))
+    const den = viewDay
+    const prev = entries[h.id]?.[den] ?? 0
+    const put = (v: number) => setEntries(e => ({ ...e, [h.id]: { ...(e[h.id] || {}), [den]: v } }))
+    put(hodnota)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) {
-      setValues(v => ({ ...v, [h.id]: prev }))
+      put(prev)
       showToast('Uložení selhalo: nejsi přihlášený', 'error')
       return
     }
     const { error } = await supabase.from('habit_entries')
-      .upsert({ user_id: user.id, habit_id: h.id, datum: today, hodnota }, { onConflict: 'habit_id,datum' })
+      .upsert({ user_id: user.id, habit_id: h.id, datum: den, hodnota }, { onConflict: 'habit_id,datum' })
     if (error) {
-      setValues(v => ({ ...v, [h.id]: prev }))   // vrátit, ať UI neukazuje neuložený stav
+      put(prev)   // vrátit, ať UI neukazuje neuložený stav
       showToast(`Uložení selhalo: ${error.message}`, 'error')
       return
     }
-    // Dnešek je poslední den okna — přepočítat, ať série i hint sedí hned.
-    setCounts(c => {
-      if (!c.length) return c
-      const next = [...c]
-      const vals = { ...values, [h.id]: hodnota }
-      next[next.length - 1] = habits
-        .filter(x => !x.archivovany && appliesOn(x, today))
-        .reduce((n, x) => n + (metOn(x, vals[x.id] ?? 0) ? 1 : 0), 0)
-      return next
-    })
     showToast(hlaska)
   }
 
@@ -174,8 +172,25 @@ export default function NavykyPage() {
   }
 
   // ---------- odvozené ----------
-  // Hlavní stránka ukazuje jen návyky platné pro dnešek — a nikdy skryté.
-  const dnesni = habits.filter(h => !h.archivovany && appliesOn(h, today))
+  // Hodnoty zobrazeného dne. Vše ostatní se počítá z celého okna, takže
+  // přepnutí dne nebo zápis do minulosti nevyžaduje další dotaz.
+  const values: Values = useMemo(
+    () => Object.fromEntries(habits.map(h => [h.id, entries[h.id]?.[viewDay] ?? 0])),
+    [habits, entries, viewDay])
+
+  // Den, kdy návyk neplatil, se nesmí počítat jako nesplněný. Skrytý návyk
+  // do denního součtu nevstupuje vůbec — jinak by série stála na návyku,
+  // který uživatel nevidí.
+  const counts = useMemo(() => {
+    if (!days.length) return []
+    const aktivni = habits.filter(h => !h.archivovany)
+    const perHabit: Record<string, number[]> = {}
+    for (const h of aktivni) perHabit[h.id] = days.map(d => entries[h.id]?.[d] ?? 0)
+    return dayStats(aktivni, days, perHabit).map(s => s.met)
+  }, [habits, days, entries])
+
+  // Seznam patří zobrazenému dni: co tehdy platilo a už existovalo.
+  const dnesni = habits.filter(h => !h.archivovany && tracksOn(h, viewDay))
   const skryte = habits.filter(h => h.archivovany)
   const total = dnesni.length
   const doneCount = dnesni.filter(h => metOn(h, values[h.id] ?? 0)).length
@@ -183,8 +198,15 @@ export default function NavykyPage() {
   const streak = counts.length ? streaks(counts).cur : 0
   const remaining = Math.max(0, DAY_DONE_THRESHOLD - doneCount)
 
-  const dateLine = new Date().toLocaleDateString('cs-CZ', {
-    weekday: isMobile ? 'short' : 'long', day: 'numeric', month: 'long',
+  const dateLine = dayLabel(viewDay, isMobile)
+  // Dozadu jen po nejstarší den okna, dopředu nikdy za dnešek.
+  const minDay = days[0] ?? today
+  const canPrev = viewDay > minDay
+  // Posun přes funkční update: rychlé poklepání jinak celou dobu počítá
+  // z `viewDay` z posledního renderu a všechna ťuknutí skončí na stejném dni.
+  const step = (delta: -1 | 1) => setViewDay(cur => {
+    const next = shiftDay(cur, delta)
+    return next > today || next < minDay ? cur : next
   })
 
   // ---------- kusy ----------
@@ -220,6 +242,53 @@ export default function NavykyPage() {
     cursor: 'pointer', touchAction: 'manipulation',
   }
 
+  /**
+   * Přepínání dne. Doprava se za dnešek nedá — budoucí den se neodškrtává,
+   * takže je tlačítko rovnou vypnuté, ne že by kliknutí nic neudělalo.
+   */
+  const dayNav = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: -10 }}>
+      <button
+        onClick={() => step(-1)} disabled={!canPrev}
+        aria-label="Předchozí den" title="Předchozí den"
+        style={{
+          ...iconBtn, border: 'none', background: 'transparent',
+          opacity: canPrev ? 1 : 0.3, cursor: canPrev ? 'pointer' : 'default',
+        }}><ChevronLeft size={20} /></button>
+      <div style={{
+        fontSize: isMobile ? 12 : 13, letterSpacing: '.1em', textTransform: 'uppercase',
+        color: isToday ? C.muted : C.accent, whiteSpace: 'nowrap', fontWeight: isToday ? 400 : 600,
+      }}>{isToday ? `Dnes · ${dateLine}` : dateLine}</div>
+      <button
+        onClick={() => step(1)} disabled={isToday}
+        aria-label="Následující den"
+        title={isToday ? 'Do budoucnosti to nejde' : 'Následující den'}
+        style={{
+          ...iconBtn, border: 'none', background: 'transparent',
+          opacity: isToday ? 0.3 : 1, cursor: isToday ? 'default' : 'pointer',
+        }}><ChevronRight size={20} /></button>
+    </div>
+  )
+
+  // Zpětný zápis je vidět na první pohled — pruh nad seznamem a přerušovaný
+  // rámeček karet. Odškrtávat jde dál, jen je jasné, že to není dnešek.
+  const backdateBar = !isToday && (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: isMobile ? '10px 12px' : '12px 18px', marginBottom: isMobile ? 10 : 14,
+      border: `1px dashed ${C.accent}`, background: 'rgba(232,25,44,0.08)', borderRadius: 12,
+      color: C.accent, fontSize: isMobile ? 13 : 14,
+    }}>
+      <History size={16} style={{ flexShrink: 0 }} />
+      <span style={{ minWidth: 0 }}>Zpětný zápis — {dateLine}</span>
+      <button onClick={() => setViewDay(today)} style={{
+        marginLeft: 'auto', flexShrink: 0, minHeight: 36, padding: '0 14px', borderRadius: 10,
+        border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent,
+        fontSize: 13, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
+      }}>Na dnešek</button>
+    </div>
+  )
+
   /** Tap na číslo otevře stepper — jediná cesta, jak jít s hodnotou dolů. */
   function valueButton(h: Habit, text: string, style: React.CSSProperties) {
     return (
@@ -230,6 +299,17 @@ export default function NavykyPage() {
       >{text}</button>
     )
   }
+
+  // Karta minulého dne má přerušovaný rámeček a tlumené pozadí — na první
+  // pohled je vidět, že se needituje dnešek.
+  const cardSkin: React.CSSProperties = isToday
+    ? { background: C.card, border: `1px solid ${C.border}` }
+    // Tlumení jde přes překryv, ne přes --input-bg: ve světlém motivu je
+    // --input-bg bílá stejně jako --card, takže by karta vypadala shodně.
+    : {
+      background: 'linear-gradient(rgba(107,114,128,0.09), rgba(107,114,128,0.09)), var(--card)',
+      border: '1px dashed rgba(107,114,128,0.55)',
+    }
 
   function habitCard(h: Habit) {
     const v = values[h.id] ?? 0
@@ -320,7 +400,7 @@ export default function NavykyPage() {
     if (isMobile) {
       return (
         <div key={h.id} style={{
-          padding: '14px 16px', background: C.card, border: `1px solid ${C.border}`,
+          padding: '14px 16px', ...cardSkin,
           borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 12,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -358,7 +438,7 @@ export default function NavykyPage() {
     return (
       <div key={h.id} className="habit-card" style={{
         display: 'flex', alignItems: 'center', gap: 20, padding: '18px 22px', minHeight: 88,
-        background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+        ...cardSkin, borderRadius: 14,
         transition: 'border-color .14s ease-out',
       }}>
         {chip}
@@ -427,9 +507,11 @@ export default function NavykyPage() {
       <Flame size={16} style={{ flexShrink: 0 }} />
       <span>
         Série {streak} {dayWord(streak)}.{' '}
-        {remaining > 0
-          ? `Splň ještě ${remaining} ${habitWord(remaining)} a den se ti zapíše.`
-          : 'Dnešek se ti už zapsal.'}
+        {!isToday
+          ? `Zpětný zápis: splněno ${doneCount} z ${total}.`
+          : remaining > 0
+            ? `Splň ještě ${remaining} ${habitWord(remaining)} a den se ti zapíše.`
+            : 'Dnešek se ti už zapsal.'}
       </span>
     </div>
   )
@@ -442,7 +524,7 @@ export default function NavykyPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }}>{dateLine}</div>
+              {dayNav}
               <h1 className="habits-h1" style={{ margin: '2px 0 0', fontSize: 26, fontWeight: 600, color: C.text, letterSpacing: '-.02em' }}>Habits</h1>
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -472,7 +554,7 @@ export default function NavykyPage() {
       ) : (
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <div style={{ fontSize: 13, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted, marginBottom: 6 }}>{dateLine}</div>
+            <div style={{ marginBottom: 2 }}>{dayNav}</div>
             <h1 style={{ margin: 0, fontSize: 34, fontWeight: 600, color: C.text, letterSpacing: '-.02em' }}>Habits</h1>
           </div>
           <div style={{ display: 'flex', gap: 10, marginLeft: 32, marginRight: 'auto' }}>
@@ -490,13 +572,26 @@ export default function NavykyPage() {
             <button onClick={() => router.push('/habits/prehled')} style={secondaryBtn}><BarChart3 size={16} /> Přehled</button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {counter(26, 'splněno dnes')}
+            {counter(26, isToday ? 'splněno dnes' : 'splněno v tento den')}
             {progressBar(donePct, 180)}
           </div>
         </div>
       )}
 
+      {backdateBar}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 10 }}>
+        {/* Návyk založený později v minulém dni neexistoval — den je prázdný,
+            ne „všechno nesplněno". */}
+        {dnesni.length === 0 && (
+          <div style={{
+            padding: isMobile ? '16px' : '20px 22px', borderRadius: 14,
+            border: `1px dashed ${C.border}`, background: C.sunken,
+            color: C.muted, fontSize: isMobile ? 13 : 14,
+          }}>
+            {isToday ? 'Na dnešek nemáš žádný návyk.' : 'Pro tento den žádný návyk neplatil.'}
+          </div>
+        )}
         {dnesni.map(habitCard)}
 
         {/* Skryté návyky — jen v režimu úprav, zašedle na konci seznamu. */}
@@ -573,6 +668,14 @@ export default function NavykyPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
+}
+
+/** „úterý 12. srpna" (na mobilu „út 12. srpna") z klíče dne. */
+function dayLabel(key: string, short: boolean): string {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', {
+    weekday: short ? 'short' : 'long', day: 'numeric', month: 'long',
+  })
 }
 
 /** 2000 → „2000", 2.5 → „2,5" (celá čísla bez desetinné části). */

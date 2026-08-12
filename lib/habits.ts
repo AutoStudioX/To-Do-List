@@ -138,6 +138,14 @@ export function lastDays(n: number, today = new Date()): string[] {
   return out
 }
 
+/** Posun o dny: „2026-08-12" + (-1) → „2026-08-11". Přes měsíce i roky. */
+export function shiftDay(key: string, delta: number): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + delta)
+  return dayKey(dt)
+}
+
 /** Po=0 … Ne=6 (README má popisky Po–Ne). */
 export function weekdayIndex(key: string): number {
   const [y, m, d] = key.split('-').map(Number)

@@ -652,3 +652,22 @@ Výška se **měří, nehádá**: `below` je vzdálenost od spodku matice ke kon
 Ověřeno vykreslené s **10 návyky**:
 - **1440×900** — stránka `scrollHeight === clientHeight` (nescrolluje), matice `max-height 340px` a scrolluje uvnitř, po odscrollování o 150 px je záhlaví 0 px od horní hrany a „Souhrn dne" 0 px od spodní, dlaždice končí na 745 px v okně vysokém 900.
 - **390×844** — stránka nescrolluje, matice `max-height 157px`, záhlaví i „Den | 30/30" přilepené, dlaždice končí na 656 px, spodní navigace začíná na 775 px, nic nepřetéká do stran, lišta neubírá šířku (`offsetWidth − clientWidth = 0`).
+
+## Habits — přepínání dne, zpětný zápis
+Vidět šel jen dnešek. Vedle data jsou teď **šipky doleva/doprava** (44×44, v mobilní i desktopové hlavičce). Doprava se **za dnešek nedostaneš** — na dnešku je tlačítko rovnou `disabled` s titulkem „Do budoucnosti to nejde", ne že by kliknutí tiše nic neudělalo. Dozadu okno končí nejstarším načteným dnem (365), tam se levá šipka vypne.
+
+Odškrtávat zpětně jde, ale **minulý den je vizuálně jiný**: nad seznamem červený čárkovaný pruh „Zpětný zápis — út 11. srpna" s tlačítkem „Na dnešek", datum v hlavičce červeně a tučně, karty mají **čárkovaný obrys a tlumené pozadí**. Tlumení jde přes překryv (`linear-gradient(rgba(107,114,128,.09) …), var(--card)`), ne přes `--input-bg` — ve světlém motivu je `--input-bg` bílá stejně jako `--card`, takže by karta vypadala shodně.
+
+Data: stránka drží **celé okno** (`entries: habit → datum → hodnota`), takže přepnutí dne ani zápis do minulosti nic nedonačítá; skóre i série se počítají z okna přes `useMemo`. Zápis jde vždy na `viewDay`. Seznam patří zobrazenému dni přes `tracksOn()` — návyk, který tehdy ještě neexistoval, se nekreslí a den hlásí „Pro tento den žádný návyk neplatil", ne 0 z 10.
+
+`step()` posouvá přes **funkční update** `setViewDay(cur => …)`. S `viewDay` z posledního renderu spočítalo rychlé poklepání pořád stejný den — měřeno: 85 ťuknutí posunulo datum o 1 den, po opravě 60 ťuknutí o 60 dní.
+
+Ověřeno vykreslené na **1440 i 390** (10 návyků, 120 dní historie, světlý i tmavý motiv):
+- na dnešku pravá šipka `disabled`, žádný pruh, datum „Dnes · st 12. srpna";
+- o den zpět: datum „út 11. srpna" červeně, pruh „Zpětný zápis", karty `dashed rgba(107,114,128,0.55)`, hodnoty patří tomu dni (Kroky 0 ml proti 2000 ml dnes);
+- klik na odškrtnutí u minulého dne dojde do `write()` — bez přihlášení se hodnota vrátí zpět a přijde hláška „Uložení selhalo: nejsi přihlášený" (rollback funguje);
+- 9. dubna (před vznikem návyků) 0 karet, čítač „0 z 0" a hláška o neplatném dni;
+- na nejstarším dni okna (13. 8. 2025) je levá šipka `disabled`;
+- „Na dnešek" vrátí na dnešek, pruh zmizí, pravá šipka je zase `disabled`.
+
+Neověřeno: samotný `upsert` s `datum = viewDay` proti databázi — bez přihlášení (hesla nezadávám) se do něj nedá dostat. Otestuj po nasazení jedním zpětným odškrtnutím.
