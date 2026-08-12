@@ -11,7 +11,7 @@ import { loadWindow, type HabitWindow } from '@/lib/habitsData'
 import {
   metOn, ratio, level, dayWord, yearGridOffset, weekdayIndex, DAY_LABELS,
   isReadOnly, habitStreaksOn, successRateOn, appliesOn, existsOn, tracksOn, sortHabits, fmtTimeRange,
-  windowStart,
+  windowStart, activeDays, type CasRozsah,
 } from '@/lib/habits'
 import { ChevronLeft, Flame, Settings, Link2 } from 'lucide-react'
 
@@ -25,6 +25,9 @@ export default function HabitDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  // Denní výjimky z výchozího času, den (1=Po) → rozsah. Načítá se jen pro
+  // tenhle návyk — Přehled je nepotřebuje, takže nejsou v `loadWindow`.
+  const [casyDnu, setCasyDnu] = useState<Record<number, CasRozsah>>({})
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -40,9 +43,16 @@ export default function HabitDetailPage() {
     if (!user) { setLoading(false); return }
     try { setWin(await loadWindow(supabase, user.id)) }
     catch (e) { showToast(`Načtení selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error') }
+    // Bez `user_id` — vlastnictví hlídá RLS přes návyk (viz migrace 0018).
+    // Chybějící tabulka nesmí shodit detail; bez výjimek platí výchozí čas.
+    const { data: ts, error: tErr } = await supabase
+      .from('habit_times').select('den, cas_od, cas_do').eq('habit_id', id)
+    if (tErr) console.warn('[habits] denní časy se nenačetly:', tErr)
+    setCasyDnu(Object.fromEntries(((ts || []) as { den: number; cas_od: string; cas_do: string | null }[])
+      .map(t => [t.den, { cas: t.cas_od, cas_do: t.cas_do }])))
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase])
+  }, [supabase, id])
 
   useEffect(() => { load() }, [load])
 
@@ -111,6 +121,10 @@ export default function HabitDetailPage() {
 
   const { habit } = view
   const ro = isReadOnly(habit)
+  // Výchozí čas sám o sobě lže, když půlka dnů běží jinak — proto se u návyku
+  // s výjimkami vypíše, co platí který den.
+  const maVyjimky = Object.keys(casyDnu).length > 0
+  const dnyNavyku = activeDays(habit)
   const card: React.CSSProperties = {
     background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16,
     padding: isMobile ? 16 : '26px 30px', display: 'flex', flexDirection: 'column',
@@ -139,7 +153,9 @@ export default function HabitDetailPage() {
           }}>{habit.nazev}</h1>
           <div style={{ fontSize: isMobile ? 12 : 14, color: 'var(--muted)', marginTop: isMobile ? 0 : 4, display: 'flex', alignItems: 'center', gap: 5 }}>
             {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}
-            {habit.cas && <span style={{ whiteSpace: 'nowrap' }}>{fmtTimeRange(habit.cas, habit.cas_do)}</span>}
+            {habit.cas && <span style={{ whiteSpace: 'nowrap' }}>
+              {maVyjimky && 'výchozí '}{fmtTimeRange(habit.cas, habit.cas_do)}
+            </span>}
             {habit.cas && habit.podtitul && <span>·</span>}
             {habit.podtitul}
           </div>
@@ -201,6 +217,35 @@ export default function HabitDetailPage() {
         ))}
       </div>
 
+      {/* čas po dnech — jen když se některý den liší */}
+      {maVyjimky && (
+        <div style={{ ...card, gap: isMobile ? 10 : 12 }}>
+          <div style={{ fontSize: 11, letterSpacing: 0.6, color: 'var(--muted)', fontWeight: 700 }}>ČAS PO DNECH</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {dnyNavyku.map(d => {
+              const vlastni = casyDnu[d]
+              const cas = vlastni ?? { cas: habit.cas, cas_do: habit.cas_do }
+              return (
+                <span key={d} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 34,
+                  padding: '0 12px', borderRadius: 10, fontSize: isMobile ? 13 : 14,
+                  border: `1px solid ${vlastni ? 'var(--accent)' : 'var(--border)'}`,
+                  background: vlastni ? 'rgba(232,25,44,0.10)' : 'var(--input-bg)',
+                  color: vlastni ? 'var(--text)' : 'var(--muted)', whiteSpace: 'nowrap',
+                }}>
+                  <b style={{ fontWeight: 700 }}>{DAY_LABELS[d - 1]}</b>
+                  {cas.cas ? fmtTimeRange(cas.cas, cas.cas_do) : 'bez času'}
+                </span>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+            Zvýrazněné dny mají vlastní čas, zbytek jede podle výchozího
+            {habit.cas ? ` ${fmtTimeRange(habit.cas, habit.cas_do)}` : ' (bez času)'}.
+          </div>
+        </div>
+      )}
+
       {/* rok po dnech */}
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -254,6 +299,9 @@ export default function HabitDetailPage() {
       <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title={`Upravit — ${habit.nazev}`}>
         <HabitForm
           habit={habit}
+          // Bez toho by se editor otevřel s vypnutým přepínačem a uložení by
+          // všechny denní výjimky smazalo.
+          casyDnu={casyDnu}
           poradi={habit.poradi}
           onDone={(msg) => { setEditOpen(false); showToast(msg); load() }}
           onError={(msg) => showToast(msg, 'error')}

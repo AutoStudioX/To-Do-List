@@ -691,3 +691,12 @@ Ověřeno:
 - **Vykresleno na 1440 i 390** s návykem Focus (výchozí 9:00–11:00, út 10:00–13:00, st 7:00–10:00, platí út–čt): ve středu „Focus 7:00 – 10:00" nad „Snídaně 7:30 – 8:00", v úterý „Focus 10:00 – 13:00" pod snídaní, ve čtvrtek výchozí „9:00 – 11:00", v pondělí Focus vůbec není. Editor: přepínač zapnutý, řádky Út/St/Čt, u čtvrtka „výchozí · 9:00 – 11:00", nota „Vlastní čas má 2 dny"; nastavení 8:00 přepne řádek na vlastní, konec 6:30 vyvolá hlášku a **vypne Uložit**, „Zpět na výchozí" vrátí den zpět; odškrtnutí dne v „PLATÍ VE DNY" jeho řádek skryje, vypnutí přepínače skryje celý seznam. Nic nepřetéká do stran (`scrollWidth − clientWidth = 0`), tapovací plochy 44–52 px.
 
 Neověřeno: samotný zápis do `habit_times` proti databázi — bez přihlášení se do něj nedá dostat. Otestuj po spuštění migrace jedním uložením.
+
+## Habits — Detail vypisuje odchylky času
+V hlavičce Detailu svítil jen výchozí čas, který u návyku s výjimkami neplatí pro půlku dnů. Teď: když má návyk aspoň jednu denní výjimku, podtitul říká **„výchozí 9:00 – 11:00"** a pod dlaždicemi přibude karta **ČAS PO DNECH** — jeden chip na každý den, kdy návyk platí. Dny s vlastním časem jsou zvýrazněné akcentem, ostatní tlumeně s výchozím časem, pod tím věta, co znamená zvýraznění. Návyk bez výjimek vypadá přesně jako dřív, karta se vůbec nevykreslí.
+
+Časy se načítají jen pro ten jeden návyk (`eq('habit_id', id)`), ne přes `loadWindow` — Přehled je nepotřebuje. Chyba dotazu jde do konzole a detail se dál vykreslí s výchozím časem.
+
+**Opraveno rovnou:** editor otevřený z Detailu nedostával `casyDnu`, takže by se otevřel s vypnutým přepínačem a **uložení by všechny denní výjimky smazalo**. Teď je předává stejně jako seznam Dnes.
+
+Ověřeno vykreslené na **1440 i 390** (Focus: výchozí 9:00–11:00, út 10:00–13:00, st 7:00–10:00, platí út–čt): podtitul „výchozí 9:00 – 11:00", chipy „Út 10:00 – 13:00" a „St 7:00 – 10:00" akcentem, „Čt 9:00 – 11:00" tlumeně; u návyku bez výjimek (Snídaně) karta chybí a slovo „výchozí" se nikde neobjeví. Na 390 se chipy zalomí do dvou řádků, nic nepřetéká (`scrollWidth − clientWidth = 0`), výška chipu 34 px.
