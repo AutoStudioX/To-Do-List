@@ -49,14 +49,22 @@ export default function TimePicker({ value, onChange }: { value: string; onChang
       </div>
 
       {custom && (
+        // Dva steppery vedle sebe potřebují ~380 px. V užším místě — třeba
+        // v rozbaleném dni v editoru návyku na 390px — se do řádku nevešly
+        // a tlačítko „+" u minut zůstalo useknuté za okrajem. Základ 200 px
+        // je proto zalomí pod sebe dřív, než by se musely mačkat.
         <div style={{
-          display: 'flex', gap: 12, padding: 12, borderRadius: 12,
+          display: 'flex', flexWrap: 'wrap', gap: 12, padding: 12, borderRadius: 12,
           border: '1px solid var(--border)', background: 'var(--input-bg)',
         }}>
-          <StepperField label="Hodina" value={h} step={1} min={0}
-            onChange={v => set(v > 23 ? 0 : v, m)} />
-          <StepperField label="Minuta" value={m} step={5} min={0}
-            onChange={v => set(h, v > 59 ? 0 : v)} />
+          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <StepperField label="Hodina" value={h} step={1} min={0}
+              onChange={v => set(v > 23 ? 0 : v, m)} />
+          </div>
+          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <StepperField label="Minuta" value={m} step={5} min={0}
+              onChange={v => set(h, v > 59 ? 0 : v)} />
+          </div>
         </div>
       )}
     </div>

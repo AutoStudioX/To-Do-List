@@ -242,16 +242,80 @@ export function appliesOn(h: Pick<Habit, 'dny'>, day: string): boolean {
   return h.dny.includes(weekdayIndex(day) + 1)
 }
 
+/** Dny, ve kterých návyk platí, vzestupně (1=Po). Prázdné `dny` = všech sedm. */
+export function activeDays(h: Pick<Habit, 'dny'>): number[] {
+  if (!h.dny || h.dny.length === 0) return [1, 2, 3, 4, 5, 6, 7]
+  return [...new Set(h.dny)].filter(d => d >= 1 && d <= 7).sort((a, b) => a - b)
+}
+
+// ---- Čas po dnech ----
+//
+// `habits.cas` / `cas_do` je VÝCHOZÍ čas a platí pro všechny dny. Tabulka
+// `habit_times` drží jen výjimky — den bez záznamu jede podle výchozího.
+
+export type HabitTime = {
+  habit_id: string
+  /** 1 = pondělí … 7 = neděle */
+  den: number
+  cas_od: string
+  cas_do: string | null
+}
+
+export type CasRozsah = { cas: string | null; cas_do: string | null }
+
+/** habit_id → den → vlastní čas. */
+export type TimeOverrides = Record<string, Record<number, CasRozsah>>
+
+export function indexTimes(rows: HabitTime[]): TimeOverrides {
+  const out: TimeOverrides = {}
+  for (const r of rows) {
+    ;(out[r.habit_id] ||= {})[r.den] = { cas: r.cas_od, cas_do: r.cas_do }
+  }
+  return out
+}
+
+/**
+ * Čas návyku pro konkrétní den: výjimka pro ten den, jinak výchozí z návyku.
+ *
+ * Výjimka platí i u návyku bez výchozího času — „záznam pro den chybí" je
+ * jediná podmínka, za které se sahá po výchozím.
+ */
+export function timeOn(
+  h: Pick<Habit, 'id' | 'cas' | 'cas_do'>, overrides: TimeOverrides, day: string,
+): CasRozsah {
+  const vlastni = overrides[h.id]?.[weekdayIndex(day) + 1]
+  return vlastni ?? { cas: h.cas, cas_do: h.cas_do }
+}
+
+/** Má návyk aspoň jednu denní výjimku? Rozhoduje o přepínači v editoru. */
+export function hasPerDayTimes(h: Pick<Habit, 'id'>, overrides: TimeOverrides): boolean {
+  return Object.keys(overrides[h.id] ?? {}).length > 0
+}
+
 /**
  * Řazení hlavní stránky: nejdřív návyky S ČASEM vzestupně, pod nimi ostatní
  * podle ručního pořadí. Šipky proto přeuspořádávají jen tu druhou skupinu —
  * u návyku s časem rozhoduje čas, ne `poradi`.
  */
 export function sortHabits(list: Habit[]): Habit[] {
+  return sortByTime(list, h => h.cas)
+}
+
+/**
+ * Řazení seznamu KONKRÉTNÍHO dne. Focus v 7:00 ve středu musí ve středu stát
+ * nad snídaní v 7:30, i když jeho výchozí čas je 10:00 — jinak by se seznam
+ * řadil podle času, který ten den neplatí.
+ */
+export function sortHabitsOn(list: Habit[], overrides: TimeOverrides, day: string): Habit[] {
+  return sortByTime(list, h => timeOn(h, overrides, day).cas)
+}
+
+function sortByTime(list: Habit[], cas: (h: Habit) => string | null): Habit[] {
   return [...list].sort((a, b) => {
-    if (a.cas && b.cas) return a.cas.localeCompare(b.cas) || a.poradi - b.poradi
-    if (a.cas) return -1
-    if (b.cas) return 1
+    const ca = cas(a), cb = cas(b)
+    if (ca && cb) return ca.localeCompare(cb) || a.poradi - b.poradi
+    if (ca) return -1
+    if (cb) return 1
     return a.poradi - b.poradi
   })
 }

@@ -671,3 +671,23 @@ Ověřeno vykreslené na **1440 i 390** (10 návyků, 120 dní historie, světl�
 - „Na dnešek" vrátí na dnešek, pruh zmizí, pravá šipka je zase `disabled`.
 
 Neověřeno: samotný `upsert` s `datum = viewDay` proti databázi — bez přihlášení (hesla nezadávám) se do něj nedá dostat. Otestuj po nasazení jedním zpětným odškrtnutím.
+
+## Habits — čas po dnech
+Focus má být v úterý 10:00–13:00 a ve středu 7:00–10:00. Tři návyky se stejným jménem by udělaly bordel v Přehledu, takže zůstává **jeden návyk, jeden řádek** a liší se jen čas.
+
+`habits.cas` / `cas_do` je **výchozí** čas a platí pro všechny dny. Nová tabulka `habit_times (habit_id, den, cas_od, cas_do)` drží jen **výjimky** — den bez záznamu jede podle výchozího, prázdná tabulka = chování jako dosud. Řádek na každý den by znamenal, že změna výchozího času musí přepsat sedm řádků a při výpadku uprostřed by část dnů zůstala na starém.
+
+Vlastnictví hlídá RLS **přes návyk** (`exists (select 1 from habits …)`), ne přes vlastní `user_id` — denormalizovaný sloupec by se dal zapsat i špatně. Mazání návyku bere časy s sebou (`on delete cascade`). Check `cas_do > cas_od`: konec před začátkem je překlep, ne rozsah přes půlnoc.
+
+V editoru je pod výchozím časem přepínač **„Jiný čas v některé dny"**, který rozbalí **jen dny, kdy návyk platí**. Rozbalený je vždy nejvýš jeden den — sedm dnů se dvěma TimePickery naráz se na 390px nedá projít. „Bez času" v denním pickeru = zpátky na výchozí, stejně jako tlačítko **Zpět na výchozí**. Ukládá se po návyku (nový návyk teprve pak má `id`), nejdřív upsert platných výjimek a teprve pak smazání zbylých — opačné pořadí by při chybě uprostřed nechalo návyk bez časů.
+
+Seznam Dnes ukazuje a **řadí podle času platného pro zobrazený den** (`sortHabitsOn`): ve středu stojí Focus v 7:00 nad snídaní v 7:30, i když jeho výchozí čas je 9:00. Přehled ani Detail se nemění — `loadWindow()` `habit_times` vůbec nečte.
+
+**Opraveno při ověřování:** `TimePicker` měl v úzkém místě useknuté tlačítko „+" u minut — dva steppery potřebují ~380 px, v rozbaleném dni na 390px jich bylo k dispozici 324 (naměřeno `scrollWidth 379` proti `clientWidth 324`). Řádek se teď zalamuje (`flex: 1 1 200px`), takže na 390 jsou steppery pod sebou a na 1440 vedle sebe. Týkalo se to i výchozích pickerů, ne jen nových denních.
+
+Ověřeno:
+- **Migrace proti skutečnému Postgresu** — dvojí spuštění (idempotence), `cas_do <= cas_od` odmítnuto, `den = 8` odmítnuto, `on conflict (habit_id, den)` přepíše řádek, `cas_do` smí být NULL, RLS: vlastník vidí 1 a zapíše, cizí uživatel vidí 0, insert odmítnut, update změnil 0 řádků; smazání návyku smazalo i časy.
+- **Jednotkově** (17 tvrzení): výjimka pro út/st, čtvrtek spadne na výchozí, výjimka platí i bez výchozího času, `activeDays` filtruje smetí, `sortHabitsOn` řadí podle denního času a bez výjimek se chová jako `sortHabits`.
+- **Vykresleno na 1440 i 390** s návykem Focus (výchozí 9:00–11:00, út 10:00–13:00, st 7:00–10:00, platí út–čt): ve středu „Focus 7:00 – 10:00" nad „Snídaně 7:30 – 8:00", v úterý „Focus 10:00 – 13:00" pod snídaní, ve čtvrtek výchozí „9:00 – 11:00", v pondělí Focus vůbec není. Editor: přepínač zapnutý, řádky Út/St/Čt, u čtvrtka „výchozí · 9:00 – 11:00", nota „Vlastní čas má 2 dny"; nastavení 8:00 přepne řádek na vlastní, konec 6:30 vyvolá hlášku a **vypne Uložit**, „Zpět na výchozí" vrátí den zpět; odškrtnutí dne v „PLATÍ VE DNY" jeho řádek skryje, vypnutí přepínače skryje celý seznam. Nic nepřetéká do stran (`scrollWidth − clientWidth = 0`), tapovací plochy 44–52 px.
+
+Neověřeno: samotný zápis do `habit_times` proti databázi — bez přihlášení se do něj nedá dostat. Otestuj po spuštění migrace jedním uložením.

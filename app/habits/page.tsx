@@ -9,8 +9,8 @@ import HabitForm from '@/components/habits/HabitForm'
 import StepperField from '@/components/gym/StepperField'
 import {
   metOn, ratio, streaks, dayWord, habitWord, lastDays, dayKey, dayStats,
-  trainingValues, isReadOnly, sortHabits, tracksOn, shiftDay, fmtTimeRange,
-  DAY_DONE_THRESHOLD, type Habit,
+  trainingValues, isReadOnly, sortHabits, sortHabitsOn, tracksOn, shiftDay, fmtTimeRange,
+  indexTimes, timeOn, DAY_DONE_THRESHOLD, type Habit, type HabitTime, type TimeOverrides,
 } from '@/lib/habits'
 import {
   Plus, Check, BarChart3, Flame, Link2, Pencil, Eye, EyeOff, ArrowUp, ArrowDown,
@@ -39,6 +39,9 @@ export default function NavykyPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [habits, setHabits] = useState<Habit[]>([])
+  // Denní výjimky z výchozího času. Prázdné = všechny návyky jedou podle
+  // `habits.cas`, tedy přesně jako před zavedením `habit_times`.
+  const [times, setTimes] = useState<TimeOverrides>({})
   // Celé okno, ne jen dnešek — přepínání dne pak nemusí nic donačítat.
   const [entries, setEntries] = useState<Record<string, Record<string, number>>>({})
   const [days, setDays] = useState<string[]>([])
@@ -70,15 +73,20 @@ export default function NavykyPage() {
     const days = lastDays(WINDOW_DAYS)
     const from = days[0]
 
-    const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }] = await Promise.all([
+    const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }, { data: ts, error: tErr }] = await Promise.all([
       // Skryté návyky se načtou taky — v režimu úprav je vidět na konci
       // seznamu, aby šly vrátit. Do skóre, sérií ani statistik nejdou.
       supabase.from('habits').select('*').eq('user_id', user.id).order('poradi'),
       supabase.from('habit_entries').select('habit_id, datum, hodnota').eq('user_id', user.id).gte('datum', from),
       // Návyk „trénink" se ČTE odsud — do habit_entries se pro něj nikdy nezapisuje.
       supabase.from('workouts').select('date').eq('user_id', user.id).gte('date', from),
+      // Bez `user_id` — vlastnictví hlídá RLS přes návyk (viz migrace 0018).
+      supabase.from('habit_times').select('habit_id, den, cas_od, cas_do'),
     ])
     if (hErr || eErr) { showToast(`Načtení selhalo: ${(hErr || eErr)!.message}`, 'error'); setLoading(false); return }
+    // Chybějící tabulka (nepuštěná migrace 0018) nesmí shodit celý seznam —
+    // bez výjimek se prostě všude ukáže výchozí čas.
+    if (tErr) console.warn('[habits] denní časy se nenačetly:', tErr)
 
     const list = (hs || []) as Habit[]
     const byHabit: Record<string, Record<string, number>> = {}
@@ -91,6 +99,7 @@ export default function NavykyPage() {
     }
 
     setHabits(sortHabits(list))
+    setTimes(indexTimes((ts || []) as HabitTime[]))
     setEntries(byHabit)
     setDays(days)
     setLoading(false)
@@ -143,7 +152,9 @@ export default function NavykyPage() {
    * rozhoduje čas, takže by přehození `poradi` nebylo vidět.
    */
   async function move(h: Habit, dir: -1 | 1) {
-    const volne = sortHabits(habits).filter(x => !x.cas)
+    // Míchá se v pořadí, které je zrovna na obrazovce — tedy podle času
+    // platného v zobrazený den.
+    const volne = sortHabitsOn(habits, times, viewDay).filter(x => !timeOn(x, times, viewDay).cas)
     const i = volne.findIndex(x => x.id === h.id)
     const j = i + dir
     if (i < 0 || j < 0 || j >= volne.length) return
@@ -189,8 +200,9 @@ export default function NavykyPage() {
     return dayStats(aktivni, days, perHabit).map(s => s.met)
   }, [habits, days, entries])
 
-  // Seznam patří zobrazenému dni: co tehdy platilo a už existovalo.
-  const dnesni = habits.filter(h => !h.archivovany && tracksOn(h, viewDay))
+  // Seznam patří zobrazenému dni: co tehdy platilo a už existovalo — a řadí se
+  // podle času, který platí TEN den, ne podle výchozího.
+  const dnesni = sortHabitsOn(habits.filter(h => !h.archivovany && tracksOn(h, viewDay)), times, viewDay)
   const skryte = habits.filter(h => h.archivovany)
   const total = dnesni.length
   const doneCount = dnesni.filter(h => metOn(h, values[h.id] ?? 0)).length
@@ -318,10 +330,13 @@ export default function NavykyPage() {
     const ro = isReadOnly(h)
     const tint = done ? C.accent : C.muted
 
+    // Čas zobrazeného dne — u návyku s denní výjimkou je to jiný čas než
+    // výchozí a v seznamu se musí ukázat ten, podle kterého se ten den řadí.
+    const cas = timeOn(h, times, viewDay)
 
     // Ovládání režimu úprav. Trénink jde upravit (název, čas, dny), ale ne
     // smazat — je řízený z tréninkové sekce.
-    const bezCasu = !h.cas
+    const bezCasu = !cas.cas
     const editBar = editMode && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <button onClick={() => move(h, -1)} disabled={!bezCasu} aria-label="Posunout nahoru" title={bezCasu ? 'Posunout nahoru' : 'Pořadí určuje čas'} style={{ ...iconBtn, opacity: bezCasu ? 1 : 0.35, cursor: bezCasu ? 'pointer' : 'default' }}><ArrowUp size={16} /></button>
@@ -411,7 +426,7 @@ export default function NavykyPage() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <button onClick={() => router.push(`/habits/${h.id}`)} style={{ display: 'block', width: '100%', minWidth: 0, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
                 <div style={{ fontSize: 15, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
-                  {h.nazev}{h.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
+                  {h.nazev}{cas.cas && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(cas.cas, cas.cas_do)}</span>}
                 </div>
               </button>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, minHeight: 20 }}>
@@ -444,7 +459,7 @@ export default function NavykyPage() {
         {chip}
         <button onClick={() => router.push(`/habits/${h.id}`)} style={{ flex: 1, minWidth: 0, minHeight: 44, background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}>
           <div style={{ fontSize: 17, fontWeight: 500, color: C.text, letterSpacing: '-.01em' }}>
-            {h.nazev}{h.cas && <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(h.cas, h.cas_do)}</span>}
+            {h.nazev}{cas.cas && <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: C.muted, whiteSpace: 'nowrap' }}>{fmtTimeRange(cas.cas, cas.cas_do)}</span>}
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
             {ro && <Link2 size={12} style={{ flexShrink: 0 }} />}{h.podtitul}
@@ -650,6 +665,7 @@ export default function NavykyPage() {
         {editing && (
           <HabitForm
             habit={editing}
+            casyDnu={times[editing.id]}
             poradi={editing.poradi}
             onDone={(msg) => { setEditing(null); showToast(msg); load() }}
             onError={(msg) => showToast(msg, 'error')}
