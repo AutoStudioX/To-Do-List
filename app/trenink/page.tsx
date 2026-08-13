@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Workout, SplitType } from '@/lib/types'
 import { useLiveData } from '@/lib/useLiveData'
+import { useToday } from '@/lib/useToday'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import { SPLITS, nextSplit, splitColor, volume, fmtTonnage, pctDelta, topSet, fmtSet, fmtWeight, startOfWeek, fmtDuration } from '@/lib/gym'
@@ -17,9 +18,14 @@ type Derived = { count: number; vol: number; summary: { name: string; set: strin
 const DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
 // "dnes" / "včera" / "29. 7."
-function relDate(iso: string): string {
+//
+// Dnešek přichází zvenčí (`useToday`), ne z `new Date()` uvnitř: appka nechaná
+// otevřená přes půlnoc se nemá proč překreslit a včerejší trénink by se dál
+// tvářil jako dnešní.
+function relDate(iso: string, todayKey: string): string {
   const d = new Date(iso)
-  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const [ty, tm, td] = todayKey.split('-').map(Number)
+  const today = new Date(ty, tm - 1, td)
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const diff = Math.round((today.getTime() - day.getTime()) / 86400000)
   if (diff === 0) return 'Dnes'
@@ -112,6 +118,10 @@ export default function TreninkPage() {
 
   useEffect(() => { load() }, [load])
   useLiveData(['workouts', 'workout_sets'], load)
+  // Půlnoc: štítky „Dnes/Včera" i hranice týdne se počítají z data, které se
+  // jinak při otevřené appce nezmění. Poll v `useLiveData` běží jen ve
+  // viditelné záložce, takže se na něj v tomhle spolehnout nedá.
+  const today = useToday()
 
   // Weekly stats (Mon–Sun): this week vs last week.
   const week = useMemo(() => {
@@ -125,7 +135,9 @@ export default function TreninkPage() {
       else if (t >= lastMon) { lastVol += dv?.vol || 0 }
     }
     return { count, vol, sets, delta: pctDelta(vol, lastVol) }
-  }, [workouts, derived])
+    // `today` v závislostech: přes půlnoc z neděle na pondělí se musí přepočítat
+    // i hranice týdne, jinak by statistika zůstala viset na minulém týdnu.
+  }, [workouts, derived, today])
 
   // Per-day bars for the current week, colored by that day's split.
   const weekBars = useMemo(() => {
@@ -140,7 +152,8 @@ export default function TreninkPage() {
     }
     const max = Math.max(1, ...days.map(d => d.vol))
     return days.map(d => ({ ...d, h: d.vol ? Math.max(0.16, d.vol / max) : 0 }))
-  }, [workouts, derived])
+    // Stejně jako u týdenní statistiky: přes půlnoc se musí přepočítat i sloupce.
+  }, [workouts, derived, today])
 
   // Most recent workout of the currently-selected split → preview card.
   const lastOfSplit = useMemo(() => {
@@ -168,7 +181,7 @@ export default function TreninkPage() {
 
   async function deleteWorkout(id: string) {
     const w = workouts.find(x => x.id === id)
-    const what = w?.split_type ? `trénink ${w.split_type} (${relDate(w.date).toLowerCase()})` : 'tento trénink'
+    const what = w?.split_type ? `trénink ${w.split_type} (${relDate(w.date, today).toLowerCase()})` : 'tento trénink'
     if (!await confirm(`Smazat ${what} i se všemi sériemi? Nejde to vrátit.`)) return
     setDeleting(id)
     const supabase = createClient()
@@ -219,7 +232,7 @@ export default function TreninkPage() {
       {!isMobile && lastOfSplit && lastOfSplit.summary.length > 0 && (
         <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 10, letterSpacing: 0.5, color: 'var(--muted)', fontWeight: 700, marginBottom: 8 }}>
-            MINULÝ {String(lastOfSplit.workout.split_type || '').toUpperCase()} · {relDate(lastOfSplit.workout.date)}
+            MINULÝ {String(lastOfSplit.workout.split_type || '').toUpperCase()} · {relDate(lastOfSplit.workout.date, today)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {lastOfSplit.summary.map((s, i) => (
@@ -348,7 +361,7 @@ export default function TreninkPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                         {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '4px 8px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
-                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date, today)}</span>
                         {w.duration_min && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {fmtDuration(w.duration_min)}</span>}
                         {autoBadge}
                         {gymBadge}
@@ -361,7 +374,7 @@ export default function TreninkPage() {
                     <>
                       {w.split_type && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#fff', background: splitColor(w.split_type), borderRadius: 8, padding: '5px 9px', flexShrink: 0, textTransform: 'uppercase' }}>{w.split_type}</span>}
                       <div style={{ minWidth: 92, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${fmtDuration(w.duration_min)}` : ''}</span></div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{relDate(w.date, today)} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{d?.count ?? 0} sérií{w.duration_min ? ` · ${fmtDuration(w.duration_min)}` : ''}</span></div>
                         {autoBadge}
                         {gymBadge}
                       </div>
@@ -403,7 +416,7 @@ export default function TreninkPage() {
           </div>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>Trénink</h1>
-            {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date).toLowerCase()}</div>}
+            {last && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Poslední: {last.split_type || '—'} · {relDate(last.date, today).toLowerCase()}</div>}
           </div>
         </div>
       )}

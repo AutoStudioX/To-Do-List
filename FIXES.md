@@ -740,3 +740,21 @@ Ověřeno vykreslené s posunutými hodinami (`window.Date` o +24 h, skutečný 
 - **návrat na záložku** — hlavička „Dnes · čtvrtek 13. srpna" → po `visibilitychange` „Dnes · pátek 14. srpna", pravá šipka pořád `disabled`, žádný pruh zpětného zápisu;
 - **ruční den zůstává** — po kliku zpět na „středa 12. srpna" a přechodu půlnoci hlavička dál „středa 12. srpna" i s pruhem „Zpětný zápis — středa 12. srpna", jen se povolila šipka dopředu; dva kliky vpřed došly na „Dnes · pátek 14. srpna", kde se šipka zase vypnula (tedy `today` se opravdu překlopil, jen `viewDay` ne);
 - **minutový časovač** — po posunu hodin a **bez jakékoli události** se hlavička sama přepnula na nový den.
+
+## Půlnoc — sdílený `useToday`, prošlý Focus i Trénink
+Kontrola půlnoci z Habits je teď `lib/useToday.ts` a používají ji obě stránky, které na datu stojí. Hook drží dnešek ve stavu a překlápí ho na `visibilitychange`, `focus` a minutovým časovačem; `onChange(nový, starý)` dostane stránka, která musí kromě překreslení ještě něco dorovnat.
+
+Časovač schválně **nehlídá `visibilityState`** — na rozdíl od pollu v `useLiveData`, který ve schované záložce neběží. Právě proto se na `useLiveData` nedalo spolehnout: appka na pozadí přes noc žádný refetch neudělá.
+
+**Habits** — beze změny chování, jen refaktor na hook (zobrazený den se posune, jen když uživatel stojí na dnešku, a znovu se načte okno dat).
+
+**Trénink (`/trenink`)** — měl tentýž vzorec na třech místech:
+- `relDate()` počítal „Dnes/Včera" z `new Date()` uvnitř sebe, takže včerejší trénink zůstal „Dnes". Dnešek teď přichází parametrem, aby bylo v podpisu vidět, na čem štítek závisí.
+- `week` a `weekBars` počítaly `startOfWeek(new Date())` v `useMemo` se závislostmi `[workouts, derived]`, takže přechod z neděle na pondělí statistiku ani sloupce nepřepočítal. `today` je teď v závislostech.
+
+**Focus (`/focus`)** — **nic se neměnilo a není co**: stránka nevykresluje žádný štítek odvozený z dneška (všechna `new Date()` jsou uvnitř zápisů, kde se razítkuje okamžik akce) a zbývající čas se počítá z `started_at` proti tikajícímu `nowMs`, který stránku překresluje každou sekundu. Běžící focus tedy přes půlnoc doběhne správně.
+
+Ověřeno vykreslené s posunutými hodinami (`window.Date` o +24 h):
+- **Trénink, návrat na záložku** — trénink z 13. 8. měl štítek „Dnes"; po posunu hodin na 14. 8. a `visibilitychange` se přepsal na „Včera".
+- **Trénink, minutový časovač** — po posunu hodin a bez jakékoli události se štítek přepnul sám.
+- **Habits** — po refaktoru znovu ověřeny všechny tři cesty z předchozího záznamu (návrat na záložku, ruční den zůstává, minutový časovač).
