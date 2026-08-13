@@ -700,3 +700,29 @@ V hlavičce Detailu svítil jen výchozí čas, který u návyku s výjimkami ne
 **Opraveno rovnou:** editor otevřený z Detailu nedostával `casyDnu`, takže by se otevřel s vypnutým přepínačem a **uložení by všechny denní výjimky smazalo**. Teď je předává stejně jako seznam Dnes.
 
 Ověřeno vykreslené na **1440 i 390** (Focus: výchozí 9:00–11:00, út 10:00–13:00, st 7:00–10:00, platí út–čt): podtitul „výchozí 9:00 – 11:00", chipy „Út 10:00 – 13:00" a „St 7:00 – 10:00" akcentem, „Čt 9:00 – 11:00" tlumeně; u návyku bez výjimek (Snídaně) karta chybí a slovo „výchozí" se nikde neobjeví. Na 390 se chipy zalomí do dvou řádků, nic nepřetéká (`scrollWidth − clientWidth = 0`), výška chipu 34 px.
+
+## Trénink — načtené cviky přežijí obnovení stránky
+„Načíst minulý trénink" předvyplnil cviky, ale po obnovení stránky zůstaly jen ty, kde už byla aspoň jedna potvrzená série. Příčina seděla přesně tam, kde jsi ji čekal: `load()` skládal seznam cviků **jen z `workout_sets`** (`for (const s of confirmed) if (!order.includes(...)) order.push(...)`), a předvyplněný cvik do prvního potvrzení v databázi nemá nic. Netýkalo se to jen šablony — stejně mizel i cvik přidaný ručně přes „Přidat cvik".
+
+### Volba: vlastní tabulka, ne prázdné řádky sérií
+Nová tabulka `workout_exercises (workout_id, exercise_id, order_index)`, migrace 0019.
+
+Prázdné řádky v `workout_sets` by znamenaly, že v tabulce, kde **každý řádek je odcvičená série**, najednou leží něco, co série není. Na `workout_sets` visí počítadlo v hlavičce i v chipech, objem a tonáž, PR odznaky, `targetMet()` nad top sérií, export do CSV/JSON a hlavně `workout_origin()` a `workout_last_activity()` v migraci 0010, ze kterých se počítá **délka tréninku a automatické ukončení**. Plánovaný cvik by musel dostat příznak „tohle není série" a ten by se pak musel odfiltrovat úplně všude — v SQL funkcích, v exportu, ve statistikách. Jedno zapomenuté místo tiše rozbije číslo, kterého si nikdo hned nevšimne (délka tréninku by se počítala od „série", která se nikdy necvičila). Je to i proti pravidlu, které v appce už je: *počítadlo počítá jen skutečné řádky, žádné automatické dolepování sérií*.
+
+Oddělený seznam nic z toho nepotřebuje — do `workout_exercises` nesahá nic, co počítá. Cena je jeden dotaz navíc při načtení a zápis při přidání/odebrání/přerovnání cviku.
+
+### Jak to funguje
+- Plán zapisuje „Načíst minulý trénink", „Přidat cvik" i přerovnání šipkami (`upsert` na `(workout_id, exercise_id)`), odebrání cviku ho maže. Selhání zápisu se **hlásí toastem** a necouvá seznam na obrazovce — cvičit se dá dál, jen po obnovení bude seznam kratší.
+- `exerciseOrder(planned, confirmed)` v `lib/gym.ts`: nejdřív plán v jeho pořadí, pak cviky, které v plánu nejsou, ale mají série. Druhá větev drží tréninky založené před migrací a případ, kdy se zápis do plánu nepovede — bez plánu se seznam poskládá po staru.
+- Plánovaný cvik bez potvrzené série dostane po obnovení předvyplněné řádky **dopočítané z „minule"**, tedy ze stejného zdroje, ze kterého je vyrobilo „Načíst minulý trénink". Když není z čeho (první výskyt cviku, trénink v jiné posilovně), zbude jedna prázdná série — přesně jak vypadá ručně přidaný cvik.
+- U **dokončeného** tréninku se plán ignoruje: historie ukazuje, co se odcvičilo, ne co se zamýšlelo. Po „Pokračovat v tréninku" (`duration_min` zpět na NULL) se plánované cviky zase objeví.
+- Chybějící tabulka (nepuštěná migrace) nesmí shodit rozdělaný trénink — chyba jde do konzole a seznam se poskládá po staru.
+
+Známé omezení: hodnota upravená u **nepotvrzené** série se obnovením ztratí a předvyplní se znovu z „minule". Dřív se ztrácel celý cvik, takže je to posun správným směrem; ukládat rozepsané neodcvičené číslo by znamenalo přesně ty prázdné řádky, kterým se tahle změna vyhýbá.
+
+### Ověřeno
+- **Migrace proti skutečnému Postgresu:** dvojí spuštění (idempotence); po zápisu plánu tří cviků a potvrzení jediné série u druhého vrací dotaz `load()` **všechny tři** (`Bench press 0 sérií, Rozpažky 1, Tricepsy 0`), zatímco starý dotaz jen ze sérií vrací **jediný** (`Rozpažky`) — přesně ta chyba; `upsert` při přerovnání nezdvojí řádky (3 řádky, order_index 0–2); odebrání smaže jeden; RLS: vlastník vidí a zapíše, cizí uživatel vidí 0, insert odmítnut, delete smazal 0 řádků; smazání tréninku smaže plán kaskádou.
+- **Jednotkově** `exerciseOrder` (7 tvrzení): plán bez jediného potvrzení přežije, plán + jedno potvrzení drží všechny, bez plánu se jede ze sérií, série mimo plán jde na konec, pořadí určuje plán, duplicity se zahodí.
+- `next build` prochází.
+
+Neověřeno mnou: proklik v prohlížeči (načíst minulý trénink → obnovit → cviky tam jsou). Bez přihlášení se do rozdělaného tréninku nedostanu a migrace 0019 v ostré databázi ještě nebyla. Po jejím spuštění je to test na tři kroky.

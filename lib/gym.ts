@@ -272,3 +272,18 @@ export function buildAdvice(sessions: ExSession[], target: Target | null, exerci
       : `Top série minule dala ${topReps} opakování z cílových ${target.reps}. Váhu má smysl přidat, až vrchol vyjde celý.`,
   }
 }
+
+/**
+ * Pořadí cviků v rozdělaném tréninku: nejdřív plán (`workout_exercises`),
+ * pak cviky, které v plánu nejsou, ale mají potvrzené série.
+ *
+ * Seznam nesmí stát jen na sériích — předvyplněný cvik bez jediného potvrzení
+ * nemá v `workout_sets` nic a po obnovení stránky by zmizel. Druhá větev drží
+ * tréninky založené před migrací 0019 a případ, kdy se zápis do plánu nepovede.
+ */
+export function exerciseOrder(planned: string[], confirmed: { exercise_id: string }[]): string[] {
+  const out: string[] = []
+  for (const id of planned) if (!out.includes(id)) out.push(id)
+  for (const s of confirmed) if (!out.includes(s.exercise_id)) out.push(s.exercise_id)
+  return out
+}

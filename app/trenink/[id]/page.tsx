@@ -9,7 +9,7 @@ import StepperField from '@/components/gym/StepperField'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { Toast, useToast } from '@/components/Toast'
 import ExerciseSparkline from '@/components/gym/ExerciseSparkline'
-import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, setBadge, maxPrevWeight, type Target, type Advice, type ExSession } from '@/lib/gym'
+import { WEIGHT_STEP, REP_STEP, formatPrevious, fmtWeight, fmtDuration, splitColor, epley1RM, fmtTonnage, buildAdvice, stepForWeight, setBadge, maxPrevWeight, exerciseOrder, type Target, type Advice, type ExSession } from '@/lib/gym'
 import { autoFinishStale, IDLE_LIMIT_MIN, TAIL_MIN } from '@/lib/autoFinish'
 import { ChevronLeft, Plus, Check, Trash2, ArrowUp, ArrowDown, BarChart3, Flame, Zap, Timer, Minus, RotateCcw, Dumbbell, X, MapPin, Target as TargetIcon, Lightbulb, TrendingUp } from 'lucide-react'
 
@@ -118,8 +118,26 @@ export default function ActiveWorkoutPage() {
     // A new workout starts EMPTY even when a previous one exists — only
     // exercises that already have logged sets show up. The previous workout is
     // offered explicitly via "Načíst minulý trénink" in the empty state.
-    const order: string[] = []
-    for (const s of confirmed) if (!order.includes(s.exercise_id)) order.push(s.exercise_id)
+    //
+    // Seznam cviků ale NEMŮŽE stát jen na `workout_sets`: předvyplněný cvik bez
+    // jediné potvrzené série tam nemá nic a po obnovení stránky by zmizel.
+    // Drží ho `workout_exercises` (migrace 0019).
+    //
+    // U dokončeného tréninku se plán ignoruje — historie ukazuje, co se
+    // odcvičilo, ne co se zamýšlelo. Po „Pokračovat v tréninku" (duration_min
+    // zpět na NULL) se plánované cviky zase objeví.
+    const finishedW = (w as Workout).duration_min != null
+    let planned: string[] = []
+    if (!finishedW) {
+      const { data: pl, error: plErr } = await supabase
+        .from('workout_exercises').select('exercise_id, order_index')
+        .eq('workout_id', id).order('order_index')
+      // Nepuštěná migrace nesmí shodit rozdělaný trénink — bez plánu se seznam
+      // poskládá po staru, tedy z potvrzených sérií.
+      if (plErr) console.warn('[trenink] plán cviků se nenačetl:', plErr)
+      planned = ((pl || []) as { exercise_id: string }[]).map(r => r.exercise_id)
+    }
+    const order = exerciseOrder(planned, confirmed)
 
     // Keep the template around so the empty state can offer "Načíst minulý trénink".
     const tmplOrder: string[] = []
@@ -180,10 +198,17 @@ export default function ActiveWorkoutPage() {
       const ex = exMap.get(exId)
       if (!ex) continue
       const conf = confG.get(exId) || []
-      // `order` vzniká jen z potvrzených sérií, takže `conf` nikdy není prázdné
-      // — žádná náhradní prázdná série se sem nedoplňuje.
-      const sets: ActiveSet[] = conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, to_failure: !!s.to_failure, confirmed: true, prefilled: false }))
       const p = prevByEx.get(exId)
+      // Potvrzené série jsou jediná pravda; žádná náhradní prázdná se k nim
+      // nedoplňuje. Prázdné `conf` znamená plánovaný cvik — jeho předvyplněné
+      // řádky se dopočítají z „minule" (stejný zdroj, ze kterého je vyrobilo
+      // „Načíst minulý trénink"). Když není z čeho, zbude jedna prázdná série,
+      // přesně jak vypadá ručně přidaný cvik.
+      const sets: ActiveSet[] = conf.length
+        ? conf.map(s => ({ key: newKey(), id: s.id, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, to_failure: !!s.to_failure, confirmed: true, prefilled: false }))
+        : (p?.sets.length
+          ? p.sets.map(r => ({ key: newKey(), id: null, weight: Number(r.weight_kg ?? 0), reps: r.reps ?? 0, is_warmup: false, to_failure: false, confirmed: false, prefilled: true }))
+          : [{ key: newKey(), id: null, weight: 20, reps: 8, is_warmup: false, to_failure: false, confirmed: false, prefilled: false }])
       built.push({ exercise: ex, previous: p?.sets ?? [], prevDate: p?.date ?? null, sets })
     }
     setItems(built)
@@ -341,6 +366,23 @@ export default function ActiveWorkoutPage() {
       setActiveIdx(next.length - 1)
       return next
     })
+    // Do plánu, ať cvik přežije obnovení i bez potvrzené série.
+    await planExercises([ex.id], items.length)
+  }
+
+  /**
+   * Zápis cviků do `workout_exercises`. Bez toho by cvik bez potvrzené série
+   * po obnovení stránky zmizel — v `workout_sets` po něm nic není.
+   *
+   * Selhání se hlásí, ale seznam na obrazovce se nevrací zpět: cvičit se dá
+   * dál, jen po obnovení bude seznam kratší. Tiché spolknutí by uživatele
+   * nechalo v přesvědčení, že je uloženo.
+   */
+  async function planExercises(exerciseIds: string[], from = 0) {
+    if (!exerciseIds.length) return
+    const rows = exerciseIds.map((exercise_id, i) => ({ workout_id: id, exercise_id, order_index: from + i }))
+    const { error } = await supabase.from('workout_exercises').upsert(rows, { onConflict: 'workout_id,exercise_id' })
+    if (error) showToast(`Cvik se neuložil do plánu: ${error.message}`, 'error')
   }
 
   async function addCustomExercise(name: string) {
@@ -351,7 +393,7 @@ export default function ActiveWorkoutPage() {
   }
 
   // Rebuild the exercise list from the previous same-split workout (empty state).
-  function loadTemplate() {
+  async function loadTemplate() {
     if (!tmpl.groups.length) return
     setItems(tmpl.groups.map(g => ({
       exercise: g.exercise,
@@ -360,6 +402,9 @@ export default function ActiveWorkoutPage() {
       sets: g.sets.map(s => ({ key: newKey(), id: null, weight: Number(s.weight_kg ?? 0), reps: s.reps ?? 0, is_warmup: s.is_warmup, to_failure: !!s.to_failure, confirmed: false, prefilled: true })),
     })))
     setActiveIdx(0)
+    // Načtené cviky musí přežít obnovení stránky — v `workout_sets` po nich
+    // do prvního potvrzení nic není.
+    await planExercises(tmpl.groups.map(g => g.exercise.id))
   }
 
   async function removeExercise(ex: number) {
@@ -372,6 +417,10 @@ export default function ActiveWorkoutPage() {
       const { error } = await supabase.from('workout_sets').delete().in('id', ids)
       if (error) { showToast(`Odebrání selhalo: ${error.message}`, 'error'); return }
     }
+    // Z plánu taky, jinak by se cvik po obnovení stránky vrátil.
+    const { error: pErr } = await supabase.from('workout_exercises')
+      .delete().eq('workout_id', id).eq('exercise_id', it.exercise.id)
+    if (pErr) { showToast(`Odebrání selhalo: ${pErr.message}`, 'error'); return }
     setItems(prev => prev.filter((_, i) => i !== ex))
     setActiveIdx(i => Math.max(0, i > ex ? i - 1 : i === ex ? Math.min(i, items.length - 2) : i))
     showToast('Cvik odebrán')
@@ -388,6 +437,8 @@ export default function ActiveWorkoutPage() {
       const ids = arr[i].sets.filter(s => s.confirmed && s.id).map(s => s.id as string)
       if (ids.length) await supabase.from('workout_sets').update({ order_index: i }).in('id', ids)
     }
+    // Pořadí drží i plán — po obnovení se cviky mají seřadit stejně.
+    await planExercises(arr.map(a => a.exercise.id))
   }
 
   // duration_min NULL = running, set = finished (see migration 0007).
