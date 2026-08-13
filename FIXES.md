@@ -726,3 +726,17 @@ Známé omezení: hodnota upravená u **nepotvrzené** série se obnovením ztra
 - `next build` prochází.
 
 Neověřeno mnou: proklik v prohlížeči (načíst minulý trénink → obnovit → cviky tam jsou). Bez přihlášení se do rozdělaného tréninku nedostanu a migrace 0019 v ostré databázi ještě nebyla. Po jejím spuštění je to test na tři kroky.
+
+## Habits — appka otevřená přes půlnoc se přepne na nový den
+Appka nechaná otevřenou přes noc ukazovala pořád včerejšek: `today` se počítal při renderu (`const today = dayKey(new Date())`) a render přes noc nikdy nepřišel, takže na obrazovce zůstalo staré datum a odškrtávalo by se do včerejška.
+
+`today` je teď ve stavu a hlídají ho **dvě spouště**: `visibilitychange` (návrat na záložku — pokrývá zamčený telefon i schovaný tab, kde prohlížeč časovače přiškrtí), `focus` a **minutový časovač** pro appku, na kterou je vidět celou dobu. Obě volají tutéž funkci; když se datum nezměnilo, neudělá nic.
+
+Dvě věci, na kterých to stojí:
+- **Ručně přepnutý den se nepřepisuje.** Reset patří jen tomu, kdo stojí na dnešku (`viewDay === starý dnešek`). Kdo si listuje v historii, o svoje místo o půlnoci nepřijde — jen se mu odemkne šipka dopředu, protože dnešek je teď o den dál.
+- **Okno dat se načte znovu.** `days` z `lastDays()` končí u starého dneška, takže bez `load()` by nový den nebyl ani ve skóre, ani v sérii.
+
+Ověřeno vykreslené s posunutými hodinami (`window.Date` o +24 h, skutečný kód, ne mock logiky):
+- **návrat na záložku** — hlavička „Dnes · čtvrtek 13. srpna" → po `visibilitychange` „Dnes · pátek 14. srpna", pravá šipka pořád `disabled`, žádný pruh zpětného zápisu;
+- **ruční den zůstává** — po kliku zpět na „středa 12. srpna" a přechodu půlnoci hlavička dál „středa 12. srpna" i s pruhem „Zpětný zápis — středa 12. srpna", jen se povolila šipka dopředu; dva kliky vpřed došly na „Dnes · pátek 14. srpna", kde se šipka zase vypnula (tedy `today` se opravdu překlopil, jen `viewDay` ne);
+- **minutový časovač** — po posunu hodin a **bez jakékoli události** se hlavička sama přepnula na nový den.

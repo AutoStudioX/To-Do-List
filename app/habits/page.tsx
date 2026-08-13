@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Toast, useToast } from '@/components/Toast'
@@ -60,7 +60,10 @@ export default function NavykyPage() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  const today = dayKey(new Date())
+  // „Dnešek" musí být ve stavu, ne dopočítaný při renderu: appka nechaná
+  // otevřená přes půlnoc se sama nepřekreslí a zůstala by viset na včerejšku.
+  const [today, setToday] = useState(() => dayKey(new Date()))
+  const todayRef = useRef(today)
   // Zobrazený den. Nikdy nesmí přeskočit dnešek — do budoucnosti se nechodí.
   const [viewDay, setViewDay] = useState(today)
   const isToday = viewDay === today
@@ -107,6 +110,40 @@ export default function NavykyPage() {
   }, [supabase])
 
   useEffect(() => { load() }, [load])
+
+  /**
+   * Přechod přes půlnoc. Appka nechaná otevřenou jinak ukazovala včerejšek —
+   * `today` se počítal jen při renderu a ten přes noc nikdy nepřišel.
+   *
+   * Dvě spouště: návrat na záložku (`visibilitychange`, pokrývá zamčený telefon
+   * i schovaný tab, kde prohlížeč časovače přiškrtí) a minutový časovač pro
+   * appku, na kterou je vidět celou dobu. Obojí volá totéž.
+   *
+   * Ručně přepnutý den se NEPŘEPÍNÁ — reset patří jen tomu, kdo stojí na
+   * dnešku. Kdo si listuje v historii, o svoje místo o půlnoci nepřijde.
+   *
+   * Okno dat se překlopením musí načíst znovu: `days` z `lastDays()` končí
+   * u starého dneška, takže by nový den nebyl ani ve skóre, ani v sérii.
+   */
+  useEffect(() => {
+    const check = () => {
+      const now = dayKey(new Date())
+      const prev = todayRef.current
+      if (now === prev) return
+      todayRef.current = now
+      setToday(now)
+      setViewDay(v => (v === prev ? now : v))
+      load()
+    }
+    const t = setInterval(check, 60_000)
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [load])
 
   /**
    * Zápis hodnoty ZOBRAZENÉHO dne — zpětné odškrtnutí je povolené. Návyk
