@@ -810,3 +810,10 @@ Dvě věci, které by to jinak shodily:
 - **Service worker cachuje obrázky cache-first**, takže nainstalovaným klientům by zůstala stará ikona v mezipaměti. `CACHE_NAME` zvednuto na `dashboard-v3`.
 
 Ověřeno na běžící appce: v HTML jsou právě dva odkazy (`/icon.svg?…` a `/apple-icon.png?…`), oba vracejí **200** (dřív 307 na /login), servírované SVG je checklist a servírovaný apple-icon má **stejný otisk MD5 jako `public/apple-touch-icon.png`**, tedy přesně tu ikonu, kterou má appka na telefonu. `/icon-192.png` i `/icon-512.png` z manifestu se nemění.
+
+### Favicon jako zaoblený čtverec
+SVG favicon byl kruh (`<circle r="256">`), zbytek appky čtverec. Změněno na `<rect rx="115">` (22 % strany, tedy proporce, jakou používá systémový squircle).
+
+PNG z manifestu se schválně **nemění**: měřením přes canvas mají rohový pixel plně krytý (`rgba(232,25,44,255)`), tedy ostrý čtverec bez průhlednosti — 512 je v manifestu `maskable` a zaoblení dělá systém sám. Předzaoblit je by znamenalo dvojí zaoblení a odseknuté rohy na ploše telefonu.
+
+Ověřeno vykreslené ve 128, 64, 32 i 16 px: tvar drží i v nejmenší velikosti.
