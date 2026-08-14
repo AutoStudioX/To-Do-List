@@ -38,11 +38,9 @@ type ToolCall = { id: string; name: string; input: Record<string, unknown> }
 
 const SILENCE_TIMEOUT_MS = 2000
 const SILENCE_CHECK_INTERVAL_MS = 250
-const SILENCE_RMS_THRESHOLD = 0.02
 
-// Mobile browsers can't hold getUserMedia (our silence watcher) at the same time as
-// SpeechRecognition without the recognition erroring out, and they don't support
-// continuous recognition well. Detect mobile and use a simpler single-utterance flow there.
+// Mobile browsers don't support continuous recognition well — jedna promluva
+// a konec. Desktop jede continuous a zastaví se po 2 s ticha (viz níž).
 const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
 const GENERIC_TASK_NAMES = new Set([
@@ -176,8 +174,6 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
   const finalTranscriptRef = useRef('')
   const lastSoundAtRef = useRef(Date.now())
   const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const audioCtxRef = useRef<AudioContext | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
 
   const todayISO = () => {
     const d = new Date()
@@ -186,42 +182,27 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
 
   function stopSilenceWatch() {
     if (silenceIntervalRef.current) { clearInterval(silenceIntervalRef.current); silenceIntervalRef.current = null }
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    streamRef.current = null
-    if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null }
   }
 
-  async function startSilenceWatch(onTimeout: () => void) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      const audioCtx = new AudioCtx()
-      audioCtxRef.current = audioCtx
-      const source = audioCtx.createMediaStreamSource(stream)
-      const analyser = audioCtx.createAnalyser()
-      analyser.fftSize = 512
-      source.connect(analyser)
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      lastSoundAtRef.current = Date.now()
-
-      silenceIntervalRef.current = setInterval(() => {
-        analyser.getByteTimeDomainData(data)
-        let sumSquares = 0
-        for (let i = 0; i < data.length; i++) {
-          const v = (data[i] - 128) / 128
-          sumSquares += v * v
-        }
-        const rms = Math.sqrt(sumSquares / data.length)
-        if (rms > SILENCE_RMS_THRESHOLD) {
-          lastSoundAtRef.current = Date.now()
-        } else if (Date.now() - lastSoundAtRef.current >= SILENCE_TIMEOUT_MS) {
-          onTimeout()
-        }
-      }, SILENCE_CHECK_INTERVAL_MS)
-    } catch {
-      // Mic-level access unavailable/denied — silence auto-stop just won't fire; manual stop still works.
-    }
+  /**
+   * Automatické zastavení po 2 s ticha — BEZ vlastního mikrofonu.
+   *
+   * Dřív tu byl `getUserMedia` + AnalyserNode na hlasitost. Mikrofon si ale
+   * otevírá i `SpeechRecognition` sám, takže se prohlížeč ptal na povolení
+   * DVAKRÁT za sebou. Sdílet jeden stream nejde: Web Speech API žádný stream
+   * nepřijímá, mikrofon si drží samo. Jediná cesta k jednomu dotazu je tedy
+   * nemít druhého spotřebitele — ticho se pozná z toho, že nechodí výsledky
+   * rozpoznávání (`onresult` sype průběžné výsledky, dokud se mluví).
+   *
+   * Vedlejší efekt je k lepšímu: hlídá se ticho V ŘEČI, ne hlasitost, takže
+   * hluk v pozadí už poslech neudržuje naživu donekonečna.
+   */
+  function startSilenceWatch(onTimeout: () => void) {
+    stopSilenceWatch()
+    lastSoundAtRef.current = Date.now()
+    silenceIntervalRef.current = setInterval(() => {
+      if (Date.now() - lastSoundAtRef.current >= SILENCE_TIMEOUT_MS) onTimeout()
+    }, SILENCE_CHECK_INTERVAL_MS)
   }
 
   // Executes one of the agent's mutating tools against Supabase. get_summary is handled separately (read-only, client-side).
@@ -557,8 +538,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
       setStatus('listening')
       setPanelOpen(true)
       lastSoundAtRef.current = Date.now()
-      // The getUserMedia silence watcher conflicts with recognition's own mic on mobile.
-      // Desktop uses it for the 2s-silence auto-stop; mobile ends on its own after a pause.
+      // Desktop jede continuous, takže ho po 2 s ticha musí zastavit hlídač;
+      // mobil skončí jednou promluvou sám.
       if (!isMobile) startSilenceWatch(() => { recognitionRef.current?.stop() })
     }
 
@@ -636,8 +617,8 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
         disabled={busy}
         title={labels[status]}
         style={{
-          width: 40, height: 40, borderRadius: 10, border: 'none',
-          cursor: busy ? 'default' : 'pointer',
+          width: 44, height: 44, borderRadius: 11, border: 'none',
+          cursor: busy ? 'default' : 'pointer', touchAction: 'manipulation',
           background: colors[status], display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: status === 'listening' ? 'none' : '0 4px 14px rgba(232, 25, 44,0.35)',
           animation: status === 'listening' ? 'pulseRing 1.4s ease-out infinite' : undefined,
@@ -697,10 +678,10 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button onClick={confirmActions} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#10b981', border: 'none', borderRadius: 8, padding: '7px 10px', color: 'white', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>
+                    <button onClick={confirmActions} style={{ flex: 1, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#10b981', border: 'none', borderRadius: 8, padding: '7px 10px', color: 'white', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, touchAction: 'manipulation' }}>
                       <Check size={13} /> Potvrdit
                     </button>
-                    <button onClick={cancelActions} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--border)', border: 'none', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>
+                    <button onClick={cancelActions} style={{ flex: 1, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--border)', border: 'none', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, touchAction: 'manipulation' }}>
                       <X size={13} /> Zrušit
                     </button>
                   </div>
@@ -733,11 +714,20 @@ export default function VoiceAgent({ onSuccess }: { onSuccess?: () => void }) {
                 </div>
               )}
             </div>
+            {/* Zavírací křížek měl hitbox 14×14 px. Myší se trefíš, prstem ne —
+                na mobilu tak panel nešel zavřít. Ikona zůstává malá, plocha má
+                44×44 jako všude jinde; záporné okraje drží layout na místě. */}
             <button
               onClick={() => { if (status === 'confirm') cancelActions(); setPanelOpen(false) }}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0, flexShrink: 0 }}
+              aria-label="Zavřít hlasový panel"
+              style={{
+                width: 44, height: 44, margin: -14, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'var(--muted)', padding: 0, touchAction: 'manipulation',
+              }}
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
         </div>

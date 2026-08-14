@@ -758,3 +758,26 @@ Ověřeno vykreslené s posunutými hodinami (`window.Date` o +24 h):
 - **Trénink, návrat na záložku** — trénink z 13. 8. měl štítek „Dnes"; po posunu hodin na 14. 8. a `visibilitychange` se přepsal na „Včera".
 - **Trénink, minutový časovač** — po posunu hodin a bez jakékoli události se štítek přepnul sám.
 - **Habits** — po refaktoru znovu ověřeny všechny tři cesty z předchozího záznamu (návrat na záložku, ruční den zůstává, minutový časovač).
+
+## Hlasový režim — dvojí dotaz na mikrofon a nedostupná tlačítka na mobilu
+
+### 1) Dvojí dotaz na mikrofon
+Mikrofon si otevírali **dva spotřebitelé**: `SpeechRecognition` (rozpoznávání) a vlastní `getUserMedia` + `AnalyserNode`, který hlídal 2 s ticha pro automatické zastavení. Prohlížeč se proto ptal dvakrát za sebou.
+
+**Sdílet jeden stream nejde** — Web Speech API žádný `MediaStream` nepřijímá, mikrofon si drží samo a není jak mu vnutit cizí. Jediná cesta k jednomu dotazu je tedy nemít druhého spotřebitele: ticho se pozná z toho, že přestanou chodit výsledky rozpoznávání (`onresult` sype průběžné výsledky, dokud se mluví), takže hlídač je teď obyčejný časovač nad `lastSoundAt` bez jediného přístupu k mikrofonu.
+
+Vedle jednoho dotazu to má i věcný přínos: hlídá se **ticho v řeči**, ne hlasitost, takže hluk v pozadí už poslech neudržuje naživu donekonečna.
+
+Ověřeno v prohlížeči na desktopové větvi (`isMobile === false`, tedy ta s hlídačem): za celý cyklus poslechu **`getUserMedia` 0 volání** (dřív 1 + vlastní mikrofon rozpoznávání) a jedna instance `SpeechRecognition`; po 2 s bez výsledku hlídač zavolal `stop()` právě jednou, takže automatické zastavení funguje dál.
+
+### 2) Tapy na mobilu
+Zavírací křížek panelu měl hitbox **14×14 px** — myší se trefíš, prstem ne. Panel tak na mobilu nešel zavřít. Ikona zůstala malá, plocha má 44×44 (záporné okraje drží layout na místě); potvrzovací tlačítka „Potvrdit / Zrušit" dostala `min-height: 44` a tlačítko mikrofonu 44×44 místo 40×40. Pravidlo projektu (min. 44×44) tak platí i tady.
+
+Ověřeno skutečným tapem na **390 px** s emulací dotyku: hardwarový tap dopadl na křížek (`pointerdown:touch` + `touchstart:touch` přímo na tlačítku) a všech sedm bodů posunutých o ±15 px od středu pořád trefí tlačítko — u původních 14×14 px stačilo minout o 8 px. Po dokončení tapu se panel zavřel.
+
+**Co v kódu není:** žádný `unlockAudio` ani `onPointerDown` — hlasový panel nemá jediný pointer handler, takže konflikt s odemykáním audia to být nemohl. A **hlasový režim nemá tlačítko „zpět na dashboard"** — jediné ovládání panelu je ten křížek.
+
+### 3) Cesta zpět na dashboard byla ve vývoji zakrytá bublinou Next.js
+Na 390 px leží indikátor dev nástrojů přesně na první položce spodní navigace, tedy na odkazu **Přehled** — cestě zpět na dashboard. Změřeno: `elementFromPoint` uprostřed odkazu vracel `NEXTJS-PORTAL`, o 10 px doleva/nahoru/doprava taky. Tap tedy nedopadl na odkaz a nic se nestalo; na desktopu je stejná položka v postranním panelu, kde ji nic nepřekrývá.
+
+V produkci bublina není, takže v kódu appky nebylo co opravovat — vypnul jsem ji v `next.config.ts` (`devIndicators: false`), aby ladění na telefonu nemátlo. Přesouvat ji nemá smysl: na 390 px má appka v každém rohu něco, na co se ťuká. Po vypnutí je hittestem ověřeno, že všech sedm položek navigace včetně „Přehled" trefí samy sebe.
