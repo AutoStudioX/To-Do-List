@@ -795,3 +795,18 @@ Ověřeno v prohlížeči:
 - **skutečné tažení myší** z pole uvnitř modálu ven na překryv (hardwarový vstup, ne syntetická událost) — modál zůstal otevřený;
 - čtyři kombinace na `Modal` — stisk uvnitř → puštění mimo: **nezavře**; stisk mimo → puštění uvnitř: **nezavře**; stisk uvnitř → zrušené gesto → puštění mimo: **nezavře**; stisk i puštění mimo: **zavře**;
 - totéž na `ConfirmDialog` (stisk uvnitř → puštění mimo nezavře, poctivý klik vedle zavře).
+
+## Ikona v prohlížeči byla jiná než na telefonu
+V hlavičce se ikony uváděly ručně: `metadata.icons.icon` i `.apple` mířily na `/icon.svg`. Ten se ale servíroval z `public/icon.svg`, kde ležel **úplně jiný obrázek — blesk**, zatímco mobilní appka bere ikonu z manifestu (`/icon-192.png`, `/icon-512.png`), a tam je **checklist**. Odtud dvě různé ikony.
+
+Řešení: jeden zdroj a konvence Next.js místo ručních odkazů.
+- `app/icon.svg` (checklist) → Next si sám vygeneruje `<link rel="icon" type="image/svg+xml" sizes="any">`,
+- `app/apple-icon.png` (kopie 180×180 z `public/apple-touch-icon.png`) → Next vygeneruje `<link rel="apple-touch-icon" sizes="180x180">`,
+- ruční `icons` v metadatech i ruční `<link rel="apple-touch-icon">` jsou pryč,
+- `public/icon.svg` (blesk) a `public/favicon.svg` (duplikát) smazané, aby se dvě pravdy neměly kde vzít.
+
+Dvě věci, které by to jinak shodily:
+- **Middleware přesměrovával i ikony.** Matcher měl výjimku jen pro `icon-`, takže `/icon.svg` i `/apple-icon.png` (metadata routy) dostaly 307 na `/login` — nepřihlášenému uživateli, tedy i na přihlašovací stránce, se favicon vůbec nenačetl. Výjimka rozšířena na `favicon|icon|apple-icon`.
+- **Service worker cachuje obrázky cache-first**, takže nainstalovaným klientům by zůstala stará ikona v mezipaměti. `CACHE_NAME` zvednuto na `dashboard-v3`.
+
+Ověřeno na běžící appce: v HTML jsou právě dva odkazy (`/icon.svg?…` a `/apple-icon.png?…`), oba vracejí **200** (dřív 307 na /login), servírované SVG je checklist a servírovaný apple-icon má **stejný otisk MD5 jako `public/apple-touch-icon.png`**, tedy přesně tu ikonu, kterou má appka na telefonu. `/icon-192.png` i `/icon-512.png` z manifestu se nemění.

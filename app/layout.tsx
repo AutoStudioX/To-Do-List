@@ -8,10 +8,13 @@ export const metadata: Metadata = {
   title: 'AutoStudio Dashboard',
   description: 'Personal productivity dashboard',
   manifest: '/manifest.json',
-  icons: {
-    icon: { url: '/icon.svg', type: 'image/svg+xml' },
-    apple: { url: '/icon.svg', type: 'image/svg+xml' },
-  },
+  // Ikony se NEUVÁDĚJÍ ručně: `app/icon.svg` a `app/apple-icon.png` jsou
+  // konvence Next.js, ze kterých si odkazy i velikosti vygeneruje sám.
+  //
+  // Dřív tu byl ruční odkaz na `/icon.svg`, jenže ten se servíroval
+  // z `public/icon.svg`, kde ležel ÚPLNĚ JINÝ obrázek (blesk) než v mobilní
+  // appce z manifestu (checklist). Prohlížeč tak ukazoval jinou ikonu než
+  // telefon. Ten soubor je pryč, aby se dvě pravdy neměly kde vzít.
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +22,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="cs" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#ffffff" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

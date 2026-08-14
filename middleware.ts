@@ -42,5 +42,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon-|manifest|sw.js).*)'],
+  // `icon.svg` a `apple-icon.png` jsou metadata routy Next.js, ne stránky —
+  // bez výjimky je middleware odpovídal přesměrováním na /login, takže
+  // nepřihlášenému uživateli (třeba přímo na přihlašovací stránce) se favicon
+  // vůbec nenačetl. Výjimka `icon-` pokrývala jen PNG z manifestu.
+  matcher: ['/((?!_next/static|_next/image|favicon|icon|apple-icon|manifest|sw.js).*)'],
 }

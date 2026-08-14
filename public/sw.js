@@ -1,4 +1,6 @@
-const CACHE_NAME = 'dashboard-v2'
+// v3: ikony se cachují jako `image` (cache-first), takže bez změny jména by
+// nainstalovaným klientům zůstala v mezipaměti stará ikona.
+const CACHE_NAME = 'dashboard-v3'
 
 self.addEventListener('install', event => {
   self.skipWaiting()
