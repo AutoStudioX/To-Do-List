@@ -781,3 +781,17 @@ Ověřeno skutečným tapem na **390 px** s emulací dotyku: hardwarový tap dop
 Na 390 px leží indikátor dev nástrojů přesně na první položce spodní navigace, tedy na odkazu **Přehled** — cestě zpět na dashboard. Změřeno: `elementFromPoint` uprostřed odkazu vracel `NEXTJS-PORTAL`, o 10 px doleva/nahoru/doprava taky. Tap tedy nedopadl na odkaz a nic se nestalo; na desktopu je stejná položka v postranním panelu, kde ji nic nepřekrývá.
 
 V produkci bublina není, takže v kódu appky nebylo co opravovat — vypnul jsem ji v `next.config.ts` (`devIndicators: false`), aby ladění na telefonu nemátlo. Přesouvat ji nemá smysl: na 390 px má appka v každém rohu něco, na co se ťuká. Po vypnutí je hittestem ověřeno, že všech sedm položek navigace včetně „Přehled" trefí samy sebe.
+
+## Modály — klik mimo zavírá jen tehdy, když mimo i začal
+Modál se zavíral i při tažení, které začalo uvnitř: `onClick` na překryvu se doručí nejbližšímu společnému předkovi místa stisku a místa puštění, takže stisk uvnitř + puštění venku (tažení posuvníku, výběr textu, kterému ujede myš) trefil překryv a modál zmizel uprostřed práce.
+
+Rozhodnutí teď padá ze dvou událostí: `pointerdown` si zapamatuje, jestli stisk padl na překryv (`target === currentTarget`, tedy ne na potomka), a `pointerup` zavře jen tehdy, když i puštění padlo tam. `pointercancel` příznak maže, aby zrušené gesto (scroll prstem) nenechalo modál zavřít při příštím puštění.
+
+Logika je v `lib/useOverlayClose.ts` a používají ji **oba** systémy dialogů v appce — `components/Modal.tsx` (všechny formulářové modály včetně exportu a pickerů) a `components/ConfirmDialog.tsx`. `stopPropagation` na obsahu už není potřeba a zmizel.
+
+Při té příležitosti: `Modal` neměl **zavření Esc**, které pravidlo projektu vyžaduje u každého dialogu (`ConfirmDialog` ho měl). Doplněno.
+
+Ověřeno v prohlížeči:
+- **skutečné tažení myší** z pole uvnitř modálu ven na překryv (hardwarový vstup, ne syntetická událost) — modál zůstal otevřený;
+- čtyři kombinace na `Modal` — stisk uvnitř → puštění mimo: **nezavře**; stisk mimo → puštění uvnitř: **nezavře**; stisk uvnitř → zrušené gesto → puštění mimo: **nezavře**; stisk i puštění mimo: **zavře**;
+- totéž na `ConfirmDialog` (stisk uvnitř → puštění mimo nezavře, poctivý klik vedle zavře).

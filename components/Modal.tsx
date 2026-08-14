@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useOverlayClose } from '@/lib/useOverlayClose'
 import { X } from 'lucide-react'
 
 // The overlay is sized to the VISUAL viewport, not the layout viewport.
@@ -34,12 +35,24 @@ export default function Modal({ isOpen, onClose, title, children, bodyFill = fal
   bodyFill?: boolean
 }) {
   const vp = useVisualViewport(isOpen)
+  // Zavření klikem mimo řeší dvojice pointerdown/pointerup, ne `onClick` —
+  // ten by modál zavřel i při tažení, které začalo uvnitř (viz hook).
+  const overlay = useOverlayClose(onClose)
+
+  // Esc zavírá — pravidlo projektu pro každý modál.
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (
     <div
       className="modal-overlay"
-      onClick={onClose}
+      {...overlay}
       style={{
         position: 'fixed', left: 0, right: 0, top: 0,
         // Follow the visual viewport so the sheet sits above the keyboard.
@@ -52,7 +65,6 @@ export default function Modal({ isOpen, onClose, title, children, bodyFill = fal
     >
       <div
         className="modal-content"
-        onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--card)',
           border: '1px solid var(--border)',

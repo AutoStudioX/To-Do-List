@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { useOverlayClose } from '@/lib/useOverlayClose'
 
 interface Props {
   message: string
@@ -10,6 +11,8 @@ interface Props {
 
 export function ConfirmDialog({ message, confirmLabel = 'Smazat', onConfirm, onCancel }: Props) {
   const confirmRef = useRef<HTMLButtonElement>(null)
+  // Stejné pravidlo jako u Modalu: zavřít jen když klik mimo i začal mimo.
+  const overlay = useOverlayClose(onCancel)
 
   // Esc closes; the destructive button takes focus so Enter confirms.
   useEffect(() => {
@@ -24,12 +27,12 @@ export function ConfirmDialog({ message, confirmLabel = 'Smazat', onConfirm, onC
       position: 'fixed', inset: 0, zIndex: 99998,
       background: 'rgba(0,0,0,0.5)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onCancel}>
+    }} {...overlay}>
       <div style={{
         background: 'var(--card)', border: '1px solid var(--border)',
         borderRadius: 14, padding: '24px 28px', minWidth: 300, maxWidth: 400,
         boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
-      }} onClick={e => e.stopPropagation()}>
+      }}>
         <div style={{ fontSize: 15, color: 'var(--text)', marginBottom: 20, fontWeight: 500 }}>{message}</div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={{
