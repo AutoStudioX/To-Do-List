@@ -836,3 +836,28 @@ Ověřeno vykreslené:
 - **390 px** — pole 332 px v kartě 366 px, `font-size: 16px` (iOS při zaostření nezvětší stránku), pole leží mezi seznamem návyků a řádkem se sérií, nic nepřetéká do stran; v Přehledu tečka 3 px na 7px buňce, taky bez přetečení.
 
 Neověřeno: skutečný zápis do `habit_notes` proti databázi — bez přihlášení se do něj nedostanu, ověřoval jsem logiku kolem něj (prodleva, cílový den, stavy) s odstřiženým dotazem.
+
+## Cold cally — krok 1: datová vrstva, migrace, import leadů
+Sekce podle handoffu `design_handoff_cold_cally`. První ze tří kroků: data, migrace a import leadů. Obrazovky (seznam, záznam hovoru, Co se učím) jsou krok 2 a 3.
+
+### Migrace 0021 — `cold_calls`
+Sloupce podle zadání; `vysledek` má check na pět hodnot včetně `ceka`, což je **výchozí** hodnota — nahraný lead, kterému se ještě nevolalo.
+
+Datum je ve dvou sloupcích schválně: `created_at` = kdy záznam vznikl (u leadu okamžik importu), `volano_at` = kdy se doopravdy volalo. S jedním sloupcem by po zavolání zmizelo, kdy lead přišel, a statistika „dnes zavoláno" by počítala i dnešní import bez jediného hovoru. Proto `statistiky()` počítá „dnes" i „celkem" z `volano_at` a frontu do nich nezahrnuje.
+
+Indexy: `(user_id, vysledek, created_at desc)` pro seznam a **částečný** `(user_id, telefon) where telefon is not null` na hledání duplicit, aby si záznamy bez čísla nepřekážely.
+
+### Import leadů
+`lib/coldCallsImport.ts` je celý čistá funkce nad mřížkou `string[][]`, takže parsování, rozpoznání sloupců i náhled jdou testovat bez prohlížeče a bez databáze; čtení souboru je jediné, co sahá na `File`.
+
+- **CSV vlastním parserem** — umí uvozovky, zdvojené uvozovky, oddělovač uvnitř hodnoty i CRLF a BOM z Excelu. `split(',')` by spadl na první adrese „Praha 4, Nusle". Oddělovač se hádá z první řádky (`;` česká verze Excelu, `,` webové exporty, tabulátor).
+- **Excel přes `xlsx` (SheetJS)** — nová závislost, načítaná **dynamicky**, takže skoro megabajt knihovny se stáhne jen když uživatel opravdu vybere `.xlsx`. Čte se `raw: false`, jinak se z telefonu uloženého jako číslo stane `7.77123456e8`.
+- **Sloupce se poznají samy** — nejdřív podle hlavičky (česky i anglicky, bez ohledu na diakritiku, velikost písmen a pořadí sloupců), a když hlavička chybí nebo nesedí aspoň ve dvou sloupcích, hádá se z obsahu: telefon je sloupec, kde většina buněk vypadá jako číslo, firma nejdelší textový sloupec.
+- **Náhled před uložením** — počty a stav po řádcích: `ok`, `bez-telefonu` (naimportuje se, ale je označený), `duplicita` (přeskočí se), `chybi-firma` (přeskočí se, bez názvu je lead k ničemu). Duplicity se hledají podle telefonu proti databázi **i uvnitř souboru**; klíč je posledních devět číslic, takže „+420 777 123 456", „777123456" i „00420777123456" jsou totéž číslo.
+
+### Ověřeno
+- **Migrace proti skutečnému Postgresu:** idempotence dvojím během, `vysledek = 'ceka'` jako výchozí a `volano_at` NULL, neplatná hodnota odmítnuta checkem, přechod leadu na `schuzka` s `volano_at`, RLS (cizí vidí 0 a zápis je odmítnut), a `explain` potvrdil, že se na frontu použije index `cold_calls_user_idx`.
+- **Jednotkově (34 tvrzení):** parser CSV (uvozovky, escapované uvozovky, BOM+CRLF, prázdné řádky), detekce oddělovače, rozpoznání sloupců z české i anglické hlavičky, v jiném pořadí i bez hlavičky, náhled se všemi čtyřmi stavy, klíč telefonu, formátování čísla, statistiky (import dnes nezvedne „dnes zavoláno"), řazení (fronta nahoře, nejstarší lead první), hledání bez diakritiky, relativní datum („Dnes 10:12" / „Včera 16:40" / „st 12. 8.") a CSV export (BOM, escapovaný středník, český popisek).
+- **Excel end-to-end:** vyrobený `.xlsx` s telefonem uloženým jako číslo, hlavičkou v jiném pořadí a prázdnou řádkou uprostřed projde stejnou cestou jako CSV — telefon zůstal „777123456", prázdná řádka vypadla, sloupce rozpoznány.
+
+Poznámka k testu: jeden pád byl **chyba testu, ne kódu** — řádek „Delta" jsem omylem dal stejné číslo jako dřívějšímu řádku a kód ho správně označil za duplicitu.
