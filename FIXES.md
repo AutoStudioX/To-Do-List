@@ -935,3 +935,16 @@ Nepoužité proměnné `--cc-queue-bg` a `--cc-queue-line` jsou odstraněné —
 „ZAVOLÁNO" bylo tlumené (`--muted` bez podkladu) a v tmavém motivu se skoro ztrácelo, takže seznam vypadal, jako by fronta pokračovala dál. Obě hlavičky mají teď **stejný styl**: 11,5px/800, letter-spacing .1em, verzálky, barva `--text` a jemný podklad `--hover-bg`, který je oddělí od řádků v obou motivech. „ZAVOLÁNO" dostalo počet jako fronta, se správným skloňováním (1 hovor / 2–4 hovory / 5+ hovorů, totéž pro leady).
 
 Ověřeno vykreslené: v tmavém motivu obě hlavičky `rgb(255,255,255)` na `rgba(255,255,255,.04)`, ve světlém `rgb(17,24,39)` na `rgb(243,244,246)` — stejné hodnoty u obou, tedy ani jedna není výraznější; počty „2 leady" a „5 hovorů" tlumeně vedle popisku.
+
+## Cold cally — „Info o firmě", rozdělený seznam, telefon i u zavolaných
+**Info o firmě** je víceřádkové pole hned pod řádkem Firma / Kontakt / Telefon, tedy **nad** výsledkem a reflexí. Čte se před vytáčením — dole u reflexe by bylo k ničemu, ta se píše až po hovoru. Volný text schválně: strukturovaná pole (obor, počet zaměstnanců, obrat) se vyplňují hůř, než se čtou, a leady chodí z různých zdrojů s různými údaji. Migrace 0023 přidává sloupec `info`.
+
+**Import umí sloupec s poznámkou.** Hledá se podle hlavičky: `info`, `informace`, `poznámka`, `popis`, `obor`, `činnost`, `předmět podnikání`, `note`, `description`, `komentář`, `detail`… Sloupec se **nehádá z obsahu** — nejdelší text v souboru bývá adresa, ne popis firmy — a samotná „poznámka" v prvním řádku nestačí na to, aby se řádek považoval za hlavičku; na to je potřeba shoda ve dvou z trojice firma/kontakt/telefon. Náhled importu i export CSV info vozí s sebou.
+
+**Fronta a zavolané jsou dvě karty s mezerou** (14 px na desktopu, 10 na mobilu), ne jeden blok — jsou to dva různé seznamy: co mě čeká a co mám za sebou. Poslední řádek v každé kartě už nemá spodní linku, kryla by se s okrajem.
+
+**Telefon je na začátku druhé řádky i u zavolaných.** Dřív ho měla jen fronta, takže u zavolaného čísla nebylo vidět a musel se otevírat záznam.
+
+Ověřeno vykreslené na **1440 i 390**: pole „Info o firmě" je čtvrté v pořadí (Firma → Kontakt → Telefon → **Info o firmě** → Výsledek → Kde skončil → …), min-height 84/76 px, na mobilu font 16 px (iOS nezvětší stránku) · dvě karty s mezerou 14 px, poslední řádek v obou bez linky · druhé řádky „608 990 123 · Veronika Šimková" u fronty a „777 123 456 · Dnes 15:20 · Martin Vlček" u zavolaných, výška řádku pořád 58 px · import z CSV s hlavičkou „Firma; Telefon; Poznámka" rozpoznal všechny tři sloupce a v náhledu ukázal „603222111 · Účetní kancelář, 8 lidí".
+
+Jednotkových tvrzení nad importem je teď 42 — přibyly čtyři na rozpoznání sloupce s info a tři na to, že se veze až do uložení.

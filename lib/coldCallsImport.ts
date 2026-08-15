@@ -8,7 +8,7 @@ import { telefonKlic } from '@/lib/coldCalls'
 
 export type Mrizka = string[][]
 
-export type Sloupce = { firma: number; kontakt: number; telefon: number }
+export type Sloupce = { firma: number; kontakt: number; telefon: number; info: number }
 
 export type NahledRadek = {
   /** číslo řádku v souboru, 1 = první datový řádek (kvůli hlášce uživateli) */
@@ -16,6 +16,7 @@ export type NahledRadek = {
   firma: string
   kontakt: string
   telefon: string
+  info: string
   stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybi-firma'
 }
 
@@ -86,6 +87,11 @@ const NAZVY = {
   telefon: ['telefon', 'tel', 'mobil', 'phone', 'mobile', 'cislo', 'telcislo', 'telefonnicislo', 'kontakttelefon', 'gsm'],
   kontakt: ['kontaktnijmeno', 'kontaktniosoba', 'kontaktjmeno', 'kontaktniosobajmeno', 'jmeno', 'kontakt', 'osoba', 'contact', 'contactname', 'person', 'jmenoaprijmeni'],
   firma: ['firma', 'spolecnost', 'company', 'nazevfirmy', 'nazev', 'obchodnijmeno', 'subjekt', 'klient', 'organizace', 'name'],
+  // Co o firmě víme předem. Sloupec se hledá JEN podle hlavičky — hádat ho
+  // z obsahu by znamenalo, že nejdelší text v souboru skončí jako info,
+  // i když je to adresa nebo cokoli jiného.
+  info: ['info', 'informace', 'poznamka', 'poznamky', 'popis', 'popisfirmy', 'obor', 'oborcinnosti',
+    'cinnost', 'predmetpodnikani', 'note', 'notes', 'description', 'komentar', 'detail'],
 } as const
 
 const vypadaJakoTelefon = (v: string) => {
@@ -116,14 +122,17 @@ export function detekujSloupce(mrizka: Mrizka): { sloupce: Sloupce; hlavicka: st
     telefon: najdi(NAZVY.telefon),
     kontakt: najdi(NAZVY.kontakt),
     firma: najdi(NAZVY.firma),
+    info: najdi(NAZVY.info),
   }
-  // Aspoň dvě shody = první řádek je opravdu hlavička, ne data.
-  const shod = Object.values(podleHlavicky).filter(i => i >= 0).length
+  // Aspoň dvě shody v POVINNÉ trojici = první řádek je opravdu hlavička.
+  // Samotné „poznámka" o hlavičce nesvědčí.
+  const shod = [podleHlavicky.firma, podleHlavicky.kontakt, podleHlavicky.telefon]
+    .filter(i => i >= 0).length
   if (shod >= 2) return { sloupce: dopln(podleHlavicky, mrizka.slice(1)), hlavicka: prvni }
 
   // Bez použitelné hlavičky se hádá z obsahu: telefonní sloupec je ten, kde
   // většina buněk vypadá jako číslo; firma je nejdelší textový sloupec.
-  return { sloupce: dopln({ firma: -1, kontakt: -1, telefon: -1 }, mrizka), hlavicka: null }
+  return { sloupce: dopln({ firma: -1, kontakt: -1, telefon: -1, info: -1 }, mrizka), hlavicka: null }
 }
 
 /** Doplní chybějící sloupce odhadem z obsahu. */
@@ -184,6 +193,7 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
     const firma = bunka(sloupce.firma)
     const kontakt = bunka(sloupce.kontakt)
     const telefon = bunka(sloupce.telefon)
+    const info = bunka(sloupce.info)
     const k = telefonKlic(telefon)
     let stav: NahledRadek['stav']
     if (!firma) stav = 'chybi-firma'
@@ -191,7 +201,7 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
     else if (!k) stav = 'bez-telefonu'
     else stav = 'ok'
     if (stav === 'ok') videne.add(k)
-    return { cislo: i + 1, firma, kontakt, telefon, stav }
+    return { cislo: i + 1, firma, kontakt, telefon, info, stav }
   })
 
   const spocti = (s: NahledRadek['stav']) => radky.filter(r => r.stav === s).length
@@ -208,13 +218,16 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
 }
 
 /** Řádky, které se opravdu uloží. */
-export function kImportu(nahled: Nahled): { firma: string; kontakt_jmeno: string | null; telefon: string | null }[] {
+export function kImportu(nahled: Nahled): {
+  firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+}[] {
   return nahled.radky
     .filter(r => r.stav === 'ok' || r.stav === 'bez-telefonu')
     .map(r => ({
       firma: r.firma,
       kontakt_jmeno: r.kontakt || null,
       telefon: r.telefon || null,
+      info: r.info || null,
     }))
 }
 

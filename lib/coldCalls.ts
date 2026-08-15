@@ -14,6 +14,8 @@ export type ColdCall = {
   firma: string
   kontakt_jmeno: string | null
   telefon: string | null
+  /** co o firmě vím před hovorem — obor, velikost, obrat, čím se živí */
+  info: string | null
   vysledek: Vysledek
   /** `null` = lead, nebo se hovor k žádné fázi nedostal (nedovoláno) */
   faze: Faze | null
@@ -184,7 +186,7 @@ export function fmtTelefon(tel: string | null | undefined): string {
 // ---- Export ----
 
 const EXPORT_SLOUPCE = [
-  'firma', 'kontakt', 'telefon', 'vysledek', 'kde_skoncil', 'volano', 'vytvoreno',
+  'firma', 'kontakt', 'telefon', 'info', 'vysledek', 'kde_skoncil', 'volano', 'vytvoreno',
   'co_jsem_rekl', 'co_odpovedel', 'co_spatne', 'co_priste_jinak',
 ] as const
 
@@ -198,7 +200,7 @@ export function doCsv(calls: ColdCall[]): string {
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const radek = (c: ColdCall) => [
-    c.firma, c.kontakt_jmeno ?? '', c.telefon ?? '', VYSLEDEK_STYL[c.vysledek].label,
+    c.firma, c.kontakt_jmeno ?? '', c.telefon ?? '', c.info ?? '', VYSLEDEK_STYL[c.vysledek].label,
     c.faze ? FAZE_LABEL[c.faze] : '',
     c.volano_at ? c.volano_at.slice(0, 16).replace('T', ' ') : '',
     c.created_at.slice(0, 16).replace('T', ' '),

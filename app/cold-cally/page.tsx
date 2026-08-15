@@ -77,7 +77,9 @@ export default function ColdCallyPage() {
   const fronta = videt.filter(c => c.vysledek === 'ceka')
   const zavolane = videt.filter(c => c.vysledek !== 'ceka')
 
-  async function importuj(radky: { firma: string; kontakt_jmeno: string | null; telefon: string | null }[]) {
+  async function importuj(radky: {
+    firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+  }[]) {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { showToast('Import selhal: nejsi přihlášený', 'error'); return }
@@ -145,14 +147,17 @@ export default function ColdCallyPage() {
    * u zavolaného datum, kontakt a začátek poznámky „co příště jinak" — vždy
    * na jednu řádku s třemi tečkami, ať výška řádků zůstane pravidelná.
    */
-  const radek = (c: ColdCall, lead: boolean) => {
+  const radek = (c: ColdCall, lead: boolean, posledni = false) => {
     const pruh = VYSLEDEK_STYL[c.vysledek].dot
     const kontakt = c.kontakt_jmeno?.trim()
     const poznamka = c.co_priste_jinak?.trim()
     const kdy = fmtKdy(c.volano_at || c.created_at)
+    // Druhá řádka začíná telefonem u fronty i u zavolaných — číslo je to
+    // první, co člověk hledá, a nemá smysl, aby u zavolaného chybělo.
+    const tel = c.telefon ? fmtTelefon(c.telefon) : (lead ? 'bez čísla' : null)
     const druhyRadek = lead
-      ? [c.telefon ? fmtTelefon(c.telefon) : 'bez čísla', kontakt].filter(Boolean)
-      : [isMobile ? kdy : null, kontakt, poznamka].filter(Boolean)
+      ? [tel, kontakt].filter(Boolean)
+      : [tel, isMobile ? kdy : null, kontakt, poznamka].filter(Boolean)
 
     const obsah = (
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -174,7 +179,8 @@ export default function ColdCallyPage() {
         width: '100%', display: 'flex', alignItems: 'center',
         gap: isMobile ? 12 : 18, minHeight: isMobile ? 58 : 57,
         padding: isMobile ? '9px 14px' : '9px 20px',
-        borderBottom: '1px solid var(--border)', boxSizing: 'border-box',
+        // Poslední řádek v kartě už linku nepotřebuje — kryla by se s okrajem.
+        borderBottom: posledni ? 'none' : '1px solid var(--border)', boxSizing: 'border-box',
         background: 'transparent', border: 'none',
         borderLeft: `3px solid ${pruh}`,
         textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation',
@@ -217,6 +223,11 @@ export default function ColdCallyPage() {
       </span>
     </div>
   )
+
+  const karta: React.CSSProperties = {
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 12, overflow: 'hidden',
+  }
 
   const primaryBtn: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
@@ -324,16 +335,15 @@ export default function ColdCallyPage() {
         )}
       </div>
 
-      {/* seznam */}
+      {/* seznam — fronta a zavolané jsou DVĚ karty s mezerou, ne jeden blok:
+          jsou to dva různé seznamy (co mě čeká vs. co mám za sebou). */}
       <div style={{
-        marginTop: isMobile ? 14 : 26, background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 12, overflow: 'hidden',
+        marginTop: isMobile ? 14 : 26,
+        display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 14,
       }}>
         {prazdno ? (
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            padding: isMobile ? 40 : 56, textAlign: 'center',
-          }}>
+          <div style={{ ...karta, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+            padding: isMobile ? 40 : 56, textAlign: 'center' }}>
             <Phone size={26} style={{ color: 'var(--muted)', opacity: 0.6 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Zatím žádné hovory</div>
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -341,16 +351,23 @@ export default function ColdCallyPage() {
             </div>
           </div>
         ) : nicNenalezeno ? (
-          <div style={{ padding: isMobile ? 32 : 48, textAlign: 'center', fontSize: 14, color: 'var(--muted)' }}>
+          <div style={{ ...karta, padding: isMobile ? 32 : 48, textAlign: 'center', fontSize: 14, color: 'var(--muted)' }}>
             Nic neodpovídá hledání ani filtru.
           </div>
         ) : (
           <>
-            {/* Fronta k obvolání — vlastní část seznamu, ne jen jiný badge. */}
-            {fronta.length > 0 && predel('K obvolání', fronta.length, 'lead')}
-            {fronta.map(c => radek(c, true))}
-            {fronta.length > 0 && zavolane.length > 0 && predel('Zavoláno', zavolane.length, 'hovor')}
-            {zavolane.map(c => radek(c, false))}
+            {fronta.length > 0 && (
+              <div style={karta}>
+                {predel('K obvolání', fronta.length, 'lead')}
+                {fronta.map((c, i) => radek(c, true, i === fronta.length - 1))}
+              </div>
+            )}
+            {zavolane.length > 0 && (
+              <div style={karta}>
+                {predel('Zavoláno', zavolane.length, 'hovor')}
+                {zavolane.map((c, i) => radek(c, false, i === zavolane.length - 1))}
+              </div>
+            )}
           </>
         )}
       </div>

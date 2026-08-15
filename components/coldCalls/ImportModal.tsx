@@ -23,7 +23,9 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
   onClose: () => void
   /** telefony už uložených záznamů — proti nim se hledají duplicity */
   existujiciTelefony: string[]
-  onImport: (radky: { firma: string; kontakt_jmeno: string | null; telefon: string | null }[]) => Promise<void>
+  onImport: (radky: {
+    firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+  }[]) => Promise<void>
 }) {
   const [nahled, setNahled] = useState<Nahled | null>(null)
   const [jmeno, setJmeno] = useState('')
@@ -85,7 +87,8 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
             {jmeno} · {nahled.hlavicka
               ? `sloupce podle hlavičky: ${[
                 nahled.hlavicka[nahled.sloupce.firma], nahled.hlavicka[nahled.sloupce.kontakt],
-                nahled.hlavicka[nahled.sloupce.telefon]].filter(Boolean).join(', ')}`
+                nahled.hlavicka[nahled.sloupce.telefon], nahled.hlavicka[nahled.sloupce.info]]
+                .filter(Boolean).join(', ')}`
               : 'soubor nemá hlavičku — sloupce jsou odhadnuté z obsahu'}
           </div>
 
@@ -131,8 +134,11 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       textDecoration: preskoceno ? 'line-through' : undefined,
                     }}>{r.firma || '—'}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
-                      {[r.kontakt, r.telefon].filter(Boolean).join(' · ') || 'bez kontaktu'}
+                    <div style={{
+                      fontSize: 12, color: 'var(--muted)', marginTop: 1,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {[r.kontakt, r.telefon, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
                     </div>
                   </div>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: s.barva, flexShrink: 0 }}>

@@ -10,6 +10,7 @@ export type Draft = {
   firma: string
   kontakt_jmeno: string
   telefon: string
+  info: string
   vysledek: Vysledek | ''
   faze: Faze | ''
   co_jsem_rekl: string
@@ -19,7 +20,7 @@ export type Draft = {
 }
 
 const prazdny: Draft = {
-  firma: '', kontakt_jmeno: '', telefon: '', vysledek: '', faze: '',
+  firma: '', kontakt_jmeno: '', telefon: '', info: '', vysledek: '', faze: '',
   co_jsem_rekl: '', co_odpovedel: '', co_spatne: '', co_priste_jinak: '',
 }
 
@@ -27,6 +28,7 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
   firma: c.firma,
   kontakt_jmeno: c.kontakt_jmeno ?? '',
   telefon: c.telefon ?? '',
+  info: c.info ?? '',
   // Lead ještě nemá výsledek hovoru — `ceka` není nic, co by se dalo vybrat.
   vysledek: c.vysledek === 'ceka' ? '' : c.vysledek,
   faze: c.faze ?? '',
@@ -82,6 +84,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       firma: d.firma.trim(),
       kontakt_jmeno: d.kontakt_jmeno.trim() || null,
       telefon: d.telefon.trim() || null,
+      info: d.info.trim() || null,
       vysledek: d.vysledek as Vysledek,
       // Fáze je nepovinná: u „nedovoláno" se hovor k žádné nedostal.
       faze: d.faze || null,
@@ -248,6 +251,18 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             </div>
           </div>
         )}
+
+        {/* Info o firmě — patří NAHORU, čte se před vytáčením. Dole u reflexe
+            by bylo k ničemu: to se píše až po hovoru. */}
+        <div>
+          <label style={label} htmlFor="cc-info">Info o firmě</label>
+          <textarea
+            id="cc-info" className="cc-textarea" value={d.info}
+            onChange={e => set('info', e.target.value)}
+            placeholder="Obor, počet zaměstnanců, obrat, čím se živí…"
+            style={textarea(isMobile ? 76 : 84)}
+          />
+        </div>
 
         {/* výsledek */}
         <div>
