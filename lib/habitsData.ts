@@ -10,6 +10,8 @@ export type HabitWindow = {
   days: string[]
   /** hodnoty návyku po dnech okna, ve stejném pořadí jako `days` */
   byHabit: Record<string, number[]>
+  /** dny, ke kterým je napsaná poznámka — Přehled je značí tečkou */
+  noteDays: Set<string>
 }
 
 /**
@@ -21,13 +23,18 @@ export async function loadWindow(supabase: SupabaseClient, userId: string): Prom
   const days = lastDays(WINDOW_DAYS)
   const from = days[0]
 
-  const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }] = await Promise.all([
+  const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }, { data: ns, error: nErr }] = await Promise.all([
     supabase.from('habits').select('*').eq('user_id', userId).eq('archivovany', false).order('poradi'),
     supabase.from('habit_entries').select('habit_id, datum, hodnota').eq('user_id', userId).gte('datum', from),
     supabase.from('workouts').select('date').eq('user_id', userId).gte('date', from),
+    // Jen data, ne texty — Přehled potřebuje vědět KDE poznámka je, ne co v ní stojí.
+    supabase.from('habit_notes').select('datum').eq('user_id', userId).gte('datum', from).neq('text', ''),
   ])
   if (hErr) throw new Error(hErr.message)
   if (eErr) throw new Error(eErr.message)
+  // Nepuštěná migrace 0020 nesmí shodit celý Přehled — bez značek se prostě
+  // vykreslí jako dosud.
+  if (nErr) console.warn('[habits] poznámky se nenačetly:', nErr)
 
   const habits = (hs || []) as Habit[]
   const perDay: Record<string, Record<string, number>> = {}
@@ -41,7 +48,8 @@ export async function loadWindow(supabase: SupabaseClient, userId: string): Prom
     const map = h.zdroj === 'trenink' ? trainingValues(days, workoutDays) : (perDay[h.id] || {})
     byHabit[h.id] = days.map(d => map[d] ?? 0)
   }
-  return { habits, days, byHabit }
+  const noteDays = new Set(((ns || []) as { datum: string }[]).map(n => n.datum))
+  return { habits, days, byHabit, noteDays }
 }
 
 /** Poslední `n` dnů okna — Přehled si tak vyřízne 7 / 30 / 365. */

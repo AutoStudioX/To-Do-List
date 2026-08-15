@@ -109,6 +109,8 @@ export default function PrehledPage() {
     return {
       habits, R, rows, cut, countsCut, countsAll, allDays, prvniDen,
       dayLevels: statsCut.map(x => x.applicable === 0 ? undefined : dayLevel(x.met, x.applicable)),
+      // Dny s poznámkou dostanou tečku — ať je poznat, kde něco je.
+      noteMarks: cut.days.map(d => win.noteDays.has(d)),
       // Roční páska se řídí stejným pravidlem jako 7 a 30 dní: začíná dnem,
       // kdy vznikl nejstarší návyk, a roste doprava. Dokud se kreslilo celých
       // 365 dní, ležela u čerstvého návyku jediná buňka až na pravém konci
@@ -175,6 +177,8 @@ export default function PrehledPage() {
   const COL = isMobile ? '26px 1fr 38px' : '230px 1fr 64px'
   const COL_GAP = isMobile ? 10 : 16
   const cellRadius = isMobile ? (range === 7 ? 6 : 1) : 5
+  // Tečka musí být vidět i v 7px buňce na mobilu, ale nesmí ji přerůst.
+  const DOT = Math.max(3, Math.round(CELL * (range === 7 ? 0.16 : 0.42)))
   // Svislá mezera mezi řádky matice = vodorovná mezera mezi čtverečky.
   const rowGap = GAP
   const toneColor = (t: 'accent' | 'text' | 'muted') =>
@@ -186,7 +190,7 @@ export default function PrehledPage() {
   // 7 dní: obdélníky přes celou šířku řádku — sedm sloupců se do šířky vejde,
   // roztahování tam nevadí. 30 dní a rok mají pevnou velikost i mezeru
   // a zarovnávají se doleva.
-  const matrixCells = (cells: (number | null | undefined)[]) => (
+  const matrixCells = (cells: (number | null | undefined)[], marks?: boolean[]) => (
     <div style={{
       display: 'grid',
       // Buňky rostou ZLEVA: první den historie vlevo, dnešek vpravo.
@@ -209,7 +213,19 @@ export default function PrehledPage() {
           // `undefined` (návyk ještě neexistoval) nekreslíme vůbec,
           // `null` (neplatil) čárkovaně.
           border: l === null ? '1px dashed var(--border)' : undefined,
-        }} />
+          position: 'relative',
+          display: marks?.[i] ? 'flex' : undefined,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          {/* Tečka = k tomu dni je poznámka. Bílá na vybarvené buňce, jinak
+              akcent — na obojím je vidět. */}
+          {marks?.[i] && (
+            <span style={{
+              width: DOT, height: DOT, borderRadius: '50%', flexShrink: 0,
+              background: (l ?? 0) >= 3 ? '#fff' : 'var(--accent)',
+            }} />
+          )}
+        </div>
       ))}
     </div>
   )
@@ -261,7 +277,7 @@ export default function PrehledPage() {
               <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
                 {isYear
                   ? 'Sytost čtverce odpovídá počtu splněných návyků za den'
-                  : 'Řádek je jeden návyk, sloupec jeden den. Sytost odpovídá plnění.'}
+                  : 'Řádek je jeden návyk, sloupec jeden den. Sytost odpovídá plnění. Tečka v souhrnu = poznámka k tomu dni.'}
               </div>
             )}
           </div>
@@ -339,9 +355,9 @@ export default function PrehledPage() {
               marginTop: 6, paddingTop: 14, paddingBottom: 2, borderTop: '1px solid var(--border)',
             }}>
               <div style={{ fontSize: isMobile ? 11 : 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {isMobile ? 'Den' : 'Souhrn dne'}
+                <span title="Tečka = k tomu dni je poznámka">{isMobile ? 'Den' : 'Souhrn dne'}</span>
               </div>
-              {matrixCells(view.dayLevels)}
+              {matrixCells(view.dayLevels, view.noteMarks)}
               <div style={{ textAlign: 'right', fontSize: isMobile ? (range === 7 ? 12 : 9) : 14, fontWeight: 600, color: 'var(--text)' }}>
                 {view.rangeScore}
               </div>

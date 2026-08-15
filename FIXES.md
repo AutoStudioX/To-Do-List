@@ -817,3 +817,22 @@ SVG favicon byl kruh (`<circle r="256">`), zbytek appky čtverec. Změněno na `
 PNG z manifestu se schválně **nemění**: měřením přes canvas mají rohový pixel plně krytý (`rgba(232,25,44,255)`), tedy ostrý čtverec bez průhlednosti — 512 je v manifestu `maskable` a zaoblení dělá systém sám. Předzaoblit je by znamenalo dvojí zaoblení a odseknuté rohy na ploše telefonu.
 
 Ověřeno vykreslené ve 128, 64, 32 i 16 px: tvar drží i v nejmenší velikosti.
+
+## Habits — denní poznámka
+Pod seznamem návyků je textové pole „co jsem dneska dělal, jak to šlo". Patří **zobrazenému dni**, ne dnešku: přepnutí šipkami načte poznámku toho dne a popisek se změní z „POZNÁMKA K DNEŠKU" na konkrétní datum. U minulého dne má karta stejný čárkovaný rámeček jako karty návyků, ať je vidět, že se needituje dnešek.
+
+Migrace 0020: `habit_notes (user_id, datum, text)` s unikátem na `(user_id, datum)`, který zároveň slouží jako cíl `on conflict` — poznámka se přepisuje, neverzuje. `updated_at` drží trigger v databázi, aby se nemělo s čím rozejít při úpravě z jiného zařízení.
+
+**Ukládání s prodlevou (800 ms).** Rozepsaná poznámka si nese svůj den, takže doletí do dne, ve kterém se psala, i když se mezitím přepne jinam; přepnutí dne, `blur` i schování appky (`visibilitychange`) uložení dopředu vynutí, aby se nic neztratilo. Potvrzení je nenápadné — místo toastu se u popisku objeví „Ukládám…" a pak „Uloženo" se zeleným zaškrtnutím, které po 2,5 s zmizí. Chyba se naopak hlásí toastem, ta se spolknout nesmí.
+
+**Prázdná poznámka řádek maže**, ne ukládá prázdný text — jinak by v Přehledu svítila značka u dne, kde nic není.
+
+V **Přehledu** má den s poznámkou tečku v řádku „Souhrn dne": bílou na vybarvené buňce, akcentní na světlé, velikost podle buňky (8 px při 19px buňce, 3 px při 7px buňce na mobilu). `loadWindow()` k tomu tahá jen data, ne texty.
+
+Ověřeno vykreslené:
+- **prodleva** — pět úhozů za sebou = **0 zápisů** a stav „Ukládám…"; po pauze **právě 1 zápis** s finálním textem a „Uloženo", které po chvíli zmizí;
+- **přepnutí dne** — napsáno a hned přepnuto zpět: zápis šel na `2026-08-15` (den, kde se psalo), pole ukázalo poznámku pátku a popisek „POZNÁMKA — PÁTEK 14. SRPNA"; návrat na dnešek ukázal rozepsaný text;
+- **Přehled** — v 30denní matici tečky přesně u čtyř dnů, které poznámku mají (indexy 18, 25, 28, 29), 8 px na 19px buňce; v 7denní matici 3 tečky (čtvrtá je mimo okno) o 7 px na buňce 98×44;
+- **390 px** — pole 332 px v kartě 366 px, `font-size: 16px` (iOS při zaostření nezvětší stránku), pole leží mezi seznamem návyků a řádkem se sérií, nic nepřetéká do stran; v Přehledu tečka 3 px na 7px buňce, taky bez přetečení.
+
+Neověřeno: skutečný zápis do `habit_notes` proti databázi — bez přihlášení se do něj nedostanu, ověřoval jsem logiku kolem něj (prodleva, cílový den, stavy) s odstřiženým dotazem.

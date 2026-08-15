@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Toast, useToast } from '@/components/Toast'
@@ -46,6 +46,9 @@ export default function NavykyPage() {
   // Celé okno, ne jen dnešek — přepínání dne pak nemusí nic donačítat.
   const [entries, setEntries] = useState<Record<string, Record<string, number>>>({})
   const [days, setDays] = useState<string[]>([])
+  // Poznámky celého okna: datum → text. Přepnutí dne tak nic nedonačítá.
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [noteState, setNoteState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -72,7 +75,7 @@ export default function NavykyPage() {
     const days = lastDays(WINDOW_DAYS)
     const from = days[0]
 
-    const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }, { data: ts, error: tErr }] = await Promise.all([
+    const [{ data: hs, error: hErr }, { data: es, error: eErr }, { data: ws }, { data: ts, error: tErr }, { data: ns, error: nErr }] = await Promise.all([
       // Skryté návyky se načtou taky — v režimu úprav je vidět na konci
       // seznamu, aby šly vrátit. Do skóre, sérií ani statistik nejdou.
       supabase.from('habits').select('*').eq('user_id', user.id).order('poradi'),
@@ -81,11 +84,15 @@ export default function NavykyPage() {
       supabase.from('workouts').select('date').eq('user_id', user.id).gte('date', from),
       // Bez `user_id` — vlastnictví hlídá RLS přes návyk (viz migrace 0018).
       supabase.from('habit_times').select('habit_id, den, cas_od, cas_do'),
+      supabase.from('habit_notes').select('datum, text').eq('user_id', user.id).gte('datum', from),
     ])
     if (hErr || eErr) { showToast(`Načtení selhalo: ${(hErr || eErr)!.message}`, 'error'); setLoading(false); return }
     // Chybějící tabulka (nepuštěná migrace 0018) nesmí shodit celý seznam —
     // bez výjimek se prostě všude ukáže výchozí čas.
     if (tErr) console.warn('[habits] denní časy se nenačetly:', tErr)
+    // Stejně jako u časů: chybějící tabulka (nepuštěná migrace 0020) nesmí
+    // shodit seznam návyků, jen nebude co do pole napsat.
+    if (nErr) console.warn('[habits] poznámky se nenačetly:', nErr)
 
     const list = (hs || []) as Habit[]
     const byHabit: Record<string, Record<string, number>> = {}
@@ -100,6 +107,7 @@ export default function NavykyPage() {
     setHabits(sortHabits(list))
     setTimes(indexTimes((ts || []) as HabitTime[]))
     setEntries(byHabit)
+    setNotes(Object.fromEntries(((ns || []) as { datum: string; text: string }[]).map(n => [n.datum, n.text])))
     setDays(days)
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +126,66 @@ export default function NavykyPage() {
     load()
   })
   const isToday = viewDay === today
+
+  /**
+   * Denní poznámka. Ukládá se s prodlevou, ne při každém písmenu — jinak by
+   * každý úhoz znamenal dotaz do databáze.
+   *
+   * `pendingNote` si nese SVŮJ den, takže rozepsaná poznámka doletí do dne,
+   * ve kterém se psala, i když se mezitím přepne šipkami jinam. Přepnutí dne
+   * a odchod ze stránky rozepsané uložení dopředu vynutí.
+   */
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingNote = useRef<{ den: string; text: string } | null>(null)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const flushNote = useCallback(async () => {
+    if (noteTimer.current) { clearTimeout(noteTimer.current); noteTimer.current = null }
+    const p = pendingNote.current
+    pendingNote.current = null
+    if (!p) return
+    setNoteState('saving')
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setNoteState('idle'); showToast('Poznámka se neuložila: nejsi přihlášený', 'error'); return }
+    const text = p.text.trim()
+    // Prázdná poznámka řádek maže — jinak by v Přehledu svítila značka
+    // „tady něco je" u dne, kde nic není.
+    const { error } = text
+      ? await supabase.from('habit_notes')
+        .upsert({ user_id: user.id, datum: p.den, text }, { onConflict: 'user_id,datum' })
+      : await supabase.from('habit_notes').delete().eq('user_id', user.id).eq('datum', p.den)
+    if (error) { setNoteState('idle'); showToast(`Poznámka se neuložila: ${error.message}`, 'error'); return }
+    setNoteState('saved')
+    if (savedTimer.current) clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => setNoteState('idle'), 2500)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase])
+
+  const NOTE_DEBOUNCE_MS = 800
+
+  function editNote(text: string) {
+    const den = viewDay
+    setNotes(n => ({ ...n, [den]: text }))
+    pendingNote.current = { den, text }
+    setNoteState('saving')
+    if (noteTimer.current) clearTimeout(noteTimer.current)
+    noteTimer.current = setTimeout(() => { flushNote() }, NOTE_DEBOUNCE_MS)
+  }
+
+  // Přepnutí dne: rozepsané uložit hned. `pendingNote` drží starý den, takže
+  // se text nepřelije do nově zobrazeného dne.
+  useEffect(() => { flushNote() }, [viewDay, flushNote])
+
+  // Odchod ze stránky nebo schování appky nesmí rozepsanou poznámku zahodit.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushNote() }
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      flushNote()
+    }
+  }, [flushNote])
 
 
   /**
@@ -631,6 +699,41 @@ export default function NavykyPage() {
             {skryte.map(hiddenCard)}
           </>
         )}
+      </div>
+
+      {/* Denní poznámka — patří zobrazenému dni, ne dnešku. */}
+      <div style={{
+        marginTop: isMobile ? 12 : 28, padding: isMobile ? '14px 16px' : '18px 22px',
+        background: C.card, border: `1px ${isToday ? 'solid' : 'dashed'} ${isToday ? C.border : 'rgba(107,114,128,0.55)'}`,
+        borderRadius: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+          <label htmlFor="denni-poznamka" style={{ fontSize: 11, letterSpacing: 0.6, fontWeight: 700, color: C.muted }}>
+            POZNÁMKA {isToday ? 'K DNEŠKU' : `— ${dateLine.toUpperCase()}`}
+          </label>
+          {/* Nenápadné potvrzení: žádný toast, jen se změní řádek u popisku. */}
+          <span style={{
+            fontSize: 12, color: noteState === 'saved' ? '#10b981' : C.muted,
+            display: 'flex', alignItems: 'center', gap: 5, transition: 'color .2s',
+          }}>
+            {noteState === 'saving' && 'Ukládám…'}
+            {noteState === 'saved' && <><Check size={13} /> Uloženo</>}
+          </span>
+        </div>
+        <textarea
+          id="denni-poznamka"
+          value={notes[viewDay] ?? ''}
+          onChange={e => editNote(e.target.value)}
+          onBlur={() => flushNote()}
+          placeholder="Co jsem dneska dělal, jak to šlo…"
+          rows={isMobile ? 3 : 4}
+          style={{
+            width: '100%', boxSizing: 'border-box', resize: 'vertical',
+            minHeight: isMobile ? 76 : 92, padding: '12px 14px', borderRadius: 12,
+            border: `1px solid ${C.border}`, background: C.sunken, color: C.text,
+            fontSize: 16, lineHeight: 1.5, fontFamily: 'inherit',
+          }}
+        />
       </div>
 
       <div style={{ marginTop: isMobile ? 12 : 28 }}>{hint}</div>
