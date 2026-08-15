@@ -182,6 +182,33 @@ export function telefonKlic(tel: string | null | undefined): string {
   return cislice.length > 9 ? cislice.slice(-9) : cislice
 }
 
+// ---- Info o firmě v odrážkách ----
+
+/** Odrážka v „Info o firmě": pomlčka a mezera. */
+export const ODRAZKA = '– '
+
+const jeOdrazka = (radek: string) => /^\s*[-–—•*]/.test(radek)
+
+/** Má text aspoň jednu odrážku? Podle toho se pozná starý zápis od nového. */
+export const maOdrazky = (text: string) =>
+  text.split('\n').some(r => r.trim() && jeOdrazka(r))
+
+/**
+ * Volný text na odrážky, jedna věc na řádek.
+ *
+ * Dělí se na řádcích a na oddělovačích, kterými se seznam píše jedním tahem
+ * (`·`, `•`, `;`, `|`) — na tečce ve větě ne, ta patří do textu. Řádek, který
+ * odrážku už má, se nechává být, takže druhé spuštění nic nezkazí.
+ */
+export function naOdrazky(text: string): string {
+  return text
+    .split(/\r?\n|[·•;|]/)
+    .map(r => r.trim())
+    .filter(Boolean)
+    .map(r => (jeOdrazka(r) ? r : ODRAZKA + r))
+    .join('\n')
+}
+
 // ---- Kontrola a sjednocení zápisu ----
 
 /** Firma pod tři znaky není název, se kterým se dá zvednout telefon. */

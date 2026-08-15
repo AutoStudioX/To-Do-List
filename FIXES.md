@@ -992,3 +992,14 @@ Přechod je animovaný: `grid-template-rows` 0fr → 1fr (0,24 s) plus opacita, 
 - **Jednotková tvrzení** (celkem 70, dřív 48): kontrola názvu i čísla včetně hraničních případů, normalizace pro devět číslic, `+420`, `420` bez plusu, `00420`, nulu napřed, cizí předvolbu a prázdný vstup; stavy náhledu importu na souboru se sedmi řádky včetně toho, že `kImportu` vrací už normalizovaná čísla.
 - **Vykreslené na 1440 i 390:** import CSV se 7 řádky ukázal 3 k importu, 1 duplicitu a 3 chybné s důvody u řádků; „Stavebniny Horák" s číslem `00420 777 123 456` se správně poznaly jako duplicita čísla `777 123 456` z prvního řádku (dedup a normalizace se shodnou). Ve formuláři „AB" + „777 abc" hodí červený rám a důvod pod oběma poli, uložení se odmítne a zůstane se na stránce; `(777) 123-456` ukáže „Uloží se jako +420 777 123 456". Nic nepřetéká do stran.
 - **Nechává se být:** už uložené telefony se zpětně nepřepisují — normalizace platí od dalšího uložení. Volitelný SQL na jednorázové sjednocení historie je ověřený proti skutečnému Postgresu (9 číslic, +420, 420 bez plusu, 00420, nula napřed, cizí předvolba beze změny, prázdná hodnota beze změny).
+
+## Cold cally — převod starého info na odrážky
+Odrážky se doplňovaly jen do prázdného pole, takže záznam, který info už měl (`5 lidí · řemeslníci · ABRA`), zůstal v tečkovém tvaru — a přesně ten uživatel viděl. Přibylo tlačítko **„Převést na odrážky"** pod polem; ukáže se jen tehdy, když text odrážky nemá, a po převodu zmizí.
+
+Převod je **na klik, ne při otevření záznamu**: přepsat text sám by uživateli měnil obsah pod rukama a vrátit by to šlo jen ručně. Dělí se na řádcích a na oddělovačích, kterými se seznam píše jedním tahem (`·`, `•`, `;`, `|`) — na tečce ve větě ne, ta patří do textu. Řádek, který odrážku už má, se nechává být, takže druhé spuštění nic nezkazí.
+
+Funkce (`naOdrazky`, `maOdrazky`, `ODRAZKA`) se přestěhovaly z komponenty do `lib/coldCalls.ts` — psaní do prázdného pole i tlačítko používají tentýž kód a dají se otestovat bez prohlížeče.
+
+### Ověřeno
+- **Jednotková tvrzení** (celkem 79): tečkový zápis, víc řádků, středník a svislítko, věta s tečkou uprostřed (nedělí se), opakované spuštění, prázdné řádky, rozpoznání textu s odrážkami i bez.
+- **Vykreslené na 1440 i 390:** `5 lidí · řemeslníci a menší firmy · majitel dělá i poradenství · ABRA` → čtyři odrážky, každá na svém řádku; tlačítko má 44 px na výšku a po převodu zmizí.

@@ -5,10 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import {
   VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi,
-  firmaChyba, telefonChyba, normalizujTelefon,
+  firmaChyba, telefonChyba, normalizujTelefon, naOdrazky, maOdrazky, ODRAZKA,
   type ColdCall, type Faze, type Vysledek,
 } from '@/lib/coldCalls'
-import { ChevronLeft, Check, X } from 'lucide-react'
+import { ChevronLeft, Check, X, List } from 'lucide-react'
 
 export type Draft = {
   firma: string
@@ -42,22 +42,13 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
   co_priste_jinak: c.co_priste_jinak ?? '',
 })
 
-/** Odrážka v „Info o firmě": pomlčka a mezera. */
-const ODRAZKA = '– '
-const jeOdrazka = (radek: string) => /^\s*[-–—•*]/.test(radek)
-
-/** Doplní odrážky na začátky řádků, které je nemají. Prázdné řádky nechá být. */
-const sOdrazkami = (text: string) => text.split('\n')
-  .map(r => (!r.trim() || jeOdrazka(r) ? r : ODRAZKA + r.trimStart()))
-  .join('\n')
-
 /**
- * Odrážky se doplní jen při psaní do prázdného pole (nebo vložení textu do
- * něj) — starý zápis se tím nepřepisuje. Kdo odrážku smaže, tomu se nevrátí:
- * je to pořád volný text, ne seznam s pravidly.
+ * Odrážky se doplní samy jen při psaní do prázdného pole (nebo vložení textu
+ * do něj) — rozepsaný zápis se pod rukama nepřerovnává. Starý text převede
+ * tlačítko „Převést na odrážky" pod polem, tedy až když o to uživatel řekne.
  */
 const poOdrazkach = (predtim: string, ted: string) =>
-  predtim === '' && ted.trim() ? sOdrazkami(ted) : ted
+  predtim === '' && ted.trim() ? naOdrazky(ted) : ted
 
 /**
  * Záznam hovoru (artboardy 2a/2b) — stejný formulář pro nový hovor i pro
@@ -343,6 +334,19 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             placeholder={`– 5 lidí\n– řemeslníci a menší firmy\n– majitel dělá i poradenství`}
             style={{ ...textarea(isMobile ? 96 : 108), textAlign: 'left' }}
           />
+          {/* Starý zápis („5 lidí · řemeslníci · ABRA") na odrážky až na klik —
+              přepsat ho sám při otevření záznamu by uživateli měnilo text
+              pod rukama a nešlo by to vrátit jinak než ručně. */}
+          {d.info.trim() && !maOdrazky(d.info) && (
+            <button type="button" onClick={() => set('info', naOdrazky(d.info))} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 6,
+              height: 44, padding: '0 12px 0 0', background: 'transparent', border: 'none',
+              color: 'var(--accent)', fontSize: 12.5, fontWeight: 600,
+              cursor: 'pointer', touchAction: 'manipulation',
+            }}>
+              <List size={14} /> Převést na odrážky
+            </button>
+          )}
         </div>
 
         {/* výsledek */}
