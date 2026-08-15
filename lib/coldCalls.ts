@@ -182,6 +182,83 @@ export function telefonKlic(tel: string | null | undefined): string {
   return cislice.length > 9 ? cislice.slice(-9) : cislice
 }
 
+// ---- Kontrola a sjednocení zápisu ----
+
+/** Firma pod tři znaky není název, se kterým se dá zvednout telefon. */
+export const MIN_ZNAKU_FIRMA = 3
+
+/** Jen číslice — mezery, závorky, pomlčky, tečky, lomítka a `+` se ignorují. */
+export const cislice = (tel: string) => tel.replace(/\D/g, '')
+
+/** Cokoli kromě číslic a oddělovačů (tedy hlavně písmena) je v čísle chyba. */
+const TELEFON_ZNAKY = /^[+\d\s()./-]+$/
+
+export const MIN_CISLIC_TELEFON = 9
+
+/** Chyba k zobrazení, nebo `null` když je název v pořádku. */
+export function firmaChyba(firma: string): string | null {
+  return firma.trim().length >= MIN_ZNAKU_FIRMA
+    ? null
+    : `Firma musí mít aspoň ${MIN_ZNAKU_FIRMA} znaky.`
+}
+
+/**
+ * Chyba k zobrazení, nebo `null` když je číslo v pořádku.
+ *
+ * Prázdné číslo chyba NENÍ: lead se dá nahrát i bez něj a dohledat ho později
+ * (import to tak umí odjakživa). Kontroluje se jen to, co je vyplněné.
+ */
+export function telefonChyba(tel: string): string | null {
+  const t = tel.trim()
+  if (!t) return null
+  if (!TELEFON_ZNAKY.test(t)) return 'Telefon smí mít jen číslice, mezery, závorky a +.'
+  if (cislice(t).length < MIN_CISLIC_TELEFON) return `Telefon musí mít aspoň ${MIN_CISLIC_TELEFON} číslic.`
+  return null
+}
+
+/**
+ * Předvolby, které umíme odříznout od zbytku čísla. Bez nich by se nedalo
+ * poznat, kde končí předvolba a začíná číslo — a mezery po trojicích by se
+ * počítaly od špatného místa.
+ */
+const PREDVOLBY = ['420', '421', '380', '359', '353', '386', '385', '381',
+  '30', '31', '32', '33', '34', '36', '39', '40', '41', '43', '44', '45', '46', '47', '48', '49',
+  '1', '7']
+
+/** Mezery po trojicích zleva: „777123456" → „777 123 456". */
+const poTrojicich = (c: string) => c.replace(/(\d{3})(?=\d)/g, '$1 ')
+
+/**
+ * Jeden tvar čísla pro celou appku: `+420 777 123 456`.
+ *
+ * Devět číslic bez předvolby je české číslo, takže dostane +420. Cizí předvolba
+ * se nechává (`+48 123 456 789`), zapsaná s `+`, s `00` i bez čehokoli. Číslo,
+ * které se nepodaří rozebrat, se jen očistí a rozdělí po trojicích — nikdy se
+ * nezahazuje, ať uživatel nepřijde o to, co napsal.
+ */
+export function normalizujTelefon(tel: string | null | undefined): string | null {
+  const t = (tel ?? '').trim()
+  if (!t) return null
+  let c = cislice(t)
+  if (!c) return null
+
+  let mezinarodni = t.startsWith('+')
+  if (!mezinarodni && c.startsWith('00')) { c = c.slice(2); mezinarodni = true }
+
+  // Starý zápis s nulou napřed („0 777 123 456") je pořád české číslo.
+  if (!mezinarodni && c.length === MIN_CISLIC_TELEFON + 1 && c.startsWith('0')) c = c.slice(1)
+
+  // Devět číslic bez předvolby = české číslo.
+  if (!mezinarodni && c.length === MIN_CISLIC_TELEFON) return `+420 ${poTrojicich(c)}`
+
+  // Delší číslo bez `+` bývá předvolba napsaná bez plusu (420777123456).
+  const predvolba = PREDVOLBY.find(p => c.startsWith(p)
+    && c.length - p.length >= 6 && (mezinarodni || c.length > MIN_CISLIC_TELEFON))
+  if (predvolba) return `+${predvolba} ${poTrojicich(c.slice(predvolba.length))}`
+
+  return mezinarodni ? `+${poTrojicich(c)}` : poTrojicich(c)
+}
+
 /** „777123456" → „777 123 456"; cizí formáty nechává být. */
 export function fmtTelefon(tel: string | null | undefined): string {
   const t = (tel ?? '').trim()

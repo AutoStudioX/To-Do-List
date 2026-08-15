@@ -8,8 +8,12 @@ const STAV: Record<NahledRadek['stav'], { label: string; barva: string; Icon: ty
   'ok':           { label: 'Naimportuje se', barva: 'var(--cc-sch-text)',  Icon: CircleCheck },
   'bez-telefonu': { label: 'Bez telefonu',   barva: 'var(--cc-zaj-text)',  Icon: PhoneOff },
   'duplicita':    { label: 'Duplicita',      barva: 'var(--cc-ned-text)',  Icon: CircleX },
-  'chybi-firma':  { label: 'Chybí firma',    barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
+  'chybna-firma': { label: 'Chybná firma',   barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
+  'chybne-cislo': { label: 'Chybný telefon', barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
 }
+
+/** Řádky, které se do databáze nedostanou — vypsat proč, ne jen že. */
+const PRESKOCENO: NahledRadek['stav'][] = ['duplicita', 'chybna-firma', 'chybne-cislo']
 
 /**
  * Import leadů: vyber soubor → NÁHLED → teprve pak uložení.
@@ -59,7 +63,8 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
         <div>
           <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
             CSV nebo Excel se sloupci firma, kontakt a telefon. Na názvech ani pořadí sloupců
-            nezáleží — poznají se samy. Před uložením uvidíš náhled.
+            nezáleží — poznají se samy. Před uložením uvidíš náhled: řádek s příliš krátkým
+            názvem firmy nebo s nesmyslným telefonem se označí a nenaimportuje.
           </div>
           <input
             ref={vstup} type="file" accept=".csv,.txt,.xlsx,.xlsm,.xlsb,.xls"
@@ -98,7 +103,7 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
               { l: 'Řádků v souboru', v: nahled.pocty.celkem, c: 'var(--text)' },
               { l: 'Naimportuje se', v: nahled.pocty.kImportu, c: 'var(--cc-sch-text)' },
               { l: 'Duplicit (přeskočí se)', v: nahled.pocty.duplicit, c: 'var(--muted)' },
-              { l: 'Bez firmy (přeskočí se)', v: nahled.pocty.chybiFirma, c: nahled.pocty.chybiFirma ? 'var(--cc-odm-text)' : 'var(--muted)' },
+              { l: 'Chybných (přeskočí se)', v: nahled.pocty.chybnych, c: nahled.pocty.chybnych ? 'var(--cc-odm-text)' : 'var(--muted)' },
             ].map(x => (
               <div key={x.l} style={{
                 background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 12,
@@ -109,6 +114,17 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
               </div>
             ))}
           </div>
+          {nahled.pocty.chybnych > 0 && (
+            <div style={{ fontSize: 13, color: 'var(--cc-odm-text)', marginBottom: 12, display: 'flex', gap: 7, alignItems: 'flex-start' }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>
+                {[
+                  nahled.pocty.chybnaFirma && `${nahled.pocty.chybnaFirma}× firma kratší než 3 znaky`,
+                  nahled.pocty.chybneCislo && `${nahled.pocty.chybneCislo}× telefon bez 9 číslic nebo s písmeny`,
+                ].filter(Boolean).join(' · ')} — tyhle řádky se nenaimportují.
+              </span>
+            </div>
+          )}
           {nahled.pocty.bezTelefonu > 0 && (
             <div style={{ fontSize: 13, color: 'var(--cc-zaj-text)', marginBottom: 12, display: 'flex', gap: 7, alignItems: 'center' }}>
               <PhoneOff size={14} /> {nahled.pocty.bezTelefonu} {nahled.pocty.bezTelefonu === 1 ? 'lead nemá' : 'leadů nemá'} telefon — naimportují se, číslo doplníš později.
@@ -122,7 +138,7 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
           }}>
             {nahled.radky.map(r => {
               const s = STAV[r.stav]
-              const preskoceno = r.stav === 'duplicita' || r.stav === 'chybi-firma'
+              const preskoceno = PRESKOCENO.includes(r.stav)
               return (
                 <div key={r.cislo} style={{
                   display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, padding: '6px 12px',
@@ -138,7 +154,11 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                       fontSize: 12, color: 'var(--muted)', marginTop: 1,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {[r.kontakt, r.telefon, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
+                      {/* U chybného řádku je důležitější důvod než kontakt —
+                          u telefonu se ukáže i to, co v souboru doopravdy je. */}
+                      {r.duvod
+                        ? (r.stav === 'chybne-cislo' ? `${r.duvod} — „${r.telefon}"` : r.duvod)
+                        : [r.kontakt, r.telefon, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
                     </div>
                   </div>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: s.barva, flexShrink: 0 }}>

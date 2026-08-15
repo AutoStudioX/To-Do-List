@@ -3,7 +3,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi, type ColdCall, type Faze, type Vysledek } from '@/lib/coldCalls'
+import {
+  VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi,
+  firmaChyba, telefonChyba, normalizujTelefon,
+  type ColdCall, type Faze, type Vysledek,
+} from '@/lib/coldCalls'
 import { ChevronLeft, Check, X } from 'lucide-react'
 
 export type Draft = {
@@ -73,6 +77,9 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   const [d, setD] = useState<Draft>(zaznam ? draftZaznamu(zaznam) : prazdny)
   const [saving, setSaving] = useState(false)
   const [ukazChyby, setUkazChyby] = useState(false)
+  // Chyba se ukáže až po opuštění pole nebo po pokusu uložit — ne u druhého
+  // znaku názvu, kdy uživatel teprve píše.
+  const [dotknuto, setDotknuto] = useState<{ firma?: boolean; telefon?: boolean }>({})
   const { confirm, dialog } = useConfirm()
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
@@ -91,8 +98,12 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
     requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = kurzor })
   }
   const zmeneno = JSON.stringify(d) !== JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny)
-  const chybiFirma = !d.firma.trim()
+  const chybaFirmy = firmaChyba(d.firma)
+  const chybaTelefonu = telefonChyba(d.telefon)
   const chybiVysledek = !d.vysledek
+  const chybiFirma = !!chybaFirmy
+  // Tvar, ve kterém se číslo uloží — ukazuje se, jen když se liší od zápisu.
+  const telefonPoUlozeni = chybaTelefonu ? null : normalizujTelefon(d.telefon)
   const fazeVidet = maFazi(d.vysledek)
 
   // Nový záznam startuje s kurzorem ve Firmě, jak chce handoff.
@@ -101,9 +112,12 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   }, [zaznam])
 
   async function uloz() {
-    if (chybiFirma || chybiVysledek) {
+    // Neuloží se nic, co neprojde kontrolou — a uživatel se dozví proč,
+    // v hlášce i u pole samotného.
+    const prvniChyba = chybaFirmy || chybaTelefonu || (chybiVysledek ? 'Vyber výsledek hovoru' : null)
+    if (prvniChyba) {
       setUkazChyby(true)
-      onError(chybiFirma ? 'Vyplň firmu' : 'Vyber výsledek hovoru')
+      onError(prvniChyba)
       return
     }
     setSaving(true)
@@ -115,7 +129,8 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
     const payload = {
       firma: d.firma.trim(),
       kontakt_jmeno: d.kontakt_jmeno.trim() || null,
-      telefon: d.telefon.trim() || null,
+      // Jeden tvar pro celou appku: +420 777 123 456.
+      telefon: normalizujTelefon(d.telefon),
       info: d.info.trim() || null,
       vysledek: d.vysledek as Vysledek,
       // Fáze je nepovinná a u výsledku bez fáze se neukládá vůbec —
@@ -159,8 +174,25 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
     ...pole, height: undefined, minHeight: min, padding: '12px 14px', lineHeight: 1.55,
     resize: 'vertical', ...({ '--cc-ta': `${min}px` } as React.CSSProperties),
   })
-  const chybne = (je: boolean): React.CSSProperties =>
-    (je && ukazChyby ? { borderColor: 'var(--accent)' } : {})
+  const chybne = (je: boolean, ukaz = ukazChyby): React.CSSProperties =>
+    (je && ukaz ? { borderColor: 'var(--accent)' } : {})
+
+  // Chyba se ukáže po opuštění pole nebo po pokusu uložit.
+  const ukazFirmu = ukazChyby || !!dotknuto.firma
+  const ukazTelefon = ukazChyby || !!dotknuto.telefon
+  const hlaska = (text: string, jeChyba = true) => (
+    <div style={{
+      marginTop: 6, fontSize: 12.5, lineHeight: 1.4,
+      color: jeChyba ? 'var(--cc-odm-text)' : 'var(--muted)',
+    }}>{text}</div>
+  )
+  /** Chyba pole, nebo — když je číslo v pořádku a přepíše se — tvar po uložení. */
+  const podTelefonem = () => {
+    if (ukazTelefon && chybaTelefonu) return hlaska(chybaTelefonu)
+    if (telefonPoUlozeni && telefonPoUlozeni !== d.telefon.trim())
+      return hlaska(`Uloží se jako ${telefonPoUlozeni}`, false)
+    return null
+  }
 
   const primary: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -254,7 +286,9 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             <div>
               <label style={label} htmlFor="cc-firma">Firma</label>
               <input id="cc-firma" value={d.firma} onChange={e => set('firma', e.target.value)}
-                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma) }} />
+                onBlur={() => setDotknuto(p => ({ ...p, firma: true }))}
+                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma, ukazFirmu) }} />
+              {ukazFirmu && chybaFirmy && hlaska(chybaFirmy)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
@@ -264,7 +298,10 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
               <div>
                 <label style={label} htmlFor="cc-telefon">Telefon</label>
                 <input id="cc-telefon" value={d.telefon} onChange={e => set('telefon', e.target.value)}
-                  inputMode="tel" style={pole} />
+                  onBlur={() => setDotknuto(p => ({ ...p, telefon: true }))}
+                  inputMode="tel" placeholder="+420 777 123 456"
+                  style={{ ...pole, ...chybne(!!chybaTelefonu, ukazTelefon) }} />
+                {podTelefonem()}
               </div>
             </div>
           </>
@@ -273,7 +310,9 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             <div>
               <label style={label} htmlFor="cc-firma">Firma</label>
               <input id="cc-firma" value={d.firma} onChange={e => set('firma', e.target.value)}
-                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma) }} />
+                onBlur={() => setDotknuto(p => ({ ...p, firma: true }))}
+                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma, ukazFirmu) }} />
+              {ukazFirmu && chybaFirmy && hlaska(chybaFirmy)}
             </div>
             <div>
               <label style={label} htmlFor="cc-kontakt">Kontakt — jméno</label>
@@ -282,7 +321,10 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             <div>
               <label style={label} htmlFor="cc-telefon">Telefon</label>
               <input id="cc-telefon" value={d.telefon} onChange={e => set('telefon', e.target.value)}
-                inputMode="tel" style={pole} />
+                onBlur={() => setDotknuto(p => ({ ...p, telefon: true }))}
+                inputMode="tel" placeholder="+420 777 123 456"
+                style={{ ...pole, ...chybne(!!chybaTelefonu, ukazTelefon) }} />
+              {podTelefonem()}
             </div>
           </div>
         )}

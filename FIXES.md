@@ -974,3 +974,21 @@ Přechod je animovaný: `grid-template-rows` 0fr → 1fr (0,24 s) plus opacita, 
 - Nový hovor bez vybraného výsledku „Kde skončil" nemá; po výběru „Odmítnuto" se rozbalí (výška 98 px), po přepnutí na „Nedovoláno" se sbalí na 0, dostane `inert`, `aria-hidden` a mezera mezi „Výsledek" a „Co jsem řekl" je přesně jedna mezera sloupce (16 px), ne díra.
 - Vybraná fáze „U ceny" po přepnutí na „Nedovoláno" zmizela ze stavu (žádné `aria-checked` mezi fázemi) — a při uložení se stejně posílá `faze: null`.
 - Že jde o plynulý přechod a ne skok: prohlížeč na té změně skutečně spouští CSS transition (`grid-template-rows` 240 ms, `opacity` 180 ms) a hodnota hned po změně je pořád `0px`, tedy se interpoluje. Snímkovat průběh po jednotlivých framech tady nejde — náhledový panel při skrytí nekreslí.
+
+## Cold cally — kontrola zápisu a jeden tvar telefonu
+**Kontrola platí stejně pro import i pro ruční zápis** — obojí jde přes stejné funkce v `lib/coldCalls.ts` (`firmaChyba`, `telefonChyba`, `normalizujTelefon`), takže se pravidla nemají jak rozejít.
+
+- **Firma: aspoň 3 znaky.** „AB" není název, se kterým se dá zvednout telefon.
+- **Telefon: aspoň 9 číslic, žádná písmena.** Mezery, závorky, pomlčky, tečky, lomítka a `+420` jsou povolené — počítají se jen číslice, takže `+420 (777) 123-456` projde.
+- **Prázdný telefon chyba NENÍ.** Lead se dá nahrát i bez čísla a dohledat ho později — import to tak umí odjakživa a stav „Bez telefonu" zůstává. Kontroluje se to, co je vyplněné, ne to, co chybí.
+
+**Import:** řádek, který kontrolou neprojde, je v náhledu označený, přeškrtnutý a **nenaimportuje se** — stejně jako duplicita. Dlaždice „Bez firmy" se změnila na **„Chybných (přeskočí se)"** a pod souhrnem je rozpad („1× firma kratší než 3 znaky · 2× telefon bez 9 číslic nebo s písmeny"). U řádku se místo kontaktu píše důvod, u telefonu i s tím, co v souboru doopravdy je: `Telefon musí mít aspoň 9 číslic. — „777 12"`.
+
+**Ruční zápis:** dokud to nesedí, `uloz()` nic neuloží a **řekne proč** — hláška v toastu a červený text přímo pod polem („Firma musí mít aspoň 3 znaky.", „Telefon smí mít jen číslice, mezery, závorky a +."). Chyba se ukáže po opuštění pole nebo po pokusu uložit, ne u druhého napsaného znaku. Když je číslo v pořádku a bude se přepisovat, je pod polem klidná nápověda „Uloží se jako +420 777 123 456" — sjednocení tvaru tak není překvapení až v seznamu.
+
+**Jeden tvar čísla: `+420 777 123 456`.** Devět číslic bez předvolby je české číslo a dostane +420; cizí předvolba se nechá (`+48 123 456 789`), zapsaná s `+`, s `00` i bez ničeho (`420777123456`). Starý zápis s nulou napřed (`0777123456`) je taky české číslo. Mezery po trojicích zleva. Číslo, které se nepodaří rozebrat, se jen očistí a rozdělí po trojicích — nikdy se nezahazuje. Dedup po telefonu se nemění: `telefonKlic` bere posledních 9 číslic, takže `00420 777 123 456` a `777 123 456` jsou pořád jedna a ta samá firma.
+
+### Ověřeno
+- **Jednotková tvrzení** (celkem 70, dřív 48): kontrola názvu i čísla včetně hraničních případů, normalizace pro devět číslic, `+420`, `420` bez plusu, `00420`, nulu napřed, cizí předvolbu a prázdný vstup; stavy náhledu importu na souboru se sedmi řádky včetně toho, že `kImportu` vrací už normalizovaná čísla.
+- **Vykreslené na 1440 i 390:** import CSV se 7 řádky ukázal 3 k importu, 1 duplicitu a 3 chybné s důvody u řádků; „Stavebniny Horák" s číslem `00420 777 123 456` se správně poznaly jako duplicita čísla `777 123 456` z prvního řádku (dedup a normalizace se shodnou). Ve formuláři „AB" + „777 abc" hodí červený rám a důvod pod oběma poli, uložení se odmítne a zůstane se na stránce; `(777) 123-456` ukáže „Uloží se jako +420 777 123 456". Nic nepřetéká do stran.
+- **Nechává se být:** už uložené telefony se zpětně nepřepisují — normalizace platí od dalšího uložení. Volitelný SQL na jednorázové sjednocení historie je ověřený proti skutečnému Postgresu (9 číslic, +420, 420 bez plusu, 00420, nula napřed, cizí předvolba beze změny, prázdná hodnota beze změny).

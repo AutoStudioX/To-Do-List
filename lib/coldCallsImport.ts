@@ -4,7 +4,7 @@
 // i náhled jdou otestovat bez prohlížeče a bez databáze. Čtení souboru
 // (FileReader / XLSX) je až v UI vrstvě.
 
-import { telefonKlic } from '@/lib/coldCalls'
+import { telefonKlic, firmaChyba, telefonChyba, normalizujTelefon } from '@/lib/coldCalls'
 
 export type Mrizka = string[][]
 
@@ -17,7 +17,9 @@ export type NahledRadek = {
   kontakt: string
   telefon: string
   info: string
-  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybi-firma'
+  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybna-firma' | 'chybne-cislo'
+  /** proč je řádek chybný — text z kontroly, ať uživatel nehádá */
+  duvod?: string
 }
 
 export type Nahled = {
@@ -25,7 +27,10 @@ export type Nahled = {
   /** rozpoznaná hlavička; `null` = soubor hlavičku nemá a sloupce se hádaly z obsahu */
   hlavicka: string[] | null
   radky: NahledRadek[]
-  pocty: { celkem: number; kImportu: number; bezTelefonu: number; duplicit: number; chybiFirma: number }
+  pocty: {
+    celkem: number; kImportu: number; bezTelefonu: number; duplicit: number
+    chybnaFirma: number; chybneCislo: number; chybnych: number
+  }
 }
 
 // ---- CSV ----
@@ -178,9 +183,13 @@ function dopln(s: Sloupce, data: Mrizka): Sloupce {
  * Co se naimportuje. Duplicita se pozná podle telefonu — jak proti už uloženým
  * záznamům, tak uvnitř souboru (stejná firma bývá v exportu dvakrát).
  *
- * Řádek bez firmy se přeskakuje: bez názvu je lead k ničemu. Řádek bez telefonu
- * se naimportovat DÁ, jen je označený — číslo se dá dohledat, ale ať uživatel
- * ví, kolik jich bude.
+ * Řádek, který neprojde kontrolou, se označí a NEnaimportuje — stejně jako
+ * duplicita. Kontroluje se název firmy (aspoň tři znaky) a vyplněný telefon
+ * (aspoň devět číslic, žádná písmena).
+ *
+ * Řádek bez telefonu se naimportovat DÁ, jen je označený — číslo se dá
+ * dohledat, ale ať uživatel ví, kolik jich bude. Prázdné pole není špatně
+ * vyplněné pole.
  */
 export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<string>): Nahled {
   const { sloupce, hlavicka } = detekujSloupce(mrizka)
@@ -195,16 +204,22 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
     const telefon = bunka(sloupce.telefon)
     const info = bunka(sloupce.info)
     const k = telefonKlic(telefon)
+    const chybaF = firmaChyba(firma)
+    const chybaT = telefonChyba(telefon)
     let stav: NahledRadek['stav']
-    if (!firma) stav = 'chybi-firma'
+    let duvod: string | undefined
+    if (chybaF) { stav = 'chybna-firma'; duvod = chybaF }
+    else if (chybaT) { stav = 'chybne-cislo'; duvod = chybaT }
     else if (k && videne.has(k)) stav = 'duplicita'
     else if (!k) stav = 'bez-telefonu'
     else stav = 'ok'
     if (stav === 'ok') videne.add(k)
-    return { cislo: i + 1, firma, kontakt, telefon, info, stav }
+    return { cislo: i + 1, firma, kontakt, telefon, info, stav, duvod }
   })
 
   const spocti = (s: NahledRadek['stav']) => radky.filter(r => r.stav === s).length
+  const chybnaFirma = spocti('chybna-firma')
+  const chybneCislo = spocti('chybne-cislo')
   return {
     sloupce, hlavicka, radky,
     pocty: {
@@ -212,21 +227,21 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
       kImportu: spocti('ok') + spocti('bez-telefonu'),
       bezTelefonu: spocti('bez-telefonu'),
       duplicit: spocti('duplicita'),
-      chybiFirma: spocti('chybi-firma'),
+      chybnaFirma, chybneCislo, chybnych: chybnaFirma + chybneCislo,
     },
   }
 }
 
-/** Řádky, které se opravdu uloží. */
+/** Řádky, které se opravdu uloží — s telefonem sjednoceným do jednoho tvaru. */
 export function kImportu(nahled: Nahled): {
   firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
 }[] {
   return nahled.radky
     .filter(r => r.stav === 'ok' || r.stav === 'bez-telefonu')
     .map(r => ({
-      firma: r.firma,
+      firma: r.firma.trim(),
       kontakt_jmeno: r.kontakt || null,
-      telefon: r.telefon || null,
+      telefon: normalizujTelefon(r.telefon),
       info: r.info || null,
     }))
 }
