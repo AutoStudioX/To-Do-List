@@ -7,12 +7,15 @@ import { useToday } from '@/lib/useToday'
 import { useLiveData } from '@/lib/useLiveData'
 import ImportModal from '@/components/coldCalls/ImportModal'
 import {
-  statistiky, serad, hledej, fmtKdy, fmtTelefon, doCsv, telefonKlic,
-  VYSLEDEK_STYL, VYSLEDKY, type ColdCall, type Vysledek,
+  statistiky, serad, hledej, fmtKdy, fmtTelefon, fmtRelativne, doCsv, telefonKlic,
+  rozpadFazi, FAZE_LABEL, VYSLEDEK_STYL, VYSLEDKY, type ColdCall, type Vysledek,
 } from '@/lib/coldCalls'
 import {
   Phone, PhoneCall, CircleX, CalendarCheck, Plus, Upload, Download, Search, Lightbulb,
 } from 'lucide-react'
+
+// „Co se učím" není samostatná obrazovka: poznámky i rozpad fází se čtou
+// k seznamu, ze kterého pocházejí, takže sedí pod ním.
 
 type Filtr = 'vse' | Vysledek
 
@@ -61,6 +64,15 @@ export default function ColdCallyPage() {
     const podleFiltru = filtr === 'vse' ? calls : calls.filter(c => c.vysledek === filtr)
     return serad(hledej(podleFiltru, dotaz))
   }, [calls, filtr, dotaz])
+
+  // Poznámky a rozpad se počítají ze VŠECH hovorů, ne z toho, co je zrovna
+  // vidět — filtr v seznamu je na hledání záznamu, ne na učení se z nich.
+  const poznamky = useMemo(() => calls
+    .filter(c => (c.co_priste_jinak ?? '').trim())
+    .sort((a, b) => (b.volano_at || b.created_at).localeCompare(a.volano_at || a.created_at)),
+  [calls])
+  const rozpad = useMemo(() => rozpadFazi(calls), [calls])
+  const fazíCelkem = rozpad.reduce((a, r) => a + r.pocet, 0)
 
   const fronta = videt.filter(c => c.vysledek === 'ceka')
   const zavolane = videt.filter(c => c.vysledek !== 'ceka')
@@ -230,9 +242,6 @@ export default function ColdCallyPage() {
           ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>{datum}</span>
           : (
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => router.push('/co-se-ucim')} style={ghostBtn}>
-                <Lightbulb size={16} /> Co se učím
-              </button>
               <button onClick={() => setImportOpen(true)} style={ghostBtn}>
                 <Upload size={16} /> Nahrát leady
               </button>
@@ -344,6 +353,98 @@ export default function ColdCallyPage() {
           </div>
         </div>
       )}
+
+      {/* ── Co se učím ── */}
+      <div style={{ marginTop: isMobile ? 22 : 40 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <Lightbulb size={17} style={{ color: 'var(--accent)' }} />
+          <h2 style={{
+            margin: 0, fontSize: isMobile ? 17 : 19, fontWeight: 700,
+            letterSpacing: '-.01em', color: 'var(--text)',
+          }}>Co se učím</h2>
+        </div>
+        <div style={{ marginTop: 5, fontSize: 13.5, color: 'var(--muted)' }}>
+          Všechna „co příště jinak" z hovorů · {poznamky.length}{' '}
+          {poznamky.length === 1 ? 'poznámka' : poznamky.length < 5 ? 'poznámky' : 'poznámek'}
+        </div>
+
+        {/* Rozpad fází — měřitelné vedle dojmů z poznámek. Čte se odshora
+            dolů jako trychtýř: kde hovory padají nejčastěji. */}
+        <div style={{
+          marginTop: 14, background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
+            fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase',
+            color: 'var(--muted)',
+          }}>
+            Kde hovory končí
+            <span style={{ fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
+              {fazíCelkem ? `z ${fazíCelkem} hovorů` : 'zatím bez dat'}
+            </span>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {rozpad.map(r => (
+              <div key={r.faze} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{
+                  // Na 390px se „Při popisu produktu" do 116px nevešlo a ořízlo
+                  // se na „Při popisu produ…" — sloupec je proto širší.
+                  width: isMobile ? 126 : 150, flexShrink: 0, fontSize: isMobile ? 13 : 13.5, color: 'var(--text)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{FAZE_LABEL[r.faze]}</span>
+                <span style={{
+                  flex: 1, minWidth: 0, height: 8, borderRadius: 99,
+                  background: 'var(--progress-track)', overflow: 'hidden',
+                }}>
+                  <span style={{
+                    display: 'block', width: `${Math.round(r.podil * 100)}%`, height: '100%',
+                    borderRadius: 99, background: 'var(--accent)',
+                  }} />
+                </span>
+                <span style={{
+                  width: 58, flexShrink: 0, textAlign: 'right', fontSize: 13.5, fontWeight: 600,
+                  color: r.pocet ? 'var(--text)' : 'var(--muted)', fontVariantNumeric: 'tabular-nums',
+                }}>{r.pocet}{fazíCelkem ? ` · ${Math.round(r.podil * 100)} %` : ''}</span>
+              </div>
+            ))}
+          </div>
+          {!fazíCelkem && (
+            <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--muted)' }}>
+              Vyplň u hovoru „Kde skončil" a uvidíš, ve které fázi to nejčastěji padá.
+            </div>
+          )}
+        </div>
+
+        {/* Poznámky — rozměry z handoffu (obrazovka 3). */}
+        {poznamky.length === 0 ? (
+          <div style={{
+            marginTop: 14, padding: isMobile ? 24 : 32, textAlign: 'center',
+            background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12,
+            fontSize: 13.5, color: 'var(--muted)',
+          }}>
+            Objeví se tu všechno, co u hovoru napíšeš do „Co příště jinak".
+          </div>
+        ) : (
+          <div style={{ marginTop: isMobile ? 6 : 10, maxWidth: 720 }}>
+            {poznamky.map(c => (
+              <button key={c.id} onClick={() => router.push(`/cold-cally/${c.id}`)} style={{
+                display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+                padding: isMobile ? '18px 0' : '22px 0', background: 'transparent', border: 'none',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <span style={{
+                  display: 'block', fontSize: isMobile ? 15.5 : 17.5,
+                  lineHeight: isMobile ? 1.6 : 1.62, color: 'var(--text)',
+                }}>{c.co_priste_jinak}</span>
+                <span style={{
+                  display: 'block', marginTop: 9, fontSize: isMobile ? 12.5 : 13, color: 'var(--muted)',
+                }}>{c.firma} · {fmtRelativne(c.volano_at || c.created_at)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <ImportModal
         isOpen={importOpen}

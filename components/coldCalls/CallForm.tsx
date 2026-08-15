@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, type ColdCall, type Vysledek } from '@/lib/coldCalls'
+import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, type ColdCall, type Faze, type Vysledek } from '@/lib/coldCalls'
 import { ChevronLeft, Check, X } from 'lucide-react'
 
 export type Draft = {
@@ -11,6 +11,7 @@ export type Draft = {
   kontakt_jmeno: string
   telefon: string
   vysledek: Vysledek | ''
+  faze: Faze | ''
   co_jsem_rekl: string
   co_odpovedel: string
   co_spatne: string
@@ -18,7 +19,7 @@ export type Draft = {
 }
 
 const prazdny: Draft = {
-  firma: '', kontakt_jmeno: '', telefon: '', vysledek: '',
+  firma: '', kontakt_jmeno: '', telefon: '', vysledek: '', faze: '',
   co_jsem_rekl: '', co_odpovedel: '', co_spatne: '', co_priste_jinak: '',
 }
 
@@ -28,6 +29,7 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
   telefon: c.telefon ?? '',
   // Lead ještě nemá výsledek hovoru — `ceka` není nic, co by se dalo vybrat.
   vysledek: c.vysledek === 'ceka' ? '' : c.vysledek,
+  faze: c.faze ?? '',
   co_jsem_rekl: c.co_jsem_rekl ?? '',
   co_odpovedel: c.co_odpovedel ?? '',
   co_spatne: c.co_spatne ?? '',
@@ -81,6 +83,8 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       kontakt_jmeno: d.kontakt_jmeno.trim() || null,
       telefon: d.telefon.trim() || null,
       vysledek: d.vysledek as Vysledek,
+      // Fáze je nepovinná: u „nedovoláno" se hovor k žádné nedostal.
+      faze: d.faze || null,
       co_jsem_rekl: d.co_jsem_rekl.trim() || null,
       co_odpovedel: d.co_odpovedel.trim() || null,
       co_spatne: d.co_spatne.trim() || null,
@@ -148,6 +152,25 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
           background: on ? 'rgba(232,25,44,.16)' : 'var(--input-bg)',
           color: on ? 'var(--text)' : 'var(--muted)',
         }}>{VYSLEDEK_STYL[v].label}</button>
+    )
+  }
+
+  const fazeBtn = (f: Faze) => {
+    const on = d.faze === f
+    return (
+      <button
+        key={f} type="button" role="radio" aria-checked={on}
+        // Druhý tap na vybranou fázi ji zruší — fáze je nepovinná a jinak by
+        // šla jen přepsat, ne vzít zpět.
+        onClick={() => set('faze', on ? '' : f)}
+        style={{
+          height: isMobile ? 46 : 44, padding: isMobile ? '0 12px' : '0 18px',
+          borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          touchAction: 'manipulation', whiteSpace: 'nowrap',
+          border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+          background: on ? 'rgba(232,25,44,.16)' : 'var(--input-bg)',
+          color: on ? 'var(--text)' : 'var(--muted)',
+        }}>{FAZE_LABEL[f]}</button>
     )
   }
 
@@ -235,6 +258,22 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
             gap: 8,
           }}>
             {VYSLEDKY_HOVORU.map(vysledekBtn)}
+          </div>
+        </div>
+
+        {/* kde hovor skončil — měřitelné vedle výsledku */}
+        <div>
+          <span style={label}>Kde skončil</span>
+          <div role="radiogroup" aria-label="Kde hovor skončil" style={{
+            display: isMobile ? 'grid' : 'flex',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : undefined,
+            flexWrap: isMobile ? undefined : 'wrap',
+            gap: 8,
+          }}>
+            {FAZE.map(fazeBtn)}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+            Nepovinné. Z toho se v „Co se učím" počítá, kde hovory nejčastěji padají.
           </div>
         </div>
 

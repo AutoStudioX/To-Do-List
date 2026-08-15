@@ -901,3 +901,21 @@ Validace podle handoffu: povinná **Firma + Výsledek**. Chybějící pole dosta
 - **Slepá ulička v měření:** `getComputedStyle` v náhledovém panelu vracel u tlačítek výsledku zastaralé hodnoty (inline styl říkal `var(--accent)`, computed hlásil barvu okraje), takže to vypadalo, že se výběr nepropisuje. Screenshot ukázal, že vykreslení je správně. Úpravu, kterou jsem na základě špatné diagnózy udělal, jsem **vrátil zpátky** — v kódu po ní nezůstal ani komentář, který by tvrdil neexistující chybu prohlížeče.
 
 Tím je sekce Cold cally hotová v celém rozsahu zadání: data a import (krok 1), seznam (krok 2), záznam a Co se učím (krok 3).
+
+## Cold cally — „kde skončil" a rozpad fází
+K záznamu hovoru přibylo pole **Kde skončil**: button group *Hned zavěsil · Po představení · Při popisu produktu · U ceny · U schůzky*. Výsledek říká, JAK to dopadlo; fáze říká, KDE se to zlomilo — a z toho jde poznat, jestli se láme začátek skriptu, nebo až cena.
+
+Pole je **nepovinné** a druhý tap na vybranou fázi ji zruší: u „nedovoláno" se hovor k žádné fázi nedostal a nahraný lead žádnou nemá. Prázdná fáze do rozpadu nevstupuje, jinak by trychtýř tvrdil, že polovina hovorů skončila „nikde". Migrace 0022 přidává sloupec jako nullable s checkem na pět hodnot a částečný index pro rozpad.
+
+**„Co se učím" se přesunulo pod seznam hovorů** a route `/co-se-ucim` je zrušená i s položkou v postranním panelu (ve spodní liště nikdy nebyla). Poznámky se čtou k seznamu, ze kterého pocházejí, takže sedí pod ním — a odpadá jedna položka navigace, která na 390px stejně nebyla kam dát. Sekce má nadpis, počet poznámek, kartu **„Kde hovory končí"** (řádek na fázi: popisek, proporční pruh, počet a procento) a pod ní poznámky v rozměrech z handoffu (17.5px/1.62 na desktopu, 15.5/1.6 na mobilu, položka 22 / 18 px, dělicí linka).
+
+Rozpad i poznámky se počítají **ze všech hovorů**, ne z toho, co je zrovna vidět: filtr nad seznamem slouží k hledání záznamu, ne k učení se z nich.
+
+Export CSV má nový sloupec `kde_skoncil` s českým popiskem.
+
+### Ověřeno
+- **Migrace proti skutečnému Postgresu:** dvojí spuštění, stávající řádky mají fázi NULL a nic se nerozbilo, platná hodnota projde, neplatná narazí na check, agregace vrací počty po fázích.
+- **Vykresleno na 1440 i 390:** button group má pět tlačítek 44 px (46 na mobilu), výběr se propisuje a druhý tap ho ruší · rozpad počítá „z 7 hovorů" a rozdělí 3 · 43 % / 1 · 14 % ×4 (tři hovory bez fáze se nepočítají) · poznámky sedí pod rozpadem · v navigaci ani na stránce už není odkaz na „Co se učím" jako samostatnou obrazovku · nic nepřetéká do stran.
+- **Opraveno při ověřování:** popisek „Při popisu produktu" se na 390 px ořízl na „Při popisu produ…", sloupec s popisky je proto širší (126 px) a písmo o půl bodu menší.
+
+Poznámka k průběhu: smazal jsem `.next` za běhu dev serveru a rozbil ho — přesně ta chyba, která je popsaná v CLAUDE.md. Správně je server nejdřív zastavit.

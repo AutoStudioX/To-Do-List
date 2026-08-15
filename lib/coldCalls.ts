@@ -5,6 +5,9 @@
 
 export type Vysledek = 'ceka' | 'nedovolano' | 'odmitnuto' | 'zajem' | 'schuzka'
 
+/** Kde hovor skončil. Výsledek říká JAK to dopadlo, fáze KDE se to zlomilo. */
+export type Faze = 'hned' | 'po_predstaveni' | 'pri_popisu' | 'u_ceny' | 'u_schuzky'
+
 export type ColdCall = {
   id: string
   user_id: string
@@ -12,6 +15,8 @@ export type ColdCall = {
   kontakt_jmeno: string | null
   telefon: string | null
   vysledek: Vysledek
+  /** `null` = lead, nebo se hovor k žádné fázi nedostal (nedovoláno) */
+  faze: Faze | null
   co_jsem_rekl: string | null
   co_odpovedel: string | null
   co_spatne: string | null
@@ -36,6 +41,35 @@ export const VYSLEDEK_STYL: Record<Vysledek, { label: string; text: string; dot:
   odmitnuto:  { label: 'Odmítnuto',  text: 'var(--cc-odm-text)',  dot: 'var(--cc-odm-dot)',  bg: 'var(--cc-odm-bg)' },
   zajem:      { label: 'Zájem',      text: 'var(--cc-zaj-text)',  dot: 'var(--cc-zaj-dot)',  bg: 'var(--cc-zaj-bg)' },
   schuzka:    { label: 'Schůzka',    text: 'var(--cc-sch-text)',  dot: 'var(--cc-sch-dot)',  bg: 'var(--cc-sch-bg)' },
+}
+
+/**
+ * Fáze v pořadí, jak jdou po sobě v hovoru — od zavěšení hned po řeč
+ * o schůzce. Pořadí je tu důležité: rozpad se čte odshora dolů jako trychtýř.
+ */
+export const FAZE: Faze[] = ['hned', 'po_predstaveni', 'pri_popisu', 'u_ceny', 'u_schuzky']
+
+export const FAZE_LABEL: Record<Faze, string> = {
+  hned: 'Hned zavěsil',
+  po_predstaveni: 'Po představení',
+  pri_popisu: 'Při popisu produktu',
+  u_ceny: 'U ceny',
+  u_schuzky: 'U schůzky',
+}
+
+/**
+ * Kolikrát hovor skončil v které fázi. Prázdná fáze (lead, nedovoláno) se
+ * nepočítá — jinak by trychtýř tvrdil, že polovina hovorů skončila „nikde".
+ */
+export function rozpadFazi(calls: ColdCall[]): { faze: Faze; pocet: number; podil: number }[] {
+  const pocty = Object.fromEntries(FAZE.map(f => [f, 0])) as Record<Faze, number>
+  let celkem = 0
+  for (const c of calls) {
+    if (!c.faze) continue
+    pocty[c.faze]++
+    celkem++
+  }
+  return FAZE.map(f => ({ faze: f, pocet: pocty[f], podil: celkem ? pocty[f] / celkem : 0 }))
 }
 
 /** Pořadí ve filtru: fronta první, pak výsledky hovoru tak, jak v designu. */
@@ -150,7 +184,7 @@ export function fmtTelefon(tel: string | null | undefined): string {
 // ---- Export ----
 
 const EXPORT_SLOUPCE = [
-  'firma', 'kontakt', 'telefon', 'vysledek', 'volano', 'vytvoreno',
+  'firma', 'kontakt', 'telefon', 'vysledek', 'kde_skoncil', 'volano', 'vytvoreno',
   'co_jsem_rekl', 'co_odpovedel', 'co_spatne', 'co_priste_jinak',
 ] as const
 
@@ -165,6 +199,7 @@ export function doCsv(calls: ColdCall[]): string {
   }
   const radek = (c: ColdCall) => [
     c.firma, c.kontakt_jmeno ?? '', c.telefon ?? '', VYSLEDEK_STYL[c.vysledek].label,
+    c.faze ? FAZE_LABEL[c.faze] : '',
     c.volano_at ? c.volano_at.slice(0, 16).replace('T', ' ') : '',
     c.created_at.slice(0, 16).replace('T', ' '),
     c.co_jsem_rekl ?? '', c.co_odpovedel ?? '', c.co_spatne ?? '', c.co_priste_jinak ?? '',
