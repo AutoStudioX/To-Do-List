@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, Dumbbell, Crosshair, Flame } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, Dumbbell, Crosshair, Flame, Phone } from 'lucide-react'
 
 const navItems = [
   { href: '/prehled', label: 'Přehled', icon: LayoutDashboard },
@@ -11,6 +11,12 @@ const navItems = [
   { href: '/habits', label: 'Habits', icon: Flame },
   { href: '/trenink', label: 'Trénink', icon: Dumbbell },
   { href: '/goaly', label: 'Goals', icon: Target },
+  // „Co se učím" ve spodní navigaci není schválně — je to čtecí obrazovka,
+  // ne denní navigace, a osm položek se na 390px už nevejde. Vede na ni
+  // tlačítko v hlavičce sekce.
+  // Osmá položka: „Cold cally" se na 390px ořízlo na „Cold c…", proto tu má
+  // kratší popisek. V postranním panelu i v hlavičce sekce zůstává plný název.
+  { href: '/cold-cally', label: 'Hovory', icon: Phone },
 ]
 
 export default function BottomNav() {

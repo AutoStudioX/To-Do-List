@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap, LockKeyhole, Dumbbell, Crosshair, Flame } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap, LockKeyhole, Dumbbell, Crosshair, Flame, Phone, Lightbulb } from 'lucide-react'
 import AutoStudioLogo from './AutoStudioLogo'
 import { createClient } from '@/lib/supabase/client'
 
@@ -14,6 +14,8 @@ const navItems = [
   { href: '/habits', label: 'Habits', icon: Flame },
   { href: '/trenink', label: 'Trénink', icon: Dumbbell },
   { href: '/goaly', label: 'Goals', icon: Target },
+  { href: '/cold-cally', label: 'Cold cally', icon: Phone },
+  { href: '/co-se-ucim', label: 'Co se učím', icon: Lightbulb },
 ]
 
 interface Props {

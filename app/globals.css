@@ -19,6 +19,18 @@
   --overdue-bg: #fff5f5;
   --overdue-border: #fca5a5;
   --shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.05);
+
+  /* Cold cally — badge výsledku. Tmavé hodnoty jsou 1:1 z handoffu, světlé
+     jsou dopočítané: původní odstíny jsou laděné na tmavé pozadí a na bílé
+     kartě by text neměl kontrast. Fronta („čeká") je modrá, která se v paletě
+     sekce jinde nevyskytuje. */
+  --cc-ceka-text: #1d4ed8; --cc-ceka-dot: #3b82f6; --cc-ceka-bg: #dbeafe;
+  --cc-ned-text:  #4b5563; --cc-ned-dot:  #9ca3af; --cc-ned-bg:  #f3f4f6;
+  --cc-odm-text:  #c53030; --cc-odm-dot:  #E8192C; --cc-odm-bg:  #fee2e2;
+  --cc-zaj-text:  #b45309; --cc-zaj-dot:  #EFAF3C; --cc-zaj-bg:  #fef3c7;
+  --cc-sch-text:  #047857; --cc-sch-dot:  #34C46A; --cc-sch-bg:  #d1fae5;
+  --cc-queue-line: #3b82f6;
+  --cc-queue-bg: rgba(59,130,246,.05);
 }
 
 html.dark {
@@ -40,6 +52,14 @@ html.dark {
   --overdue-bg: rgba(232, 25, 44,0.14);
   --overdue-border: rgba(232, 25, 44,0.5);
   --shadow: none;
+
+  --cc-ceka-text: #8FB8FF; --cc-ceka-dot: #4E8CF0; --cc-ceka-bg: rgba(78,140,240,.14);
+  --cc-ned-text:  #A9AEB6; --cc-ned-dot:  #878D96; --cc-ned-bg:  rgba(151,157,166,.13);
+  --cc-odm-text:  #FF7A83; --cc-odm-dot:  #E8192C; --cc-odm-bg:  rgba(232,25,44,.14);
+  --cc-zaj-text:  #F3BE5E; --cc-zaj-dot:  #EFAF3C; --cc-zaj-bg:  rgba(239,175,60,.13);
+  --cc-sch-text:  #5BD98B; --cc-sch-dot:  #34C46A; --cc-sch-bg:  rgba(52,196,106,.13);
+  --cc-queue-line: #4E8CF0;
+  --cc-queue-bg: rgba(78,140,240,.05);
 }
 
 * { box-sizing: border-box; }
@@ -138,6 +158,8 @@ a:hover {
      (Dnes 26px, Detail 20px). Třída přebije obecné `h1 !important` výš,
      konkrétní hodnotu si stránka podstrčí přes --habits-h1. */
   h1.habits-h1 { font-size: var(--habits-h1, 26px) !important; }
+  /* Cold cally mají H1 z handoffu: 20px na mobilu, 23px na desktopu. */
+  h1.cc-h1 { font-size: 20px !important; }
 
   /* Goal cards grid */
   .goal-grid { grid-template-columns: 1fr !important; }

@@ -861,3 +861,25 @@ Indexy: `(user_id, vysledek, created_at desc)` pro seznam a **částečný** `(u
 - **Excel end-to-end:** vyrobený `.xlsx` s telefonem uloženým jako číslo, hlavičkou v jiném pořadí a prázdnou řádkou uprostřed projde stejnou cestou jako CSV — telefon zůstal „777123456", prázdná řádka vypadla, sloupce rozpoznány.
 
 Poznámka k testu: jeden pád byl **chyba testu, ne kódu** — řádek „Delta" jsem omylem dal stejné číslo jako dřívějšímu řádku a kód ho správně označil za duplicitu.
+
+## Cold cally — krok 2: seznam hovorů
+Obrazovka 1 z handoffu (artboardy 1a/1b) na route `/cold-cally`. Rozměry, rozestupy a radiusy jsou z designu doslova; barvy jdou přes proměnné appky, takže sekce funguje i ve světlém motivu, a font zůstal Geist (rozhodnutí uživatele).
+
+**Fronta „čeká" = varianta B.** Nahrané leady tvoří vlastní část seznamu: hlavička „K OBVOLÁNÍ" s počtem, modrý pruh 3 px u levého kraje řádku a jemné podbarvení; pod tím předěl „ZAVOLÁNO" a historie beze změny. Modrá se v paletě sekce jinde nevyskytuje, takže fronta není další odstín červené (ta patří odmítnutí) ani šedá (nedovoláno = volal jsem a nezvedli to, čeká = ještě jsem nevolal). Řadí se nahoru, uvnitř fronty nejstarší lead první — kdo čeká nejdéle, na toho se volá dřív. U leadu se místo data ukazuje telefon, protože „kdy" u nezavolaného čísla nic neříká.
+
+**Nad rámec prototypu** (ze zadání): hledání podle firmy i kontaktu bez ohledu na diakritiku, filtr výsledku jako button group (`Vše` + pět stavů), export CSV toho, co je zrovna vidět (respektuje filtr i hledání) a „Nahrát leady" s náhledem.
+
+**Navigace (varianta a):** do postranního panelu přibyly „Cold cally" i „Co se učím", do spodní navigace jen Cold cally — „Co se učím" je čtecí obrazovka, ne denní navigace, a vede na ni tlačítko v hlavičce sekce.
+
+### Ověřeno vedle prototypu
+**Desktop 1440:** H1 23px/700 ls −.015em · dlaždice grid 4×, gap 14, mt 26, padding 16/18, r12, číslo 31px/700 tabular-nums, „Schůzky" zeleně · řádek min-height **57**, padding 0 20, gap 18 · badge h **26**, padding 0 11, r999, 12.5px, tečka 6px, gap 7 · sloupec badge **128 px** · hover řádku.
+**Mobil 390:** H1 **20 px** · dlaždice 2×2 gap 10, padding 12/14, číslo 23px a **bez ikon** (jak má artboard 1b) · řádek **58 px**, padding 9/14, dvouřádkový · badge h 25, padding 0 10, 12px · „Přidat hovor" plná šířka 52 px, r13 · nic nepřetéká do stran.
+
+**Funkčně:** hledání „novak" najde firmu *Elektro Novák* i kontakt *Jan Novák* u Kovo Servisu · filtr Schůzka 2, Čeká 3, kombinace bez výsledku hlásí „Nic neodpovídá hledání ani filtru" · prázdný stav vykreslí „Zatím žádné hovory" a statistiky nula · **import s náhledem** proti reálnému CSV: hlavička „Nazev firmy / Kontaktni osoba / Tel. cislo" rozpoznána bez diakritiky, firma s čárkou v uvozovkách nerozbila sloupce, duplicita proti databázi i uvnitř souboru označena, řádek bez firmy přeskočen, řádek bez telefonu označen — tlačítko nabídlo „Naimportovat 2".
+
+### Dvě odchylky, které ověřování odhalilo a jsou opravené
+- **H1 na mobilu bylo 22 px místo 20** — globální `h1 { font-size: 22px !important }` přebíjí inline styl. Řešeno stejně jako u Habits: třída `h1.cc-h1` uvnitř media query.
+- **Řádek na mobilu měl 61 px místo 58** — globální `line-height` appky přerostl návrhovou výšku. Oběma řádkům textu je nastavená konkrétní výška řádku (1.25 a 1.2), takže se vejdou do 58 px z designu.
+- **Spodní navigace:** osmá položka „Cold cally" se na 390 px ořízla na „Cold c…", takže má v tab baru kratší popisek **„Hovory"**; plný název zůstává v postranním panelu i v hlavičce sekce. Ověřeno: 8 položek po 49 px, žádný popisek se neořezává, nic nepřetéká.
+
+Obrazovky „Záznam hovoru" a „Co se učím" jsou zatím kostry, aby odkazy ze seznamu nevedly na 404 — obsah je krok 3.

@@ -21,19 +21,21 @@ export type ColdCall = {
 }
 
 /**
- * Barvy badge přesně z handoffu. `ceka` v prototypu není — je to stav navíc
- * pro nahrané leady, viz `VYSLEDEK_POradi` a poznámka u návrhu.
+ * Barvy badge. Hodnoty jsou v `globals.css` jako proměnné, aby sekce fungovala
+ * i ve světlém motivu — odstíny z handoffu jsou laděné na tmavé pozadí a na
+ * bílé kartě by text neměl kontrast. Rozměry a rozestupy zůstávají z designu
+ * přesně, mění se jen barva.
  *
- * Modrá se v paletě sekce nikde jinde nevyskytuje, takže fronta k obvolání je
- * na první pohled něco jiného než výsledek hovoru, a přitom to není další
- * odstín červené (ta patří odmítnutí).
+ * `ceka` v prototypu není — je to stav navíc pro nahrané leady. Modrá se
+ * v paletě sekce nikde jinde nevyskytuje, takže fronta k obvolání je na první
+ * pohled něco jiného než výsledek hovoru a není to další odstín červené.
  */
 export const VYSLEDEK_STYL: Record<Vysledek, { label: string; text: string; dot: string; bg: string }> = {
-  ceka:       { label: 'Čeká',       text: '#8FB8FF', dot: '#4E8CF0', bg: 'rgba(78,140,240,.14)' },
-  nedovolano: { label: 'Nedovoláno', text: '#A9AEB6', dot: '#878D96', bg: 'rgba(151,157,166,.13)' },
-  odmitnuto:  { label: 'Odmítnuto',  text: '#FF7A83', dot: '#E8192C', bg: 'rgba(232,25,44,.14)' },
-  zajem:      { label: 'Zájem',      text: '#F3BE5E', dot: '#EFAF3C', bg: 'rgba(239,175,60,.13)' },
-  schuzka:    { label: 'Schůzka',    text: '#5BD98B', dot: '#34C46A', bg: 'rgba(52,196,106,.13)' },
+  ceka:       { label: 'Čeká',       text: 'var(--cc-ceka-text)', dot: 'var(--cc-ceka-dot)', bg: 'var(--cc-ceka-bg)' },
+  nedovolano: { label: 'Nedovoláno', text: 'var(--cc-ned-text)',  dot: 'var(--cc-ned-dot)',  bg: 'var(--cc-ned-bg)' },
+  odmitnuto:  { label: 'Odmítnuto',  text: 'var(--cc-odm-text)',  dot: 'var(--cc-odm-dot)',  bg: 'var(--cc-odm-bg)' },
+  zajem:      { label: 'Zájem',      text: 'var(--cc-zaj-text)',  dot: 'var(--cc-zaj-dot)',  bg: 'var(--cc-zaj-bg)' },
+  schuzka:    { label: 'Schůzka',    text: 'var(--cc-sch-text)',  dot: 'var(--cc-sch-dot)',  bg: 'var(--cc-sch-bg)' },
 }
 
 /** Pořadí ve filtru: fronta první, pak výsledky hovoru tak, jak v designu. */
