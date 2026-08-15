@@ -80,6 +80,14 @@ export const VYSLEDKY: Vysledek[] = ['ceka', 'nedovolano', 'odmitnuto', 'zajem',
 /** Výsledky skutečného hovoru — to, co nabízí formulář záznamu. */
 export const VYSLEDKY_HOVORU: Vysledek[] = ['nedovolano', 'odmitnuto', 'zajem', 'schuzka']
 
+/**
+ * Fáze dává smysl jen tam, kde hovor doopravdy proběhl. U „nedovoláno" se
+ * k žádné fázi nedostal a u leadu žádný hovor nebyl — tam se pole nenabízí
+ * a případná dřív uložená fáze se zahazuje, ať trychtýř nepočítá s nesmysly.
+ */
+export const maFazi = (v: Vysledek | '') =>
+  v === 'odmitnuto' || v === 'zajem' || v === 'schuzka'
+
 export const jeLead = (c: Pick<ColdCall, 'vysledek'>) => c.vysledek === 'ceka'
 
 // ---- Statistiky ----

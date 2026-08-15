@@ -948,3 +948,29 @@ Ověřeno vykreslené: v tmavém motivu obě hlavičky `rgb(255,255,255)` na `rg
 Ověřeno vykreslené na **1440 i 390**: pole „Info o firmě" je čtvrté v pořadí (Firma → Kontakt → Telefon → **Info o firmě** → Výsledek → Kde skončil → …), min-height 84/76 px, na mobilu font 16 px (iOS nezvětší stránku) · dvě karty s mezerou 14 px, poslední řádek v obou bez linky · druhé řádky „608 990 123 · Veronika Šimková" u fronty a „777 123 456 · Dnes 15:20 · Martin Vlček" u zavolaných, výška řádku pořád 58 px · import z CSV s hlavičkou „Firma; Telefon; Poznámka" rozpoznal všechny tři sloupce a v náhledu ukázal „603222111 · Účetní kancelář, 8 lidí".
 
 Jednotkových tvrzení nad importem je teď 42 — přibyly čtyři na rozpoznání sloupce s info a tři na to, že se veze až do uložení.
+
+## Cold cally — „Co se učím" zpět jako stránka, mazání ze seznamu
+**„Co se učím" je zase samostatná route `/co-se-ucim`, ale mimo navigaci.** V postranním panelu ani ve spodní liště pro ni položka není — chodí se tam ze seznamu hovorů tlačítkem vedle „Přidat hovor" (na mobilu ze spodního bloku akcí, kde „Přidat hovor" na mobilu je). Je to výstup té sekce, ne další oddíl appky, a v navigaci by jen ředila sedm položek, které tam už jsou. Zpátky vede odkaz „‹ Cold cally" v hlavičce stránky (na desktopu i na mobilu — bez položky v navigaci by se odtud jinak nešlo vrátit jinak než tlačítkem prohlížeče). Ze seznamu hovorů sekce zmizela; rozpad fází i výpis poznámek jsou teď jen tam.
+
+**Mazání záznamu je v řádku.** Koš vpravo, 44×44 px, potvrzení jmenuje firmu („Smazat záznam „Zámečnictví Novák s.r.o."? Nejde to vrátit.") a po smazání přijde toast. Řádek proto **není jedno tlačítko**, ale obal s odkazem na záznam a košem vedle — tlačítko v tlačítku je neplatné HTML a klik na koš by procházel na otevření záznamu.
+
+**Hromadné smazání fronty** je v hlavičce „K obvolání" — po nahrání špatného souboru se nemaže po jednom. Maže přesně to, co je pod hlavičkou vidět, takže s aktivním hledáním nebo filtrem jde smazat i jen část a potvrzení to říká („Smazat z fronty to, co teď vidíš — 1 lead?" vs. „Smazat celou frontu — 24 leadů?"). V dotazu je navíc `eq('vysledek','ceka')` jako pojistka: zavolaný hovor tudy zmizet nesmí, ani kdyby se seznam id rozešel se skutečností.
+
+### Ověřeno vykreslené na 1440 i 390
+- Smazání jednoho záznamu: dialog s názvem firmy → řádek zmizel, počet ve frontě klesl z 3 na 2, zelený toast „Záznam „Autodoprava Krejčí" smazán".
+- Smazání fronty: potvrzení „Smazat celou frontu — 2 leady?" → karta „K obvolání" zmizela celá, **karta „Zavoláno" zůstala nedotčená**, toast „Smazáno 2 leady". S hledáním „Zámečnictví" hlásí dialog správně 1 lead; Esc ho zavře a nesmaže nic.
+- Rozměry z handoffu drží: text řádku začíná 17 px od kraje karty (3px pruh + 14), výška řádků 58 px na mobilu / 57 na desktopu (vnitřek si odečítá spodní linku, jinak by řádek s linkou byl o pixel vyšší), koš 44×44, mezera mezi kartami 14 px.
+- Obě hlavičky mají **stejnou výšku 45 px** — předěl dostal `min-height`, aby se do něj vešel 44px tap target „Smazat frontu" a hlavička bez tlačítka nezůstala nižší.
+
+## Cold cally — info o firmě v odrážkách, „Kde skončil" jen tam, kde dává smysl
+**„Info o firmě" se píše v odrážkách,** jedna věc na řádek — před vytáčením se to čte očima po sloupci, ne jako věta oddělená tečkami. Enter rovnou začne další odrážku (`– `), Shift+Enter udělá obyčejný nový řádek. Odrážky se doplní **jen při psaní nebo vložení do prázdného pole**; starý zápis se tím nepřepisuje a kdo odrážku smaže, tomu se nevrátí — pořád je to volný text, ne seznam s pravidly. Pole je vyšší (108 / 96 px), aby se tři odrážky vešly bez scrollování, a nápověda ukazuje rovnou ten formát.
+
+**„Kde skončil" se ukazuje jen u výsledků, kde hovor doopravdy proběhl** — odmítnuto, zájem, schůzka. U „nedovoláno" se hovor k žádné fázi nedostal a u nevybraného výsledku není co hodnotit, takže pole není vidět vůbec. Přepnutí na výsledek bez fáze **uloženou fázi zahodí** (ve stavu i v payloadu při uložení) — jinak by u „nedovoláno" zůstala viset fáze z předchozí volby a trychtýř v „Co se učím" by počítal s nesmysly.
+
+Přechod je animovaný: `grid-template-rows` 0fr → 1fr (0,24 s) plus opacita, takže se výška animuje bez hádání v pixelech. Zavřené pole má záporný spodní okraj přesně o velikost mezery sloupce, jinak by po něm zůstala 16px díra, a nese `inert` + `aria-hidden`, aby se do skrytých tlačítek nedalo tabnout.
+
+### Ověřeno vykreslené na 1440 i 390
+- Psaní do prázdného pole dá `– 5 lidí` / `– řemeslníci a menší firmy` / `– majitel dělá i poradenství (ABRA)` — tři řádky, tři odrážky, kurzor za odrážkou.
+- Nový hovor bez vybraného výsledku „Kde skončil" nemá; po výběru „Odmítnuto" se rozbalí (výška 98 px), po přepnutí na „Nedovoláno" se sbalí na 0, dostane `inert`, `aria-hidden` a mezera mezi „Výsledek" a „Co jsem řekl" je přesně jedna mezera sloupce (16 px), ne díra.
+- Vybraná fáze „U ceny" po přepnutí na „Nedovoláno" zmizela ze stavu (žádné `aria-checked` mezi fázemi) — a při uložení se stejně posílá `faze: null`.
+- Že jde o plynulý přechod a ne skok: prohlížeč na té změně skutečně spouští CSS transition (`grid-template-rows` 240 ms, `opacity` 180 ms) a hodnota hned po změně je pořád `0px`, tedy se interpoluje. Snímkovat průběh po jednotlivých framech tady nejde — náhledový panel při skrytí nekreslí.

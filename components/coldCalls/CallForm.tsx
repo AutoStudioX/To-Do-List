@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
-import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, type ColdCall, type Faze, type Vysledek } from '@/lib/coldCalls'
+import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi, type ColdCall, type Faze, type Vysledek } from '@/lib/coldCalls'
 import { ChevronLeft, Check, X } from 'lucide-react'
 
 export type Draft = {
@@ -38,6 +38,23 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
   co_priste_jinak: c.co_priste_jinak ?? '',
 })
 
+/** Odrážka v „Info o firmě": pomlčka a mezera. */
+const ODRAZKA = '– '
+const jeOdrazka = (radek: string) => /^\s*[-–—•*]/.test(radek)
+
+/** Doplní odrážky na začátky řádků, které je nemají. Prázdné řádky nechá být. */
+const sOdrazkami = (text: string) => text.split('\n')
+  .map(r => (!r.trim() || jeOdrazka(r) ? r : ODRAZKA + r.trimStart()))
+  .join('\n')
+
+/**
+ * Odrážky se doplní jen při psaní do prázdného pole (nebo vložení textu do
+ * něj) — starý zápis se tím nepřepisuje. Kdo odrážku smaže, tomu se nevrátí:
+ * je to pořád volný text, ne seznam s pravidly.
+ */
+const poOdrazkach = (predtim: string, ted: string) =>
+  predtim === '' && ted.trim() ? sOdrazkami(ted) : ted
+
 /**
  * Záznam hovoru (artboardy 2a/2b) — stejný formulář pro nový hovor i pro
  * úpravu existujícího záznamu včetně nahraného leadu.
@@ -59,9 +76,24 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   const { confirm, dialog } = useConfirm()
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
+
+  /** Enter v „Info o firmě" rovnou začne další odrážku; Shift+Enter je bez ní. */
+  function novaOdrazka(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+    e.preventDefault()
+    const el = e.currentTarget
+    const od = el.selectionStart ?? el.value.length
+    const doKonce = el.selectionEnd ?? od
+    // Do prázdného pole patří první odrážka, ne prázdný řádek s druhou.
+    const vlozit = el.value.slice(0, od).trim() ? '\n' + ODRAZKA : ODRAZKA
+    set('info', el.value.slice(0, od) + vlozit + el.value.slice(doKonce))
+    const kurzor = od + vlozit.length
+    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = kurzor })
+  }
   const zmeneno = JSON.stringify(d) !== JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny)
   const chybiFirma = !d.firma.trim()
   const chybiVysledek = !d.vysledek
+  const fazeVidet = maFazi(d.vysledek)
 
   // Nový záznam startuje s kurzorem ve Firmě, jak chce handoff.
   useEffect(() => {
@@ -86,8 +118,9 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       telefon: d.telefon.trim() || null,
       info: d.info.trim() || null,
       vysledek: d.vysledek as Vysledek,
-      // Fáze je nepovinná: u „nedovoláno" se hovor k žádné nedostal.
-      faze: d.faze || null,
+      // Fáze je nepovinná a u výsledku bez fáze se neukládá vůbec —
+      // i kdyby ji záznam nesl z dřívějška.
+      faze: (maFazi(d.vysledek as Vysledek) && d.faze) || null,
       co_jsem_rekl: d.co_jsem_rekl.trim() || null,
       co_odpovedel: d.co_odpovedel.trim() || null,
       co_spatne: d.co_spatne.trim() || null,
@@ -146,7 +179,9 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
     return (
       <button
         key={v} type="button" role="radio" aria-checked={on}
-        onClick={() => set('vysledek', v)}
+        // Přepnutí na výsledek bez fáze uloženou fázi zahodí — jinak by
+        // u „nedovoláno" zůstala viset fáze z předchozí volby.
+        onClick={() => setD(p => ({ ...p, vysledek: v, faze: maFazi(v) ? p.faze : '' }))}
         style={{
           height: isMobile ? 46 : 44, padding: isMobile ? '0 12px' : '0 20px',
           borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -253,14 +288,18 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
         )}
 
         {/* Info o firmě — patří NAHORU, čte se před vytáčením. Dole u reflexe
-            by bylo k ničemu: to se píše až po hovoru. */}
+            by bylo k ničemu: to se píše až po hovoru.
+
+            Píše se v odrážkách, jedna věc na řádek: před hovorem se to čte
+            očima po sloupci, ne po větě oddělené tečkami. */}
         <div>
           <label style={label} htmlFor="cc-info">Info o firmě</label>
           <textarea
             id="cc-info" className="cc-textarea" value={d.info}
-            onChange={e => set('info', e.target.value)}
-            placeholder="Obor, počet zaměstnanců, obrat, čím se živí…"
-            style={textarea(isMobile ? 76 : 84)}
+            onChange={e => set('info', poOdrazkach(d.info, e.target.value))}
+            onKeyDown={novaOdrazka}
+            placeholder={`– 5 lidí\n– řemeslníci a menší firmy\n– majitel dělá i poradenství`}
+            style={{ ...textarea(isMobile ? 96 : 108), textAlign: 'left' }}
           />
         </div>
 
@@ -276,19 +315,33 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
           </div>
         </div>
 
-        {/* kde hovor skončil — měřitelné vedle výsledku */}
-        <div>
-          <span style={label}>Kde skončil</span>
-          <div role="radiogroup" aria-label="Kde hovor skončil" style={{
-            display: isMobile ? 'grid' : 'flex',
-            gridTemplateColumns: isMobile ? '1fr 1fr' : undefined,
-            flexWrap: isMobile ? undefined : 'wrap',
-            gap: 8,
-          }}>
-            {FAZE.map(fazeBtn)}
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-            Nepovinné. Z toho se v „Co se učím" počítá, kde hovory nejčastěji padají.
+        {/* Kde hovor skončil — jen u výsledků, kde hovor doopravdy proběhl.
+            Vyjíždí plynule: `grid-template-rows` 0fr → 1fr animuje výšku obsahu,
+            aniž by se musela hádat v pixelech. Záporný spodní okraj v zavřeném
+            stavu vyruší mezeru sloupce, jinak by po poli zůstala díra. */}
+        <div
+          inert={!fazeVidet}
+          aria-hidden={!fazeVidet}
+          style={{
+            display: 'grid', gridTemplateRows: fazeVidet ? '1fr' : '0fr',
+            opacity: fazeVidet ? 1 : 0,
+            marginBottom: fazeVidet ? 0 : -(isMobile ? 16 : 18),
+            transition: 'grid-template-rows .24s ease, opacity .18s ease, margin-bottom .24s ease',
+          }}
+        >
+          <div style={{ overflow: 'hidden', minHeight: 0 }}>
+            <span style={label}>Kde skončil</span>
+            <div role="radiogroup" aria-label="Kde hovor skončil" style={{
+              display: isMobile ? 'grid' : 'flex',
+              gridTemplateColumns: isMobile ? '1fr 1fr' : undefined,
+              flexWrap: isMobile ? undefined : 'wrap',
+              gap: 8,
+            }}>
+              {FAZE.map(fazeBtn)}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+              Nepovinné. Z toho se v „Co se učím" počítá, kde hovory nejčastěji padají.
+            </div>
           </div>
         </div>
 
