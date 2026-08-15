@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Bez tohohle kreslí prohlížeč posuvníky, resize úchyt i vnitřek `select`
+     ve světlé barvě — v tmavém motivu je uvnitř černé karty bílý pruh. */
+  color-scheme: light;
+
   --bg: #f8f9fa;
   --card: #ffffff;
   --border: #e5e7eb;
@@ -32,6 +36,8 @@
 }
 
 html.dark {
+  color-scheme: dark;
+
   --bg: #0f0f0f;
   --card: #1a1a1a;
   --border: #2a2a2a;
@@ -102,6 +108,23 @@ a:hover {
 /* Vodorovné pásy (chipy, mřížky) mají scrollovat, ale bez viditelné lišty —
    na macOS s „Show scroll bars: Always" překrývá obsah tlustým pruhem.
    Scrollování myší i tahem zůstává. */
+/* Posuvník v barvách appky — tenký, bez šipek, přes proměnné, takže sedí
+   v obou motivech. `color-scheme` výš řeší i to, co se stylovat nedá. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 

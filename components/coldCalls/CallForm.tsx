@@ -5,10 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import {
   VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi,
-  firmaChyba, telefonChyba, normalizujTelefon, naOdrazky, maOdrazky, ODRAZKA,
+  firmaChyba, telefonChyba, normalizujTelefon,
+  naOdrazky, rozlozOdrazky, slozOdrazky, ocistiInfo,
   type ColdCall, type Faze, type Vysledek,
 } from '@/lib/coldCalls'
-import { ChevronLeft, Check, X, List } from 'lucide-react'
+import { ChevronLeft, Check, X, List, Plus } from 'lucide-react'
 
 export type Draft = {
   firma: string
@@ -43,14 +44,6 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
 })
 
 /**
- * Odrážky se doplní samy jen při psaní do prázdného pole (nebo vložení textu
- * do něj) — rozepsaný zápis se pod rukama nepřerovnává. Starý text převede
- * tlačítko „Převést na odrážky" pod polem, tedy až když o to uživatel řekne.
- */
-const poOdrazkach = (predtim: string, ted: string) =>
-  predtim === '' && ted.trim() ? naOdrazky(ted) : ted
-
-/**
  * Záznam hovoru (artboardy 2a/2b) — stejný formulář pro nový hovor i pro
  * úpravu existujícího záznamu včetně nahraného leadu.
  *
@@ -75,19 +68,34 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
 
-  /** Enter v „Info o firmě" rovnou začne další odrážku; Shift+Enter je bez ní. */
-  function novaOdrazka(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
-    e.preventDefault()
-    const el = e.currentTarget
-    const od = el.selectionStart ?? el.value.length
-    const doKonce = el.selectionEnd ?? od
-    // Do prázdného pole patří první odrážka, ne prázdný řádek s druhou.
-    const vlozit = el.value.slice(0, od).trim() ? '\n' + ODRAZKA : ODRAZKA
-    set('info', el.value.slice(0, od) + vlozit + el.value.slice(doKonce))
-    const kurzor = od + vlozit.length
-    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = kurzor })
+  // ---- odrážky v „Info o firmě" ----
+  const odrazky = rozlozOdrazky(d.info)
+  const nastavOdrazky = (nove: string[]) => set('info', slozOdrazky(nove))
+  /** Po přidání/ubrání odrážky patří kurzor do té, se kterou uživatel pracuje. */
+  const zaostri = (i: number, naKonec = false) => setTimeout(() => {
+    const el = document.getElementById(`cc-info-${i}`) as HTMLInputElement | null
+    el?.focus()
+    if (el && naKonec) el.setSelectionRange(el.value.length, el.value.length)
+  }, 0)
+
+  function klavesaOdrazky(e: React.KeyboardEvent<HTMLInputElement>, i: number) {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      e.preventDefault()
+      const nove = [...odrazky]
+      nove.splice(i + 1, 0, '')
+      nastavOdrazky(nove)
+      zaostri(i + 1)
+      return
+    }
+    // Backspace v prázdné odrážce ji zruší — jinak by po ní zůstal prázdný
+    // řádek, který jde smazat jen přes tlačítko.
+    if (e.key === 'Backspace' && odrazky[i] === '' && odrazky.length > 1) {
+      e.preventDefault()
+      nastavOdrazky(odrazky.filter((_, j) => j !== i))
+      zaostri(Math.max(0, i - 1), true)
+    }
   }
+
   const zmeneno = JSON.stringify(d) !== JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny)
   const chybaFirmy = firmaChyba(d.firma)
   const chybaTelefonu = telefonChyba(d.telefon)
@@ -122,7 +130,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       kontakt_jmeno: d.kontakt_jmeno.trim() || null,
       // Jeden tvar pro celou appku: +420 777 123 456.
       telefon: normalizujTelefon(d.telefon),
-      info: d.info.trim() || null,
+      info: ocistiInfo(d.info),
       vysledek: d.vysledek as Vysledek,
       // Fáze je nepovinná a u výsledku bez fáze se neukládá vůbec —
       // i kdyby ji záznam nesl z dřívějška.
@@ -323,30 +331,81 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
         {/* Info o firmě — patří NAHORU, čte se před vytáčením. Dole u reflexe
             by bylo k ničemu: to se píše až po hovoru.
 
-            Píše se v odrážkách, jedna věc na řádek: před hovorem se to čte
-            očima po sloupci, ne po větě oddělené tečkami. */}
+            Není to jedno velké pole, ale seznam odrážek: každá má vlastní
+            vstup a na desktopu jdou ve DVOU sloupcích po řádcích (1 vlevo,
+            2 vpravo, 3 pod jedničkou…). Krátkých údajů se tak vejde dvakrát
+            tolik bez posouvání. Jediná odrážka zabere celou šířku — sloupec
+            s prázdnou půlkou vypadá jako chyba. Na mobilu je sloupec jeden,
+            dva by se do 390 px nevešly. */}
         <div>
-          <label style={label} htmlFor="cc-info">Info o firmě</label>
-          <textarea
-            id="cc-info" className="cc-textarea" value={d.info}
-            onChange={e => set('info', poOdrazkach(d.info, e.target.value))}
-            onKeyDown={novaOdrazka}
-            placeholder={`– 5 lidí\n– řemeslníci a menší firmy\n– majitel dělá i poradenství`}
-            style={{ ...textarea(isMobile ? 96 : 108), textAlign: 'left' }}
-          />
-          {/* Starý zápis („5 lidí · řemeslníci · ABRA") na odrážky až na klik —
-              přepsat ho sám při otevření záznamu by uživateli měnilo text
-              pod rukama a nešlo by to vrátit jinak než ručně. */}
-          {d.info.trim() && !maOdrazky(d.info) && (
-            <button type="button" onClick={() => set('info', naOdrazky(d.info))} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 6,
-              height: 44, padding: '0 12px 0 0', background: 'transparent', border: 'none',
-              color: 'var(--accent)', fontSize: 12.5, fontWeight: 600,
-              cursor: 'pointer', touchAction: 'manipulation',
-            }}>
-              <List size={14} /> Převést na odrážky
-            </button>
-          )}
+          <span style={label}>Info o firmě</span>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+            gap: isMobile ? 8 : 10,
+          }}>
+            {odrazky.map((text, i) => (
+              <div key={i} style={{
+                ...pole, display: 'flex', alignItems: 'center', gap: 8,
+                padding: isMobile ? '0 12px' : '0 12px',
+                // Jedna jediná odrážka přes obě půlky.
+                gridColumn: !isMobile && odrazky.length === 1 ? '1 / -1' : undefined,
+              }}>
+                <span aria-hidden style={{ color: 'var(--muted)', flexShrink: 0 }}>–</span>
+                <input
+                  id={`cc-info-${i}`}
+                  value={text}
+                  onChange={e => nastavOdrazky(odrazky.map((t, j) => (j === i ? e.target.value : t)))}
+                  onKeyDown={e => klavesaOdrazky(e, i)}
+                  placeholder={i === 0 ? '5 lidí' : ''}
+                  aria-label={`Odrážka ${i + 1}`}
+                  style={{
+                    flex: 1, minWidth: 0, height: '100%', border: 'none', background: 'transparent',
+                    color: 'var(--text)', fontSize: isMobile ? 16 : 14.5, fontFamily: 'inherit',
+                    padding: 0, outline: 'none',
+                  }}
+                />
+                {odrazky.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => { nastavOdrazky(odrazky.filter((_, j) => j !== i)); zaostri(Math.max(0, i - 1), true) }}
+                    aria-label={`Smazat odrážku ${i + 1}`}
+                    style={{
+                      // 44px tap target; záporný okraj ho drží uvnitř řádku,
+                      // aby odrážka nevyrostla nad výšku ostatních polí.
+                      width: 44, height: 44, marginRight: -10, flexShrink: 0, borderRadius: 8,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: 'none', color: 'var(--muted)',
+                      cursor: 'pointer', touchAction: 'manipulation',
+                    }}><X size={15} /></button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => { nastavOdrazky([...odrazky, '']); zaostri(odrazky.length) }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 4,
+                height: 44, padding: '0 12px 0 0', background: 'transparent', border: 'none',
+                color: 'var(--muted)', fontSize: 12.5, fontWeight: 600,
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}><Plus size={14} /> Přidat odrážku</button>
+            {/* Starý zápis („5 lidí · řemeslníci · ABRA") na odrážky až na klik —
+                přepsat ho sám při otevření záznamu by uživateli měnilo text
+                pod rukama a nešlo by to vrátit jinak než ručně. */}
+            {odrazky.some(t => /[·•;|]/.test(t)) && (
+              <button type="button" onClick={() => set('info', naOdrazky(d.info))} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 4,
+                height: 44, padding: '0 12px 0 0', background: 'transparent', border: 'none',
+                color: 'var(--accent)', fontSize: 12.5, fontWeight: 600,
+                cursor: 'pointer', touchAction: 'manipulation',
+              }}>
+                <List size={14} /> Převést na odrážky
+              </button>
+            )}
+          </div>
         </div>
 
         {/* výsledek */}

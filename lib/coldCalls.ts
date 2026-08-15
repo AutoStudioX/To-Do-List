@@ -209,6 +209,23 @@ export function naOdrazky(text: string): string {
     .join('\n')
 }
 
+/**
+ * Text pole na jednotlivé odrážky (bez pomlčky). Prázdné pole je jedna prázdná
+ * odrážka, aby bylo kam psát — ne nula řádků, do kterých se nedá kliknout.
+ */
+export const rozlozOdrazky = (info: string): string[] =>
+  info === '' ? [''] : info.split('\n').map(r => r.replace(/^\s*[-–—•*]\s?/, ''))
+
+/** Odrážky zpátky do jednoho textu; prázdné se cestou nezahazují, píše se do nich. */
+export const slozOdrazky = (odrazky: string[]): string =>
+  odrazky.every(t => !t.trim()) ? '' : odrazky.map(t => ODRAZKA + t).join('\n')
+
+/** Co se doopravdy uloží: prázdné odrážky pryč, nic k uložení = `null`. */
+export function ocistiInfo(info: string): string | null {
+  const plne = rozlozOdrazky(info).map(t => t.trim()).filter(Boolean)
+  return plne.length ? plne.map(t => ODRAZKA + t).join('\n') : null
+}
+
 // ---- Kontrola a sjednocení zápisu ----
 
 /** Firma pod tři znaky není název, se kterým se dá zvednout telefon. */

@@ -1003,3 +1003,20 @@ Funkce (`naOdrazky`, `maOdrazky`, `ODRAZKA`) se přestěhovaly z komponenty do `
 ### Ověřeno
 - **Jednotková tvrzení** (celkem 79): tečkový zápis, víc řádků, středník a svislítko, věta s tečkou uprostřed (nedělí se), opakované spuštění, prázdné řádky, rozpoznání textu s odrážkami i bez.
 - **Vykreslené na 1440 i 390:** `5 lidí · řemeslníci a menší firmy · majitel dělá i poradenství · ABRA` → čtyři odrážky, každá na svém řádku; tlačítko má 44 px na výšku a po převodu zmizí.
+
+## Cold cally — info ve dvou sloupcích, posuvníky v barvách appky
+**„Info o firmě" už není jedno velké textové pole, ale seznam odrážek.** Textarea dvě kolonky neumí (a `columns: 2` plní po sloupcích, ne po řádcích — první odrážka by skončila vlevo, druhá pod ní), takže každá odrážka má vlastní vstup a leží v mřížce.
+
+- Na desktopu **dva sloupce, plní se po řádcích**: 1 vlevo, 2 vpravo, 3 pod jedničkou, 4 pod dvojkou. Krátkých údajů („21 lidí", „180 firem") se tak vejde dvakrát tolik do stejné výšky.
+- **Jediná odrážka zabere celou šířku** — půlka pole s prázdnou půlkou vedle vypadá jako chyba.
+- Na 390 px **jeden sloupec**; dva by se do šířky nevešly.
+- Enter zakládá další odrážku, Backspace v prázdné ji ruší, křížek u každé (44×44, záporné okraje, aby řádek zůstal 46 px) a tlačítko „Přidat odrážku". „Převést na odrážky" se ukazuje, dokud je v některé odrážce tečkový zápis.
+- V databázi se nic nemění: pořád je to jeden text `– a\n– b`. Prázdné odrážky se při psaní drží (aby se dalo mazat a psát), ale do uložení nejdou — `ocistiInfo()` je zahodí a prázdné info uloží jako `null`.
+
+**Posuvníky.** Uvnitř tmavé karty svítil bílý systémový posuvník (a stejně tak úchyt pro resize) — prohlížeč o motivu appky neví. Přibylo `color-scheme: light` / `dark` k proměnným motivu, takže systémové ovládací prvky mají správnou barvu, a k tomu tenký posuvník v barvách appky (`--border`, na hover `--muted`) pro všechny scrollovatelné oblasti. `.hide-scrollbar` funguje dál.
+
+### Ověřeno
+- **Vykreslené na 1440:** pro 1, 2, 3, 4, 5 a 6 odrážek změřené pozice sedí — 1 odrážka 880 px na celou šířku; 2 vedle sebe (x 383 a 828, stejné y); 3. na x 383 o řádek níž; 4. na x 828 vedle třetí; 5. a 6. ve třetím řádku. **Na 390:** všech 6 v jednom sloupci (jediné x = 12), řádky 46 px, křížek 44×44, nic nepřetéká.
+- **Motiv:** `color-scheme` je `light` ve světlém a `dark` v tmavém, `scrollbar-color` je `rgb(229,231,235)` / `rgb(42,42,42)` s průhlednou drážkou; přetékající textarea v tmavém motivu má tenký tmavý posuvník místo bílého pruhu.
+- **Jednotková tvrzení** (celkem 88): rozklad a složení odrážek, prázdná odrážka uprostřed při psaní zůstane, do uložení nejde, prázdné info je `null`, kolečko tam a zpět.
+- Poznámka k průběhu: změny v `globals.css` se nejdřív neprojevily — dev server servíroval starý CSS chunk (a `next build` do toho zapsal `.next` za jeho běhu). Správně je server zastavit, `.next` smazat a spustit znovu; po tom se `color-scheme` i posuvníky projevily.
