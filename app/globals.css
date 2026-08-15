@@ -29,8 +29,6 @@
   --cc-odm-text:  #c53030; --cc-odm-dot:  #E8192C; --cc-odm-bg:  #fee2e2;
   --cc-zaj-text:  #b45309; --cc-zaj-dot:  #EFAF3C; --cc-zaj-bg:  #fef3c7;
   --cc-sch-text:  #047857; --cc-sch-dot:  #34C46A; --cc-sch-bg:  #d1fae5;
-  --cc-queue-line: #3b82f6;
-  --cc-queue-bg: rgba(59,130,246,.05);
 }
 
 html.dark {
@@ -58,8 +56,6 @@ html.dark {
   --cc-odm-text:  #FF7A83; --cc-odm-dot:  #E8192C; --cc-odm-bg:  rgba(232,25,44,.14);
   --cc-zaj-text:  #F3BE5E; --cc-zaj-dot:  #EFAF3C; --cc-zaj-bg:  rgba(239,175,60,.13);
   --cc-sch-text:  #5BD98B; --cc-sch-dot:  #34C46A; --cc-sch-bg:  rgba(52,196,106,.13);
-  --cc-queue-line: #4E8CF0;
-  --cc-queue-bg: rgba(78,140,240,.05);
 }
 
 * { box-sizing: border-box; }

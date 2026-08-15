@@ -136,48 +136,58 @@ export default function ColdCallyPage() {
     </div>
   )
 
+  /**
+   * Řádek seznamu. Barevný pruh u levého kraje nese výsledek — jde ho poznat
+   * od pohledu, i když badge zrovna není v zorném poli. Podbarvení celého
+   * řádku by na to bylo moc, jeden pruh stačí.
+   *
+   * Druhý řádek: u leadu telefon a kontakt (co potřebuješ před vytáčením),
+   * u zavolaného datum, kontakt a začátek poznámky „co příště jinak" — vždy
+   * na jednu řádku s třemi tečkami, ať výška řádků zůstane pravidelná.
+   */
   const radek = (c: ColdCall, lead: boolean) => {
-    const kdy = lead
-      ? (c.telefon ? fmtTelefon(c.telefon) : 'bez čísla')
-      : fmtKdy(c.volano_at || c.created_at)
-    if (isMobile) {
-      return (
-        <button key={c.id} onClick={() => router.push(`/cold-cally/${c.id}`)} className="cc-row" style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 12, minHeight: 58,
-          padding: '9px 14px', borderBottom: '1px solid var(--border)', boxSizing: 'border-box',
-          background: lead ? 'var(--cc-queue-bg)' : 'transparent', border: 'none',
-          borderLeft: lead ? '3px solid var(--cc-queue-line)' : '3px solid transparent',
-          textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation',
-        }}>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            {/* Výška řádku je z designu 58 px. Bez explicitní výšky řádku ji
-                globální `line-height` appky přeroste na 61. */}
-            <span style={{
-              display: 'block', fontSize: 15, lineHeight: 1.25, fontWeight: 600, color: 'var(--text)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>{c.firma}</span>
-            <span style={{
-              display: 'block', marginTop: 2, fontSize: 12.5, lineHeight: 1.2, color: 'var(--muted)',
-              fontVariantNumeric: 'tabular-nums',
-            }}>{kdy}</span>
-          </span>
-          {badge(c.vysledek)}
-        </button>
-      )
-    }
+    const pruh = VYSLEDEK_STYL[c.vysledek].dot
+    const kontakt = c.kontakt_jmeno?.trim()
+    const poznamka = c.co_priste_jinak?.trim()
+    const kdy = fmtKdy(c.volano_at || c.created_at)
+    const druhyRadek = lead
+      ? [c.telefon ? fmtTelefon(c.telefon) : 'bez čísla', kontakt].filter(Boolean)
+      : [isMobile ? kdy : null, kontakt, poznamka].filter(Boolean)
+
+    const obsah = (
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display: 'block', fontSize: 15, lineHeight: 1.25, fontWeight: 600, color: 'var(--text)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>{c.firma}</span>
+        {druhyRadek.length > 0 && (
+          <span style={{
+            display: 'block', marginTop: 2, fontSize: isMobile ? 12.5 : 13, lineHeight: 1.3,
+            color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{druhyRadek.join(' · ')}</span>
+        )}
+      </span>
+    )
+
     return (
       <button key={c.id} onClick={() => router.push(`/cold-cally/${c.id}`)} className="cc-row" style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 18, minHeight: 57,
-        padding: '0 20px', borderBottom: '1px solid var(--border)', background: lead ? 'var(--cc-queue-bg)' : 'transparent',
-        border: 'none', borderLeft: lead ? '3px solid var(--cc-queue-line)' : '3px solid transparent',
-        textAlign: 'left', cursor: 'pointer',
+        width: '100%', display: 'flex', alignItems: 'center',
+        gap: isMobile ? 12 : 18, minHeight: isMobile ? 58 : 57,
+        padding: isMobile ? '9px 14px' : '9px 20px',
+        borderBottom: '1px solid var(--border)', boxSizing: 'border-box',
+        background: 'transparent', border: 'none',
+        borderLeft: `3px solid ${pruh}`,
+        textAlign: 'left', cursor: 'pointer', touchAction: 'manipulation',
       }}>
-        <span style={{
-          flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{c.firma}</span>
-        <span style={{ fontSize: 13, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{kdy}</span>
-        <span style={{ width: 128, display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>{badge(c.vysledek)}</span>
+        {obsah}
+        {!isMobile && (
+          <span style={{
+            fontSize: 13, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+          }}>{lead ? '' : kdy}</span>
+        )}
+        {isMobile
+          ? badge(c.vysledek)
+          : <span style={{ width: 128, display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>{badge(c.vysledek)}</span>}
       </button>
     )
   }
@@ -186,7 +196,7 @@ export default function ColdCallyPage() {
   const predel = (text: string, pocet: number | null, modry: boolean) => (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '8px 14px' : '9px 20px',
-      background: modry ? 'var(--cc-queue-bg)' : 'transparent',
+      background: 'transparent',
       borderBottom: '1px solid var(--border)',
       fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase',
       color: modry ? 'var(--cc-ceka-text)' : 'var(--muted)',

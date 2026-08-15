@@ -919,3 +919,14 @@ Export CSV má nový sloupec `kde_skoncil` s českým popiskem.
 - **Opraveno při ověřování:** popisek „Při popisu produktu" se na 390 px ořízl na „Při popisu produ…", sloupec s popisky je proto širší (126 px) a písmo o půl bodu menší.
 
 Poznámka k průběhu: smazal jsem `.next` za běhu dev serveru a rozbil ho — přesně ta chyba, která je popsaná v CLAUDE.md. Správně je server nejdřív zastavit.
+
+## Cold cally — barevný pruh podle výsledku a bohatší řádek
+**Modré podbarvení fronty je pryč.** Zůstal jen barevný pruh 3 px u levého kraje a ten teď nese **každý** řádek podle výsledku: čeká modrý, nedovoláno šedý, odmítnuto červený, zájem jantarový, schůzka zelený. Barvy jsou tytéž, jaké má tečka v badge, takže se nemají jak rozejít. Výsledek jde poznat od pohledu i bez čtení badge; podbarvení celého bloku na to bylo moc.
+
+**Druhý řádek nese kontext.** U leadu telefon a kontaktní osoba — co potřebuješ před vytáčením. U zavolaného na mobilu datum, kontakt a začátek „co příště jinak", na desktopu kontakt a poznámka (datum má vlastní sloupec). Vždy na **jednu řádku s třemi tečkami**, aby výška řádků zůstala pravidelná: 57 px na desktopu, 58 na mobilu, přesně jak má handoff.
+
+Řádek bez kontaktu i bez poznámky (typicky „nedovoláno") druhý řádek prostě nemá — prázdná šedá řádka by jen dělala hluk.
+
+Ověřeno vykreslené na **1440 i 390**: pruhy `rgb(78,140,240)` / `rgb(135,141,150)` / `rgb(232,25,44)` / `rgb(239,175,60)` / `rgb(52,196,106)` podle výsledku, pozadí všech řádků `rgba(0,0,0,0)` (žádné podbarvení), předěly bez výplně, výška řádků 57 / 58 i u dvouřádkových, dlouhé poznámky oříznuté třemi tečkami, nic nepřetéká do stran.
+
+Nepoužité proměnné `--cc-queue-bg` a `--cc-queue-line` jsou odstraněné — pruh bere barvu z palety badge.
