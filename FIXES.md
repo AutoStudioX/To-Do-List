@@ -930,3 +930,8 @@ Poznámka k průběhu: smazal jsem `.next` za běhu dev serveru a rozbil ho — 
 Ověřeno vykreslené na **1440 i 390**: pruhy `rgb(78,140,240)` / `rgb(135,141,150)` / `rgb(232,25,44)` / `rgb(239,175,60)` / `rgb(52,196,106)` podle výsledku, pozadí všech řádků `rgba(0,0,0,0)` (žádné podbarvení), předěly bez výplně, výška řádků 57 / 58 i u dvouřádkových, dlouhé poznámky oříznuté třemi tečkami, nic nepřetéká do stran.
 
 Nepoužité proměnné `--cc-queue-bg` a `--cc-queue-line` jsou odstraněné — pruh bere barvu z palety badge.
+
+## Cold cally — čitelný předěl „ZAVOLÁNO"
+„ZAVOLÁNO" bylo tlumené (`--muted` bez podkladu) a v tmavém motivu se skoro ztrácelo, takže seznam vypadal, jako by fronta pokračovala dál. Obě hlavičky mají teď **stejný styl**: 11,5px/800, letter-spacing .1em, verzálky, barva `--text` a jemný podklad `--hover-bg`, který je oddělí od řádků v obou motivech. „ZAVOLÁNO" dostalo počet jako fronta, se správným skloňováním (1 hovor / 2–4 hovory / 5+ hovorů, totéž pro leady).
+
+Ověřeno vykreslené: v tmavém motivu obě hlavičky `rgb(255,255,255)` na `rgba(255,255,255,.04)`, ve světlém `rgb(17,24,39)` na `rgb(243,244,246)` — stejné hodnoty u obou, tedy ani jedna není výraznější; počty „2 leady" a „5 hovorů" tlumeně vedle popisku.

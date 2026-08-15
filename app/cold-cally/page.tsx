@@ -192,21 +192,29 @@ export default function ColdCallyPage() {
     )
   }
 
-  /** Hlavička části seznamu — fronta k obvolání vs. odvolané hovory. */
-  const predel = (text: string, pocet: number | null, modry: boolean) => (
+  /** 1 lead / 2–4 leady / 5+ leadů, totéž pro hovory. */
+  const pocetSlovem = (n: number, jedn: 'lead' | 'hovor') => {
+    const tvary = jedn === 'lead' ? ['lead', 'leady', 'leadů'] : ['hovor', 'hovory', 'hovorů']
+    return `${n} ${n === 1 ? tvary[0] : n < 5 ? tvary[1] : tvary[2]}`
+  }
+
+  /**
+   * Hlavička části seznamu. Obě jsou stejně výrazné — „ZAVOLÁNO" bylo dřív
+   * tlumené a v tmavém motivu se skoro ztrácelo, takže seznam vypadal, jako by
+   * fronta pokračovala dál.
+   */
+  const predel = (text: string, pocet: number, jedn: 'lead' | 'hovor') => (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '8px 14px' : '9px 20px',
-      background: 'transparent',
-      borderBottom: '1px solid var(--border)',
+      display: 'flex', alignItems: 'baseline', gap: 10,
+      padding: isMobile ? '10px 14px' : '11px 20px',
+      background: 'var(--hover-bg)', borderBottom: '1px solid var(--border)',
       fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase',
-      color: modry ? 'var(--cc-ceka-text)' : 'var(--muted)',
+      color: 'var(--text)',
     }}>
       {text}
-      {pocet != null && (
-        <span style={{ fontWeight: 600, letterSpacing: 0, color: 'var(--muted)', textTransform: 'none' }}>
-          {pocet} {pocet === 1 ? 'lead' : pocet < 5 ? 'leady' : 'leadů'}
-        </span>
-      )}
+      <span style={{ fontWeight: 600, letterSpacing: 0, textTransform: 'none', color: 'var(--muted)' }}>
+        {pocetSlovem(pocet, jedn)}
+      </span>
     </div>
   )
 
@@ -339,9 +347,9 @@ export default function ColdCallyPage() {
         ) : (
           <>
             {/* Fronta k obvolání — vlastní část seznamu, ne jen jiný badge. */}
-            {fronta.length > 0 && predel('K obvolání', fronta.length, true)}
+            {fronta.length > 0 && predel('K obvolání', fronta.length, 'lead')}
             {fronta.map(c => radek(c, true))}
-            {fronta.length > 0 && zavolane.length > 0 && predel('Zavoláno', null, false)}
+            {fronta.length > 0 && zavolane.length > 0 && predel('Zavoláno', zavolane.length, 'hovor')}
             {zavolane.map(c => radek(c, false))}
           </>
         )}
