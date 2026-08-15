@@ -1,0 +1,314 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { VYSLEDKY_HOVORU, VYSLEDEK_STYL, type ColdCall, type Vysledek } from '@/lib/coldCalls'
+import { ChevronLeft, Check, X } from 'lucide-react'
+
+export type Draft = {
+  firma: string
+  kontakt_jmeno: string
+  telefon: string
+  vysledek: Vysledek | ''
+  co_jsem_rekl: string
+  co_odpovedel: string
+  co_spatne: string
+  co_priste_jinak: string
+}
+
+const prazdny: Draft = {
+  firma: '', kontakt_jmeno: '', telefon: '', vysledek: '',
+  co_jsem_rekl: '', co_odpovedel: '', co_spatne: '', co_priste_jinak: '',
+}
+
+export const draftZaznamu = (c: ColdCall): Draft => ({
+  firma: c.firma,
+  kontakt_jmeno: c.kontakt_jmeno ?? '',
+  telefon: c.telefon ?? '',
+  // Lead ještě nemá výsledek hovoru — `ceka` není nic, co by se dalo vybrat.
+  vysledek: c.vysledek === 'ceka' ? '' : c.vysledek,
+  co_jsem_rekl: c.co_jsem_rekl ?? '',
+  co_odpovedel: c.co_odpovedel ?? '',
+  co_spatne: c.co_spatne ?? '',
+  co_priste_jinak: c.co_priste_jinak ?? '',
+})
+
+/**
+ * Záznam hovoru (artboardy 2a/2b) — stejný formulář pro nový hovor i pro
+ * úpravu existujícího záznamu včetně nahraného leadu.
+ *
+ * Reflexní pole jsou vizuálně nejsilnější část obrazovky schválně: podle
+ * handoffu je to „to nejdůležitější z celého záznamu".
+ */
+export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
+  /** vyplněné = úprava (i lead), prázdné = nový hovor */
+  zaznam?: ColdCall
+  isMobile: boolean
+  onSaved: (hlaska: string) => void
+  onError: (hlaska: string) => void
+}) {
+  const router = useRouter()
+  const [d, setD] = useState<Draft>(zaznam ? draftZaznamu(zaznam) : prazdny)
+  const [saving, setSaving] = useState(false)
+  const [ukazChyby, setUkazChyby] = useState(false)
+  const { confirm, dialog } = useConfirm()
+
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
+  const zmeneno = JSON.stringify(d) !== JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny)
+  const chybiFirma = !d.firma.trim()
+  const chybiVysledek = !d.vysledek
+
+  // Nový záznam startuje s kurzorem ve Firmě, jak chce handoff.
+  useEffect(() => {
+    if (!zaznam) document.getElementById('cc-firma')?.focus()
+  }, [zaznam])
+
+  async function uloz() {
+    if (chybiFirma || chybiVysledek) {
+      setUkazChyby(true)
+      onError(chybiFirma ? 'Vyplň firmu' : 'Vyber výsledek hovoru')
+      return
+    }
+    setSaving(true)
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) { setSaving(false); onError('Uložení selhalo: nejsi přihlášený'); return }
+
+    const payload = {
+      firma: d.firma.trim(),
+      kontakt_jmeno: d.kontakt_jmeno.trim() || null,
+      telefon: d.telefon.trim() || null,
+      vysledek: d.vysledek as Vysledek,
+      co_jsem_rekl: d.co_jsem_rekl.trim() || null,
+      co_odpovedel: d.co_odpovedel.trim() || null,
+      co_spatne: d.co_spatne.trim() || null,
+      co_priste_jinak: d.co_priste_jinak.trim() || null,
+      // Čas hovoru se zapisuje teď — u leadu tím teprve vzniká, u úpravy
+      // hotového hovoru se původní čas nepřepisuje.
+      volano_at: zaznam?.volano_at ?? new Date().toISOString(),
+    }
+    const { error } = zaznam
+      ? await supabase.from('cold_calls').update(payload).eq('id', zaznam.id)
+      : await supabase.from('cold_calls').insert({ ...payload, user_id: user.id })
+    setSaving(false)
+    if (error) { onError(`Uložení selhalo: ${error.message}`); return }
+    onSaved(zaznam ? 'Hovor upraven' : 'Hovor uložen')
+  }
+
+  async function zrus() {
+    // Rozepsaný formulář se nezahazuje bez zeptání — a nikdy nativním confirm().
+    if (zmeneno && !await confirm('Zahodit rozepsaný záznam? Nejde to vrátit.', 'Zahodit')) return
+    router.push('/cold-cally')
+  }
+
+  // ---- styly z handoffu ----
+  const label: React.CSSProperties = {
+    display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--muted)', marginBottom: 8,
+  }
+  const pole: React.CSSProperties = {
+    width: '100%', height: isMobile ? 46 : 44, padding: isMobile ? '0 14px' : '0 14px',
+    borderRadius: isMobile ? 11 : 10, border: '1px solid var(--border)',
+    background: 'var(--input-bg)', color: 'var(--text)', fontSize: isMobile ? 16 : 14.5,
+    boxSizing: 'border-box', fontFamily: 'inherit',
+  }
+  // `--cc-ta` přebíjí globální tap-target `min-height: 44px !important`,
+  // které by víceřádková pole srazilo na výšku jednoho řádku.
+  const textarea = (min: number): React.CSSProperties => ({
+    ...pole, height: undefined, minHeight: min, padding: '12px 14px', lineHeight: 1.55,
+    resize: 'vertical', ...({ '--cc-ta': `${min}px` } as React.CSSProperties),
+  })
+  const chybne = (je: boolean): React.CSSProperties =>
+    (je && ukazChyby ? { borderColor: 'var(--accent)' } : {})
+
+  const primary: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 44, padding: '0 24px', borderRadius: 11, border: 'none', background: 'var(--accent)',
+    color: '#fff', fontSize: 14.5, fontWeight: 600, cursor: 'pointer', touchAction: 'manipulation',
+  }
+  const ghost: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 44, padding: '0 20px', borderRadius: 11, background: 'transparent',
+    border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14.5, fontWeight: 600,
+    cursor: 'pointer', touchAction: 'manipulation',
+  }
+
+  const vysledekBtn = (v: Vysledek) => {
+    const on = d.vysledek === v
+    return (
+      <button
+        key={v} type="button" role="radio" aria-checked={on}
+        onClick={() => set('vysledek', v)}
+        style={{
+          height: isMobile ? 46 : 44, padding: isMobile ? '0 12px' : '0 20px',
+          borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          touchAction: 'manipulation', whiteSpace: 'nowrap',
+          border: `1px solid ${on || (chybiVysledek && ukazChyby) ? 'var(--accent)' : 'var(--border)'}`,
+          background: on ? 'rgba(232,25,44,.16)' : 'var(--input-bg)',
+          color: on ? 'var(--text)' : 'var(--muted)',
+        }}>{VYSLEDEK_STYL[v].label}</button>
+    )
+  }
+
+  const kdy = new Date(zaznam?.volano_at || zaznam?.created_at || Date.now())
+  const datumRadek = kdy.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })
+    + ' · ' + kdy.toLocaleTimeString('cs-CZ', { hour: 'numeric', minute: '2-digit' })
+
+  return (
+    <div style={{ maxWidth: 880, margin: '0 auto', paddingBottom: isMobile ? 12 : 24 }}>
+      {/* hlavička */}
+      {isMobile ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <button onClick={zrus} aria-label="Zpět" style={{
+            width: 44, height: 44, flexShrink: 0, borderRadius: 11, border: '1px solid var(--border)',
+            background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--muted)', cursor: 'pointer', touchAction: 'manipulation',
+          }}><ChevronLeft size={22} /></button>
+          <h1 className="cc-h1" style={{
+            ...({ '--cc-h1': '17px' } as React.CSSProperties),
+            margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)',
+          }}>
+            {zaznam ? 'Záznam hovoru' : 'Nový hovor'}
+          </h1>
+        </div>
+      ) : (
+        <>
+          <button onClick={zrus} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: 0,
+            background: 'transparent', border: 'none', color: 'var(--muted)',
+            fontSize: 13.5, fontWeight: 500, cursor: 'pointer',
+          }}><ChevronLeft size={17} /> Cold cally</button>
+          <h1 style={{ margin: '2px 0 0', fontSize: 23, fontWeight: 700, letterSpacing: '-.015em', color: 'var(--text)' }}>
+            Záznam hovoru
+          </h1>
+          <div style={{ marginTop: 5, fontSize: 13.5, color: 'var(--muted)' }}>{datumRadek}</div>
+        </>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 18, marginTop: isMobile ? 0 : 22 }}>
+        {/* firma / kontakt / telefon */}
+        {isMobile ? (
+          <>
+            <div>
+              <label style={label} htmlFor="cc-firma">Firma</label>
+              <input id="cc-firma" value={d.firma} onChange={e => set('firma', e.target.value)}
+                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma) }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={label} htmlFor="cc-kontakt">Kontakt — jméno</label>
+                <input id="cc-kontakt" value={d.kontakt_jmeno} onChange={e => set('kontakt_jmeno', e.target.value)} style={pole} />
+              </div>
+              <div>
+                <label style={label} htmlFor="cc-telefon">Telefon</label>
+                <input id="cc-telefon" value={d.telefon} onChange={e => set('telefon', e.target.value)}
+                  inputMode="tel" style={pole} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={label} htmlFor="cc-firma">Firma</label>
+              <input id="cc-firma" value={d.firma} onChange={e => set('firma', e.target.value)}
+                placeholder="Název firmy" style={{ ...pole, ...chybne(chybiFirma) }} />
+            </div>
+            <div>
+              <label style={label} htmlFor="cc-kontakt">Kontakt — jméno</label>
+              <input id="cc-kontakt" value={d.kontakt_jmeno} onChange={e => set('kontakt_jmeno', e.target.value)} style={pole} />
+            </div>
+            <div>
+              <label style={label} htmlFor="cc-telefon">Telefon</label>
+              <input id="cc-telefon" value={d.telefon} onChange={e => set('telefon', e.target.value)}
+                inputMode="tel" style={pole} />
+            </div>
+          </div>
+        )}
+
+        {/* výsledek */}
+        <div>
+          <span style={label}>Výsledek</span>
+          <div role="radiogroup" aria-label="Výsledek hovoru" style={{
+            display: isMobile ? 'grid' : 'flex',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : undefined,
+            gap: 8,
+          }}>
+            {VYSLEDKY_HOVORU.map(vysledekBtn)}
+          </div>
+        </div>
+
+        {/* co jsem řekl / co odpověděl */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: isMobile ? 16 : 14,
+        }}>
+          <div>
+            <label style={label} htmlFor="cc-rekl">Co jsem řekl</label>
+            <textarea id="cc-rekl" className="cc-textarea" value={d.co_jsem_rekl} onChange={e => set('co_jsem_rekl', e.target.value)}
+              style={textarea(isMobile ? 88 : 96)} />
+          </div>
+          <div>
+            <label style={label} htmlFor="cc-odpovedel">Co odpověděl</label>
+            <textarea id="cc-odpovedel" className="cc-textarea" value={d.co_odpovedel} onChange={e => set('co_odpovedel', e.target.value)}
+              style={textarea(isMobile ? 88 : 96)} />
+          </div>
+        </div>
+
+        {/* reflexe — nejdůležitější část záznamu */}
+        <div style={{ marginTop: isMobile ? 2 : 6 }}>
+          <div style={{
+            fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase',
+            color: 'var(--accent)',
+          }}>Reflexe</div>
+          <div style={{ marginTop: 4, fontSize: 13.5, color: 'var(--muted)' }}>
+            To nejdůležitější z celého záznamu — piš konkrétně.
+          </div>
+        </div>
+        <div>
+          <label style={{ ...label, fontSize: 15, fontWeight: 700, color: 'var(--text)' }} htmlFor="cc-spatne">
+            Co jsem udělal špatně
+          </label>
+          <textarea id="cc-spatne" className="cc-textarea" value={d.co_spatne} onChange={e => set('co_spatne', e.target.value)}
+            style={{ ...textarea(isMobile ? 132 : 150), fontSize: 15, lineHeight: 1.6, background: 'var(--hover-bg)' }} />
+        </div>
+        <div>
+          <label style={{ ...label, fontSize: 15, fontWeight: 700, color: 'var(--text)' }} htmlFor="cc-priste">
+            Co příště jinak
+          </label>
+          <textarea id="cc-priste" className="cc-textarea" value={d.co_priste_jinak} onChange={e => set('co_priste_jinak', e.target.value)}
+            style={{ ...textarea(isMobile ? 132 : 150), fontSize: 15, lineHeight: 1.6, background: 'var(--hover-bg)' }} />
+        </div>
+
+        {/* akce */}
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button onClick={uloz} disabled={saving} style={{ ...primary, opacity: saving ? 0.6 : 1 }}>
+              <Check size={16} /> {saving ? 'Ukládám…' : 'Uložit hovor'}
+            </button>
+            <button onClick={zrus} style={ghost}><X size={16} /> Zrušit</button>
+          </div>
+        )}
+      </div>
+
+      {/* Mobilní patička drží tlačítko nad spodní navigací appky — ta v designu
+          není, ale v appce ano, takže se sticky opírá o její výšku. */}
+      {isMobile && (
+        <div style={{
+          // `bottom: 0` je proti spodní hraně OBSAHU, ne okna — a `.main-content`
+          // už má pod obsahem 80px rezervu na spodní navigaci appky (v designu
+          // žádná není). Patička tak sedí těsně nad ní; s vlastním odsazením
+          // by se odlepila doprostřed formuláře.
+          position: 'sticky', bottom: 0, zIndex: 5,
+          marginTop: 18, padding: '12px 0 14px', background: 'var(--bg)',
+          borderTop: '1px solid var(--border)',
+        }}>
+          <button onClick={uloz} disabled={saving} style={{
+            ...primary, width: '100%', height: 52, borderRadius: 13, opacity: saving ? 0.6 : 1,
+          }}><Check size={18} /> {saving ? 'Ukládám…' : 'Uložit hovor'}</button>
+        </div>
+      )}
+      {dialog}
+    </div>
+  )
+}

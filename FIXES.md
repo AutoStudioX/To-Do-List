@@ -883,3 +883,21 @@ Obrazovka 1 z handoffu (artboardy 1a/1b) na route `/cold-cally`. Rozměry, rozes
 - **Spodní navigace:** osmá položka „Cold cally" se na 390 px ořízla na „Cold c…", takže má v tab baru kratší popisek **„Hovory"**; plný název zůstává v postranním panelu i v hlavičce sekce. Ověřeno: 8 položek po 49 px, žádný popisek se neořezává, nic nepřetéká.
 
 Obrazovky „Záznam hovoru" a „Co se učím" jsou zatím kostry, aby odkazy ze seznamu nevedly na 404 — obsah je krok 3.
+
+## Cold cally — krok 3: záznam hovoru a Co se učím
+Poslední dvě obrazovky handoffu. Formulář `components/coldCalls/CallForm.tsx` slouží obojímu — novému hovoru (`/cold-cally/novy`) i úpravě existujícího záznamu (`/cold-cally/[id]`), včetně nahraného leadu: u leadu je `vysledek` prázdný, protože „čeká" není výsledek hovoru, a uložením se teprve zapíše `volano_at`. U už zavolaného hovoru se původní čas nepřepisuje.
+
+Validace podle handoffu: povinná **Firma + Výsledek**. Chybějící pole dostane akcentní rámeček a přijde toast s tím, co chybí. Odchod z rozepsaného formuláře se ptá **vlastním dialogem** (`useConfirm`), nikdy nativním `confirm()`.
+
+**Ověřeno vedle prototypu — Záznam hovoru, 1440:** grid **1.2fr 1fr 1fr** (naměřeno 319.5 : 266.25 : 266.25) gap 14 · input h44 r10 padding 0 14, 14.5px · Výsledek 4 tlačítka h44 padding 0 20 r10, vybrané akcentním rámečkem a tónovaným pozadím · řekl/odpověděl min-height **96**, lh 1.55 · REFLEXE 12px/800, letter-spacing .12em (1.44 px), uppercase, akcent · reflexní pole min-height **150**, 15px/1.6, odlišený podklad · „Uložit hovor" h44 padding 0 24 r11.
+**390:** titul **17 px** · zpět tlačítko **44×44** r11 · inputy **46 px** r11 · Výsledek **2×2** · řekl/odpověděl **88**, reflexe **132** · patička s tlačítkem **52 px r13**, nic nepřetéká.
+
+**Co se učím, 1440:** H1 23, sloupec **720 px**, položka padding **22px 0**, text **17.5px/1.62**, meta 13px 9 px pod textem, nejnovější nahoře. **390:** H1 20, položka 18px 0, text 15.5px/1.6, meta 12.5.
+
+**Funkčně:** uložení bez výsledku zahlásí „Vyber výsledek hovoru" a skupinu orámuje akcentem · výběr výsledku se propíše · odchod z rozepsaného formuláře otevře vlastní dialog „Zahodit rozepsaný záznam?" · prázdný stav obou obrazovek vykreslen.
+
+### Dvě věci z ověřování
+- **Sticky patička na mobilu** nejdřív visela uprostřed formuláře. Příčina: `bottom` u `position: sticky` se počítá proti spodní hraně OBSAHU, a `.main-content` má pod obsahem 80 px rezervu na spodní navigaci — vlastní odsazení se tak sečetlo. S `bottom: 0` sedí patička těsně nad navigací a formulář jí scrolluje pod rukama.
+- **Slepá ulička v měření:** `getComputedStyle` v náhledovém panelu vracel u tlačítek výsledku zastaralé hodnoty (inline styl říkal `var(--accent)`, computed hlásil barvu okraje), takže to vypadalo, že se výběr nepropisuje. Screenshot ukázal, že vykreslení je správně. Úpravu, kterou jsem na základě špatné diagnózy udělal, jsem **vrátil zpátky** — v kódu po ní nezůstal ani komentář, který by tvrdil neexistující chybu prohlížeče.
+
+Tím je sekce Cold cally hotová v celém rozsahu zadání: data a import (krok 1), seznam (krok 2), záznam a Co se učím (krok 3).
