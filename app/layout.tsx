@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import MobileLayout from '@/components/MobileLayout'
 import { ThemeProvider } from '@/components/ThemeProvider'
-import UpdateReloader from '@/components/UpdateReloader'
+import StaleReloader from '@/components/StaleReloader'
 
 export const metadata: Metadata = {
   title: 'AutoStudio Dashboard',
@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         `}} />
       </head>
       <body>
-        <UpdateReloader />
+        <StaleReloader />
         <ThemeProvider>
           <LayoutInner>{children}</LayoutInner>
         </ThemeProvider>

@@ -4,10 +4,9 @@ import { useEffect, useRef } from 'react'
 /**
  * Rozepsaný text přežije i přenačtení stránky.
  *
- * Appka se umí přenačíst sama (`UpdateReloader` po nasazení nové verze) a
- * uživatel může kdykoli zavřít záložku nebo mu spadne prohlížeč. Nic z toho
- * nesmí sebrat rozepsaný formulář — draft se proto při každé změně ukládá do
- * `localStorage` a při otevření se vrátí zpátky.
+ * Uživatel může kdykoli obnovit stránku, zavřít záložku nebo mu spadne
+ * prohlížeč. Nic z toho nesmí sebrat rozepsaný formulář — draft se proto při
+ * každé změně ukládá do `localStorage` a při otevření se vrátí zpátky.
  *
  * Klíč MUSÍ nést identitu záznamu (`ukoly:new`, `hovor:<id>`, `poznamka:<datum>`),
  * jinak by se rozepsaný text vylil do cizího formuláře.
@@ -18,23 +17,9 @@ import { useEffect, useRef } from 'react'
 
 const PREFIX = 'draft:'
 
-/** Klíče, které právě drží neuložený text. Čte to hlídač nové verze. */
-const rozepsane = new Set<string>()
-
-/** Je v appce něco rozepsaného? `UpdateReloader` se tím řídí, jestli smí přenačíst. */
-export function maRozepsanyText(): boolean {
-  return rozepsane.size > 0
-}
-
-/** Jen pro testy a ruční ověření v konzoli. */
-export function rozepsaneKlice(): string[] {
-  return [...rozepsane]
-}
-
 function zapis(klic: string, hodnota: unknown) {
   try {
     localStorage.setItem(PREFIX + klic, JSON.stringify(hodnota))
-    rozepsane.add(klic)
   } catch {
     // Plné nebo zakázané úložiště (privátní režim): draft se neuloží, ale
     // formulář musí fungovat dál — proto se tu jen tiše pokračuje.
@@ -44,7 +29,6 @@ function zapis(klic: string, hodnota: unknown) {
 
 function smaz(klic: string) {
   try { localStorage.removeItem(PREFIX + klic) } catch { console.warn('[draft] smazání se nepovedlo:', klic) }
-  rozepsane.delete(klic)
 }
 
 export function nactiDraft<T>(klic: string): T | null {
@@ -81,10 +65,7 @@ export function useDraft<T>(
     if (!klic || obnoveno.current === klic) return
     obnoveno.current = klic
     const draft = nactiDraft<T>(klic)
-    if (draft !== null && !prazdneRef.current(draft)) {
-      rozepsane.add(klic)
-      obnovRef.current(draft)
-    }
+    if (draft !== null && !prazdneRef.current(draft)) obnovRef.current(draft)
   }, [klic])
 
   useEffect(() => {
@@ -93,14 +74,11 @@ export function useDraft<T>(
     else zapis(klic, hodnota)
   }, [klic, hodnota])
 
-  // Zavřený formulář už nic nedrží — v úložišti draft ZŮSTÁVÁ, jen se přestane
-  // počítat mezi rozepsané, aby kvůli němu nešlo odkládat přenačtení donekonečna.
+  // Zavřený formulář se smí příště obnovit znovu — draft v úložišti ZŮSTÁVÁ.
   useEffect(() => {
     if (klic) return
     obnoveno.current = null
   }, [klic])
-
-  useEffect(() => () => { if (klic) rozepsane.delete(klic) }, [klic])
 
   return {
     /** Uložil se / zahodil se → draft pryč. */

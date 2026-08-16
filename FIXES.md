@@ -1090,3 +1090,16 @@ Teď se přenačte, **jen když není co ztratit**: když je něco rozepsaného 
 - **Hlídač verze při rozepsaném textu:** podvržená odpověď serveru s jiným hashem skriptu → stránka **zůstala**, v konzoli „čeká se na dopsání", text ve formuláři nedotčený. Po vyprázdnění formuláře a vypršení 30s škrtiče se stránka přenačetla sama — tedy chová se to podle záměru v obou směrech.
 - **Úkoly:** do modálu „Nový úkol" napsán název → `location.reload()` → po otevření modálu je název zpátky (`draft:ukol:novy` v úložišti nese celý formulář včetně priority a deadlinu).
 - **Denní poznámka:** rozepsaný text přežil dvě kola překreslení i uložení; v úložišti je `draft:poznamka:2026-08-16`, po uložení do databáze se maže.
+
+## Automatické přenačítání zrušené, zbyla jedna výjimka
+`UpdateReloader` je pryč i s hlídáním nové verze. Appka se **nepřenačítá sama**: novou verzi si uživatel načte tím, že stránku obnoví nebo se do appky vrátí později. Žádný časovač, žádná lišta s upozorněním.
+
+Jediná výjimka je `components/StaleReloader.tsx` a spouští se, jen když platí obojí naráz:
+1. dokument běží bez obnovení **déle než 8 hodin** (počítá se od `performance.timeOrigin`, tedy od vzniku dokumentu — ne od připojení komponenty, které by se u klientské navigace počítalo znovu),
+2. uživatel se **právě vrací na záložku** (`visibilitychange` → visible).
+
+Během práce se tedy nestane nic; přenačte se jen záložka, která visela otevřená přes noc.
+
+### Ověřeno vykreslené
+- **Čerstvá stránka (17 s) + tři návraty na záložku** → nepřenačetla se, rozepsaná reflexe zůstala.
+- **Stránka předstírající stáří 9 hodin + návrat na záložku** → přenačetla se (kontrolní značka v `window` zmizela, stáří dokumentu se vynulovalo) a rozepsaný text se hned vrátil z draftu. I ta jediná povolená obnova tedy nic nestojí.
