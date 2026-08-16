@@ -9,6 +9,7 @@ import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { useLiveData } from '@/lib/useLiveData'
+import { useDraft } from '@/lib/useDraft'
 import { Plus, Trash2, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
@@ -57,6 +58,13 @@ export default function DluhyPage() {
     setModal(true)
   }
 
+  const draftDluhu = useDraft(
+    modal ? `dluh:${editDebt?.id ?? 'novy'}` : null,
+    form,
+    (d: typeof form) => setForm(d),
+    (d: typeof form) => !d.nazev.trim() && !d.castka.trim() && !d.poznamka.trim(),
+  )
+
   async function save() {
     const errors: Record<string, string> = {}
     if (!form.nazev.trim()) errors.nazev = 'Toto pole je povinné'
@@ -77,6 +85,7 @@ export default function DluhyPage() {
     }
     setSaving(false)
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    draftDluhu.zahod()
     setModal(false); setEditDebt(null); setFormErrors({}); load()
     showToast(editDebt ? 'Dluh upraven' : 'Dluh přidán')
   }

@@ -9,6 +9,7 @@ import DatePicker from '@/components/DatePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { useLiveData } from '@/lib/useLiveData'
+import { useDraft } from '@/lib/useDraft'
 import { Plus, Trash2, Pencil, Check, Sliders, Calculator, Zap } from 'lucide-react'
 
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
@@ -96,6 +97,13 @@ export default function GoalyPage() {
     setMilestoneGoalId(goalId); setMsForm({ nazev: '', deadline: todayISO() }); setMsError(''); setMilestoneModal(true)
   }
 
+  const draftGoalu = useDraft(
+    goalModal ? `goal:${editGoal?.id ?? 'novy'}` : null,
+    goalForm,
+    (d: typeof goalForm) => setGoalForm(d),
+    (d: typeof goalForm) => !d.nazev.trim() && !d.popis.trim(),
+  )
+
   async function saveGoal() {
     if (!goalForm.nazev.trim()) { setGoalError('Název je povinný'); return }
     const supabase = createClient()
@@ -138,6 +146,7 @@ export default function GoalyPage() {
     }
     setSaving(false)
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    draftGoalu.zahod()
     setGoalModal(false); setGoalError(''); load()
     showToast(editGoal ? 'Goal upraven' : 'Goal přidán')
   }

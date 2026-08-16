@@ -1073,3 +1073,20 @@ Tvrdá zůstávají dvě pole: **firma** (aspoň tři znaky) a **telefon** (aspo
 
 ### Co ověřené NENÍ
 Cesta se skutečným service-role klíčem (nemám ho) a jakýkoli zápis pod přihlášeným uživatelem — na to bych se musel přihlásit heslem. Po nasazení projdi ručně: uložení úkolu, transakce a série v tréninku.
+
+## Samovolné přenačtení a mizející rozepsaný text
+**Viník je `UpdateReloader`.** Hlídá, jestli nevyšla nová verze (porovnává hashe skriptů v HTML), a když ano, zavolá `location.reload()` — na `focus`, na `visibilitychange` a každých 60 s. Tvrdé přenačtení uprostřed psaní, bez ptaní. V produkci to nastane po každém nasazení, ve vývoji po každém překladu; přesně to sedí na „občas se to samo přenačte a text zmizí".
+
+Teď se přenačte, **jen když není co ztratit**: když je něco rozepsaného (draft v `localStorage`) nebo je kurzor v poli s textem, přenačtení se odloží a do konzole jde `[update] nová verze je k dispozici, čeká se na dopsání`. Kontrola běží dál, takže k obnovení dojde hned, jak uživatel dopíše.
+
+**Rozepsaný text navíc přežije i tvrdé přenačtení.** Nový `lib/useDraft.ts` ukládá rozepsaný formulář do `localStorage` při každé změně a vrátí ho, když se formulář zase otevře. Klíč nese identitu záznamu (`ukol:novy`, `hovor:<id>`, `poznamka:<datum>`), aby se text nevylil do cizího formuláře. Draft se maže po úspěšném uložení a po „Zahodit"; zavření okna ani odchod ze stránky ho nemažou — „odešel jsem pryč" není totéž co „uložil jsem to". Zapojené je to v Úkolech, Financích, Dluzích, Cílech, Časovém plánu, v záznamu hovoru a v denní poznámce.
+
+**K ostatním dvěma hypotézám:**
+- `router.refresh()` je v celé appce jednou, v odhlášení (`Sidebar`) — tam patří. `revalidatePath` / `revalidateTag` nikde. Polling server komponent žádný není: appka je klientská, `useLiveData` tahá data přes Supabase klienta a server komponenty nepřekresluje.
+- `useLiveData` (poll 20 s + refetch na focus) běží na devíti stránkách, ale mění jen seznamy — stav formuláře v modálu je oddělený a `load()` na něj nesahá. **Na stránce Habits `useLiveData` vůbec není**, takže mizející poznámku nezpůsoboval; její jediné automatické přenačtení je překlopení dne v `useToday` o půlnoci. To ale poznámku přepsat mohlo, a proto je opravené taky: `load()` teď skládá `{ ...zeServeru, ...rozepsanePoznamky.current }` a den, do kterého se právě píše, si drží lokální text. Ochrana se pouští až po úspěšném uložení, ne na začátku — jinak by poll, který doletí uprostřed ukládání, přepsal text starou hodnotou.
+
+### Ověřeno vykreslené
+- **Záznam hovoru:** vyplněno pět polí (firma, telefon, odrážka, dvě reflexe) → `location.reload()` → po přenačtení jsou **všechna zpátky**.
+- **Hlídač verze při rozepsaném textu:** podvržená odpověď serveru s jiným hashem skriptu → stránka **zůstala**, v konzoli „čeká se na dopsání", text ve formuláři nedotčený. Po vyprázdnění formuláře a vypršení 30s škrtiče se stránka přenačetla sama — tedy chová se to podle záměru v obou směrech.
+- **Úkoly:** do modálu „Nový úkol" napsán název → `location.reload()` → po otevření modálu je název zpátky (`draft:ukol:novy` v úložišti nese celý formulář včetně priority a deadlinu).
+- **Denní poznámka:** rozepsaný text přežil dvě kola překreslení i uložení; v úložišti je `draft:poznamka:2026-08-16`, po uložení do databáze se maže.

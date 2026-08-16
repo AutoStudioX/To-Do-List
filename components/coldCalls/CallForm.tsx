@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
+import { useDraft } from '@/lib/useDraft'
 import {
   VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi,
   firmaChyba, telefonChyba, emailChyba, normalizujTelefon,
@@ -69,6 +70,18 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   const { confirm, dialog } = useConfirm()
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
+
+  /**
+   * Záznam hovoru je nejdelší psaní v celé appce (reflexe, co jsem řekl, co
+   * příště jinak). Rozepsaný text proto leží v `localStorage` a vrátí se
+   * i po tvrdém přenačtení stránky.
+   */
+  const draftHovoru = useDraft(
+    `hovor:${zaznam?.id ?? 'novy'}`,
+    d,
+    (ulozeny: Draft) => setD(ulozeny),
+    (h: Draft) => JSON.stringify(h) === JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny),
+  )
 
   // ---- odrážky v „Info o firmě" ----
   const odrazky = rozlozOdrazky(d.info)
@@ -153,12 +166,16 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       : await supabase.from('cold_calls').insert({ ...payload, user_id: user.id })
     setSaving(false)
     if (error) { onError(`Uložení selhalo: ${error.message}`); return }
+    draftHovoru.zahod()
     onSaved(zaznam ? 'Hovor upraven' : 'Hovor uložen')
   }
 
   async function zrus() {
     // Rozepsaný formulář se nezahazuje bez zeptání — a nikdy nativním confirm().
     if (zmeneno && !await confirm('Zahodit rozepsaný záznam? Nejde to vrátit.', 'Zahodit')) return
+    // „Zahodit" znamená zahodit — jinak by se rozepsaný text vrátil při
+    // dalším otevření formuláře.
+    draftHovoru.zahod()
     router.push('/cold-cally')
   }
 

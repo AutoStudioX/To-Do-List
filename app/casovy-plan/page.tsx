@@ -8,6 +8,7 @@ import TimePicker from '@/components/TimePicker'
 import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import { useLiveData } from '@/lib/useLiveData'
+import { useDraft } from '@/lib/useDraft'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 const DAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
@@ -69,6 +70,13 @@ export default function CasovyPlanPage() {
     setEditBlock(b); setModal(true)
   }
 
+  const draftBloku = useDraft(
+    modal ? `blok:${editBlock?.id ?? 'novy'}` : null,
+    form,
+    (d: typeof form) => setForm(d),
+    (d: typeof form) => !d.nazev.trim(),
+  )
+
   async function save() {
     if (!form.nazev.trim()) { setFormError('Název je povinný'); return }
     const supabase = createClient()
@@ -82,6 +90,7 @@ export default function CasovyPlanPage() {
       : await supabase.from('casovy_plan').insert({ ...payload, user_id: user.id })
     setSaving(false)
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    draftBloku.zahod()
     setModal(false); setFormError(''); load()
     showToast(editBlock ? 'Blok upraven' : 'Blok přidán')
   }

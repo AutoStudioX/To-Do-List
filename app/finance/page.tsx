@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/ConfirmDialog'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { seedRecurring } from '@/lib/seedRecurring'
 import { useLiveData } from '@/lib/useLiveData'
+import { useDraft } from '@/lib/useDraft'
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -130,6 +131,13 @@ export default function FinancePage() {
     setModal(true)
   }
 
+  const draftZaznamu = useDraft(
+    modal ? `transakce:${editTx?.id ?? 'novy'}` : null,
+    form,
+    (d: typeof form) => setForm(d),
+    (d: typeof form) => !d.nazev.trim() && !d.klient.trim() && !d.castka.trim() && !d.poznamka.trim(),
+  )
+
   async function save() {
     const errors: Record<string, string> = {}
     if (!form.castka) errors.castka = 'Částka je povinná'
@@ -163,6 +171,7 @@ export default function FinancePage() {
     // Potvrzení až po zápisu — dřív se hlásilo „Záznam přidán" i tehdy, když
     // insert spadl (třeba na částce, ze které vyšlo NaN).
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    draftZaznamu.zahod()
     setModal(false); setEditTx(null); setFormErrors({}); load()
     showToast(editTx ? 'Záznam upraven' : 'Záznam přidán')
   }

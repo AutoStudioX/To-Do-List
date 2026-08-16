@@ -13,6 +13,7 @@ import { Toast, useToast } from '@/components/Toast'
 import { useConfirm } from '@/components/ConfirmDialog'
 import TaskRow from '@/components/TaskRow'
 import { useLiveData } from '@/lib/useLiveData'
+import { useDraft } from '@/lib/useDraft'
 import { Plus, Search, X } from 'lucide-react'
 
 // Below this many visible rows we skip the windowing machinery entirely — plain render is simpler and fast enough.
@@ -120,6 +121,15 @@ export default function UkolyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Rozepsaný úkol přežije přenačtení i zavření modálu. Klíč nese identitu
+  // záznamu, aby se rozepsaný text nevylil do jiného úkolu.
+  const draftUkolu = useDraft(
+    modalOpen ? `ukol:${editTask?.id ?? 'novy'}` : null,
+    form,
+    (d: typeof form) => setForm(d),
+    (d: typeof form) => !d.nazev.trim(),
+  )
+
   useEffect(() => { load() }, [load])
   useEffect(() => {
     window.addEventListener('voice-data-changed', load)
@@ -167,6 +177,7 @@ export default function UkolyPage() {
     // Potvrzení až po zápisu: dřív se hlásilo „Úkol přidán" i tehdy, když
     // insert spadl, a úkol prostě nikde nebyl.
     if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    draftUkolu.zahod()
     setModalOpen(false); setFormError(''); load()
     showToast(editTask ? 'Úkol upraven' : 'Úkol přidán')
   }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Toast, useToast } from '@/components/Toast'
 import { useToday } from '@/lib/useToday'
+import { useDraft } from '@/lib/useDraft'
 import Modal from '@/components/Modal'
 import HabitIcon from '@/components/habits/HabitIcon'
 import HabitForm from '@/components/habits/HabitForm'
@@ -67,6 +68,14 @@ export default function NavykyPage() {
   // Zobrazený den. Nikdy nesmí přeskočit dnešek — do budoucnosti se nechodí.
   const [viewDay, setViewDay] = useState(() => dayKey(new Date()))
 
+  /**
+   * Co se právě píše, podle dne. Na rozdíl od `pendingNote` se to NEMAŽE hned
+   * na začátku ukládání, ale až když je jisté, že server má tentýž text —
+   * jinak by poll (běží každých 20 s), který doletí uprostřed ukládání,
+   * přepsal rozepsanou poznámku starou hodnotou ze serveru.
+   */
+  const rozepsanePoznamky = useRef<Record<string, string>>({})
+
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
@@ -107,7 +116,10 @@ export default function NavykyPage() {
     setHabits(sortHabits(list))
     setTimes(indexTimes((ts || []) as HabitTime[]))
     setEntries(byHabit)
-    setNotes(Object.fromEntries(((ns || []) as { datum: string; text: string }[]).map(n => [n.datum, n.text])))
+    // Rozepsaný den si drží LOKÁLNÍ text. Poll běží každých 20 s a bez tohohle
+    // sebral všechno, co uživatel napsal od posledního uložení.
+    const zeServeru = Object.fromEntries(((ns || []) as { datum: string; text: string }[]).map(n => [n.datum, n.text]))
+    setNotes({ ...zeServeru, ...rozepsanePoznamky.current })
     setDays(days)
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,6 +151,10 @@ export default function NavykyPage() {
   const pendingNote = useRef<{ den: string; text: string } | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // `flushNote` vzniká dřív než draft, ale volá ho až uživatel — ref to spojí
+  // bez kruhové závislosti.
+  const draftPoznamkyRef = useRef<{ zahod: () => void }>({ zahod: () => {} })
+
   const flushNote = useCallback(async () => {
     if (noteTimer.current) { clearTimeout(noteTimer.current); noteTimer.current = null }
     const p = pendingNote.current
@@ -156,6 +172,10 @@ export default function NavykyPage() {
         .upsert({ user_id: user.id, datum: p.den, text }, { onConflict: 'user_id,datum' })
       : await supabase.from('habit_notes').delete().eq('user_id', user.id).eq('datum', p.den)
     if (error) { setNoteState('idle'); showToast(`Poznámka se neuložila: ${error.message}`, 'error'); return }
+    // Uloženo → den už nepotřebuje ochranu před pollem. Pokud se mezitím psalo
+    // dál, novější text tam zůstane a pustí se až po svém uložení.
+    if (rozepsanePoznamky.current[p.den] === p.text) delete rozepsanePoznamky.current[p.den]
+    draftPoznamkyRef.current.zahod()
     setNoteState('saved')
     if (savedTimer.current) clearTimeout(savedTimer.current)
     savedTimer.current = setTimeout(() => setNoteState('idle'), 2500)
@@ -167,11 +187,26 @@ export default function NavykyPage() {
   function editNote(text: string) {
     const den = viewDay
     setNotes(n => ({ ...n, [den]: text }))
+    rozepsanePoznamky.current[den] = text
     pendingNote.current = { den, text }
     setNoteState('saving')
     if (noteTimer.current) clearTimeout(noteTimer.current)
     noteTimer.current = setTimeout(() => { flushNote() }, NOTE_DEBOUNCE_MS)
   }
+
+  /**
+   * Rozepsaná poznámka přežije i tvrdé přenačtení stránky. Obnovuje se přes
+   * `editNote`, takže se rovnou naplánuje i uložení do databáze — po obnovení
+   * nezůstane viset jen v prohlížeči.
+   */
+  const draftPoznamky = useDraft(
+    `poznamka:${viewDay}`,
+    notes[viewDay] ?? '',
+    (text: string) => { if (text.trim()) editNote(text) },
+    (text: string) => !text.trim(),
+  )
+
+  draftPoznamkyRef.current = draftPoznamky
 
   // Přepnutí dne: rozepsané uložit hned. `pendingNote` drží starý den, takže
   // se text nepřelije do nově zobrazeného dne.
