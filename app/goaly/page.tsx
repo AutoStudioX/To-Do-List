@@ -70,7 +70,9 @@ export default function GoalyPage() {
       setMilestones(mr.data || [])
       const income = (txr.data || []).reduce((s: number, t: { castka: unknown }) => s + Number(t.castka), 0)
       setMonthIncome(income)
-    } catch { } finally { setLoading(false) }
+    } catch (e) {
+      showToast(`Načtení cílů selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])

@@ -44,8 +44,8 @@ export default function CasovyPlanPage() {
       if (!user) return
       const { data } = await supabase.from('casovy_plan').select('*').eq('user_id', user.id)
       setBlocks(data || [])
-    } catch {
-      // ignore
+    } catch (e) {
+      showToast(`Načtení plánu selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
     } finally {
       setLoading(false)
     }

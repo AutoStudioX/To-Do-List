@@ -5,6 +5,8 @@ import { createAdminClient, varujChybejiciKlic } from '@/lib/supabase/admin'
 
 const LOCKED_MSG = 'Příliš mnoho pokusů, zkuste to za 15 minut'
 const IP_BLOCKED_MSG = 'Přístup z této sítě byl zablokován. Kontaktujte správce.'
+// Kontrola zámku neproběhla — přihlášení se nepovolí, dokud se neví, jak na tom je.
+const CHECK_FAILED_MSG = 'Přihlášení je dočasně nedostupné, zkuste to za chvíli.'
 
 export default async function LoginPage() {
   // Server-side lock check on page load — keyed on the request IP, so a fresh
@@ -13,20 +15,27 @@ export default async function LoginPage() {
   const ip = (h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip')?.trim() || 'unknown')
   let initialLocked = false
   let initialMessage = ''
-  try {
-    // Service-role klient: od migrace 0025 tuhle RPC anon volat nesmí (audit, nález 1).
-    const admin = createAdminClient()
-    if (!admin) {
-      varujChybejiciKlic('LoginPage')
-    } else {
-      const { data } = await admin.rpc('check_lock_state', { p_ip: ip })
+  // Service-role klient: od migrace 0025 tuhle RPC anon volat nesmí (audit, nález 1).
+  const admin = createAdminClient()
+  if (!admin) {
+    // JEDINÁ výjimka z pravidla „fail closed": chybějící proměnná není selhání
+    // kontroly, ale chybějící konfigurace. Zamknout kvůli ní majitele venku by
+    // bylo horší než běžet bez zámku — do logu proto jde hlasitá hláška.
+    varujChybejiciKlic('LoginPage')
+  } else {
+    try {
+      const { data, error } = await admin.rpc('check_lock_state', { p_ip: ip })
+      if (error) throw error
       if (data?.locked) {
         initialLocked = true
         initialMessage = data.ip_blocked ? IP_BLOCKED_MSG : LOCKED_MSG
       }
+    } catch {
+      // Kontrola zámku selhala → bereme to jako ZAMČENO. Dřív tu bylo „fail
+      // open (form usable)", takže stačilo shodit jednu RPC a zámek zmizel.
+      initialLocked = true
+      initialMessage = CHECK_FAILED_MSG
     }
-  } catch {
-    // If the RPC isn't available, fail open (form usable); the server action still enforces.
   }
 
   return (

@@ -35,6 +35,8 @@ function playChime() {
       osc.start(t)
       osc.stop(t + 0.55)
     })
+    // Zavření AudioContextu je úklid, ne operace uživatele: když prohlížeč
+    // hlásí, že už je zavřený, není co oznamovat ani co zachraňovat.
     setTimeout(() => ctx.close().catch(() => {}), 1500)
   } catch { /* zvuk je bonus, ne podmínka */ }
 }

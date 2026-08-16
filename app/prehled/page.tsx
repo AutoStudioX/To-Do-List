@@ -66,7 +66,9 @@ export default function PrehledPage() {
       setGoals(gr.data || [])
       setTransactions(txr.data || [])
       setProjekty(pr.data || [])
-    } catch { }
+    } catch (e) {
+      showToast(`Načtení přehledu selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    }
   }
 
   async function addProjekt() {

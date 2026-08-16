@@ -8,6 +8,7 @@ export type LoginState = { error?: string; locked?: boolean }
 
 const LOCKED_MSG = 'Příliš mnoho pokusů, zkuste to za 15 minut'
 const IP_BLOCKED_MSG = 'Přístup z této sítě byl zablokován. Kontaktujte správce.'
+const CHECK_FAILED_MSG = 'Přihlášení je dočasně nedostupné, zkuste to za chvíli.'
 
 function clientIp(h: Headers): string {
   const xff = h.get('x-forwarded-for')
@@ -40,12 +41,16 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   try {
     if (admin) {
       // 1. IP permanently blocked? (before anything else)
-      const { data: ipBlocked } = await admin.rpc('check_ip_block', { p_ip: ip })
+      const { data: ipBlocked, error: ipErr } = await admin.rpc('check_ip_block', { p_ip: ip })
+      // Nepovedená kontrola = ZAMČENO. Přihlásit někoho jen proto, že se nešlo
+      // zeptat, jestli není zamčený, je přesně ta díra, kterou má zámek řešit.
+      if (ipErr) return { error: CHECK_FAILED_MSG, locked: true }
       if (ipBlocked === true) return { error: IP_BLOCKED_MSG, locked: true }
 
       // 2. Email locked? MUST run BEFORE signInWithPassword so a locked account is
       //    rejected even when the correct password is supplied.
-      const { data: lock } = await admin.rpc('check_login_lockout', { p_email: emailNorm })
+      const { data: lock, error: lockErr } = await admin.rpc('check_login_lockout', { p_email: emailNorm })
+      if (lockErr) return { error: CHECK_FAILED_MSG, locked: true }
       if (lock?.locked) return { error: LOCKED_MSG, locked: true }
     }
 

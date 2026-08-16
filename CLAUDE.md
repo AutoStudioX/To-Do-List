@@ -272,9 +272,85 @@ update public.login_lockout set failed_attempts = 0, locked_until = null
 - **Cold cally: the same check guards the form and the import.** `firmaChyba` / `telefonChyba` / `normalizujTelefon` in `lib/coldCalls.ts` are the only source — firma ≥ 3 characters, a filled-in phone ≥ 9 digits and no letters (separators and `+420` are counted out, not rejected). An empty phone is not an error: a lead can be imported without a number and get it later. Only firma and telefon are hard: a row that fails one of them is marked in the preview and skipped like a duplicate, while a malformed e-mail is a warning — the lead imports without the address (`emailVynechan`), because a typo in the mail is no reason to throw away the company and the number; the manual form refuses to save and says why, under the field and in the toast. Phones are stored in one shape, `+420 777 123 456` — nine bare digits get +420, a foreign prefix stays, spaces every three digits — and `telefonKlic` keeps deduplicating on the last 9 digits so the format can't split one company into two records.
 - **Native controls need `color-scheme`, not just CSS variables.** Scrollbars, the textarea resize grip and other browser-drawn chrome ignore the app's variables — in dark mode they render white inside a black card. The theme sets `color-scheme: light` / `dark` next to the variables, plus a thin scrollbar painted from `--border` / `--muted`; `.hide-scrollbar` still wins where a scrollbar shouldn't show at all.
 - **„Info o firmě" is a bullet list, not a text box.** Each bullet is its own input in a grid — two columns filled row-wise on desktop (1 left, 2 right, 3 under 1), one column at 390 px, and a lone bullet spans the full width. A `<textarea>` can't do columns and CSS `columns: 2` fills column-wise, which reverses the reading order. The column stays one text (`– a\n– b`); empty bullets survive while typing and are dropped by `ocistiInfo()` on save.
-- **A write whose error isn't checked is a lie to the user.** Every `insert` / `update` / `delete` / `upsert` checks `error`, reports it with a red toast including the reason, and shows the success toast only afterwards. Optimistic UI rolls back on failure. This is the rule the app broke in 33 places before the security audit — a failed insert with a green "saved" toast is worse than a crash, because the data is simply gone.
-- **Destructive cleanup only runs on data you know is complete.** The Tasks page prunes project rows that no task references; when the task query fails, "no task references anything" and the cleanup wipes every project. Any automatic delete must first verify that the queries it reasons from succeeded, and refuse to delete *everything* at once.
 - **Route names are Czech; keep redirects for any renamed/English path.** The goals page lives at `/goaly`; `/goals` (and `/goals/:path*`) permanently redirect to it via `next.config.ts` so bookmarked/external links don't 404. Add a similar redirect whenever a route is renamed.
+
+## Pravidla z bezpečnostního auditu (platí pro všechny projekty)
+
+Pět pravidel, každé vzniklo na konkrétním bugu v týhle appce. Nejsou akademická
+— u každého je napsané, co se rozbilo, když se nedodrželo.
+
+### 1. Každý zápis do databáze kontroluje `error`, potvrzení až po něm
+
+`insert` / `update` / `delete` / `upsert` / `rpc`, které něco mění: vždycky
+`if (error) { showToast('… selhalo: ' + error.message, 'error'); return }` a
+zelený toast až za tím. Kde se překresluje optimisticky, se stav při chybě
+vrací zpátky.
+
+**Vzniklo na:** ve Financích šlo `castka: Number(form.castka)` — z rozepsané
+částky vyšlo `NaN`, v JSON z toho bylo `null`, insert narazil na not-null,
+chyba se zahodila a uživatel viděl zelené „Záznam přidán". Peníze v přehledu
+chyběly a nikdo nevěděl proč. Stejná díra byla u potvrzení série v tréninku:
+série zůstala „potvrzená" jen v paměti, po obnovení stránky zmizela a
+počítadlo i objem lhaly. Celkem **33 míst v 8 souborech** (audit, nález 3).
+
+### 2. Žádné prázdné `catch` bloky
+
+`catch { }` je zákaz. Buď se chyba ukáže uživateli (toast), nebo aspoň
+`console.warn` s kontextem — a v komentáři musí být napsané proč to stačí.
+
+**Vzniklo na:** `load()` v Dluzích, Financích, Goalech, Přehledu a Úkolech
+končilo `} catch { } finally { setLoading(false) }`. Když načtení selhalo,
+stránka vypadala jako „zatím tu nic není" a uživatel klidně zadal záznam,
+který už existoval. V Úkolech to bylo horší — prázdný `catch` schoval chybu
+v okamžiku, kdy už úklid stihl mazat řádky (audit, nálezy 3 a 12).
+
+### 3. Bezpečnostní kontroly failují CLOSED
+
+Když se nepovede PŘEČÍST stav zámku, práv nebo bloku, ber to jako zamčeno /
+bez práv. Nikdy ne obráceně. „Nešlo se zeptat, tak to pustíme" je přesně ta
+díra, kterou má kontrola zavírat.
+
+**Vzniklo na:** přihlašovací stránka volala `check_lock_state` v `try/catch`
+s komentářem „fail open (form usable)". Stačilo shodit jednu RPC a zámek
+z obrazovky zmizel. Server action na tom byla stejně — chybu kontroly
+ignorovala a šla rovnou na `signInWithPassword`. Dnes obojí vrací
+„Přihlášení je dočasně nedostupné" a dovnitř nepustí.
+
+**Jediná dokumentovaná výjimka:** chybějící `SUPABASE_SERVICE_ROLE_KEY`.
+To není selhání kontroly, ale chybějící konfigurace — appka běží dál bez
+zámku a do logu jde hlasitá hláška, protože zamknout majitele venku kvůli
+nenastavené proměnné je horší než běžet bez zámku. Výjimka musí být vidět
+v kódu i v logu, jinak je to jen fail open pod jiným jménem.
+
+### 4. Mazání dat se nikdy nespouští automaticky při načtení stránky
+
+Úklid, deduplikace, „prořezání osiřelých řádků" — nic z toho nesmí běžet jako
+vedlejší efekt `load()`. Když už takový úklid musí být, spouští ho uživatel,
+běží až nad daty, o kterých je jisté, že se celá načetla, a nikdy nesmaže
+všechno najednou.
+
+**Vzniklo na:** `load()` v Úkolech mazal projekty, které nepoužíval žádný
+úkol. Dotazy nekontrolovaly chybu, takže když spadl dotaz na úkoly,
+`taskData` bylo `null`, množina používaných projektů vyšla prázdná a úklid
+smazal **všechny projekty uživatele** — bez potvrzení, bez hlášky. Jeden
+výpadek sítě = tichá ztráta dat (audit, nález 2).
+
+### 5. `grant execute … to anon` jen jako vědomé rozhodnutí
+
+Anon klíč je v klientském bundlu, takže „anon" znamená „kdokoli na internetu".
+Funkce, která něco MĚNÍ, tam nemá co dělat. Uživatele si funkce bere
+z `auth.uid()`, ne z parametru. Serverové věci volej service-role klientem
+(`lib/supabase/admin.ts`).
+
+**Past navíc:** Postgres dává `EXECUTE` na nové funkce implicitně roli
+`PUBLIC`. Samotné `revoke … from anon` proto nestačí — revokuj i od `public`
+a teprve pak granty rozdej.
+
+**Vzniklo na:** `reset_login_attempts` a `record_failed_login` měly
+`grant … to anon`. Kdokoli si mohl vynulovat počítadlo pokusů mezi hesly
+(ochrana proti hrubé síle byla tím pádem dekorace) a voláním s cizí IP zamknout
+cizí účet nebo natrvalo zablokovat libovolnou adresu včetně té majitelovy
+(audit, nález 1; opraveno migrací 0025).
 
 ## Dialogy a zpětná vazba (platí pro všechny projekty)
 

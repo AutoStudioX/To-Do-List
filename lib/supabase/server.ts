@@ -14,7 +14,12 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             )
-          } catch {}
+          } catch {
+            // Ze serverové komponenty cookies zapsat NELZE — Next tady vždycky
+            // hodí výjimku a je to očekávaný stav: obnovu session dopíše
+            // middleware, který běží dřív a cookie nastavit smí. Jediný prázdný
+            // catch v repu, který má důvod (a proto ten důvod stojí tady).
+          }
         },
       },
     }

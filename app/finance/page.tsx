@@ -69,7 +69,9 @@ export default function FinancePage() {
       if (seedErr) showToast(`Opakované položky se nezaložily: ${seedErr}`, 'error')
       const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       setTransactions(data || [])
-    } catch { } finally { setLoading(false) }
+    } catch (e) {
+      showToast(`Načtení financí selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])

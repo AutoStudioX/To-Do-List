@@ -37,7 +37,9 @@ export default function DluhyPage() {
       const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).order('datum', { ascending: false })
       const filtered = (data || []).filter((t: Transaction) => t.typ === 'dluh' || (t.typ === 'prijem' && t.status === 'dluh'))
       setDebts(filtered)
-    } catch { } finally { setLoading(false) }
+    } catch (e) {
+      showToast(`Načtení dluhů selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
