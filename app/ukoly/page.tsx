@@ -47,17 +47,27 @@ export default function UkolyPage() {
   const { confirm, dialog: confirmDialog } = useConfirm()
   const backfillRef = useRef(false)
 
+  /**
+   * Načtení + údržba seznamu projektů.
+   *
+   * ÚDRŽBA SE SPUSTÍ, JEN KDYŽ OBA DOTAZY PROŠLY. Dřív se chyby ignorovaly:
+   * když spadl dotaz na úkoly, `taskData` bylo null, množina používaných
+   * projektů vyšla prázdná a úklid „osiřelých" projektů smazal VŠECHNY
+   * projekty uživatele. Jeden výpadek sítě = tichá ztráta dat (audit, nález 2).
+   */
   const load = useCallback(async () => {
     const supabase = createClient()
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) return
-      const [{ data: taskData }, { data: projektData }] = await Promise.all([
+      const [{ data: taskData, error: taskErr }, { data: projektData, error: projektErr }] = await Promise.all([
         supabase.from('ukoly').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('projekty').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
       ])
+      if (taskErr) { showToast(`Načtení úkolů selhalo: ${taskErr.message}`, 'error'); return }
       setTasks(taskData || [])
+      if (projektErr) { showToast(`Načtení projektů selhalo: ${projektErr.message}`, 'error'); return }
 
       // De-dupe any project rows that already exist (case-insensitive), keep the earliest
       const seen = new Map<string, Projekt>()
@@ -68,7 +78,8 @@ export default function UkolyPage() {
         else seen.set(key, p)
       }
       if (dupeIds.length > 0) {
-        await supabase.from('projekty').delete().in('id', dupeIds)
+        const { error } = await supabase.from('projekty').delete().in('id', dupeIds)
+        if (error) { showToast(`Úklid duplicit selhal: ${error.message}`, 'error'); return }
       }
       let cleanProjekty = Array.from(seen.values())
 
@@ -80,7 +91,8 @@ export default function UkolyPage() {
           ((taskData || []) as Task[]).map(t => t.projekt).filter((p): p is string => !!p && !existingNames.has(p.toLowerCase()))
         ))
         if (missing.length > 0) {
-          const { data: inserted } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
+          const { data: inserted, error } = await supabase.from('projekty').insert(missing.map(nazev => ({ user_id: user.id, nazev }))).select()
+          if (error) { showToast(`Doplnění projektů selhalo: ${error.message}`, 'error'); return }
           cleanProjekty = [...cleanProjekty, ...(inserted || [])]
         }
       }
@@ -91,13 +103,21 @@ export default function UkolyPage() {
         ((taskData || []) as Task[]).map(t => (t.projekt || '').toLowerCase()).filter(Boolean)
       )
       const orphanIds = cleanProjekty.filter(p => !usedNames.has(p.nazev.toLowerCase())).map(p => p.id)
-      if (orphanIds.length > 0) {
-        await supabase.from('projekty').delete().in('id', orphanIds)
+      // Pojistka navíc: mazat všechny projekty najednou je vždycky podezřelé.
+      // Když nezbyl jediný používaný název, spíš se nenačetly úkoly, než že by
+      // uživatel opravdu smazal poslední úkol u každého projektu.
+      const mazeVse = orphanIds.length > 0 && orphanIds.length === cleanProjekty.length && usedNames.size === 0
+      if (orphanIds.length > 0 && !mazeVse) {
+        const { error } = await supabase.from('projekty').delete().in('id', orphanIds)
+        if (error) { showToast(`Úklid projektů selhal: ${error.message}`, 'error'); return }
         cleanProjekty = cleanProjekty.filter(p => usedNames.has(p.nazev.toLowerCase()))
       }
 
       setProjekty(cleanProjekty.sort((a, b) => a.nazev.localeCompare(b.nazev)))
-    } catch { } finally { setLoading(false) }
+    } catch (e) {
+      showToast(`Načtení selhalo: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally { setLoading(false) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => { load() }, [load])
