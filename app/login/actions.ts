@@ -2,6 +2,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, varujChybejiciKlic } from '@/lib/supabase/admin'
 
 export type LoginState = { error?: string; locked?: boolean }
 
@@ -30,29 +31,37 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
   const ip = clientIp(await headers())
   const supabase = await createClient()
+  // Zámek účtu jede přes service-role klienta: od migrace 0025 tyhle RPC anon
+  // volat nesmí, protože veřejným klíčem si šlo počítadlo pokusů vynulovat.
+  const admin = createAdminClient()
+  if (!admin) varujChybejiciKlic('loginAction')
 
   let ok = false
   try {
-    // 1. IP permanently blocked? (before anything else)
-    const { data: ipBlocked } = await supabase.rpc('check_ip_block', { p_ip: ip })
-    if (ipBlocked === true) return { error: IP_BLOCKED_MSG, locked: true }
+    if (admin) {
+      // 1. IP permanently blocked? (before anything else)
+      const { data: ipBlocked } = await admin.rpc('check_ip_block', { p_ip: ip })
+      if (ipBlocked === true) return { error: IP_BLOCKED_MSG, locked: true }
 
-    // 2. Email locked? MUST run BEFORE signInWithPassword so a locked account is
-    //    rejected even when the correct password is supplied.
-    const { data: lock } = await supabase.rpc('check_login_lockout', { p_email: emailNorm })
-    if (lock?.locked) return { error: LOCKED_MSG, locked: true }
+      // 2. Email locked? MUST run BEFORE signInWithPassword so a locked account is
+      //    rejected even when the correct password is supplied.
+      const { data: lock } = await admin.rpc('check_login_lockout', { p_email: emailNorm })
+      if (lock?.locked) return { error: LOCKED_MSG, locked: true }
+    }
 
     // 3. Attempt the actual sign-in.
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      const { data: after } = await supabase.rpc('record_failed_login', { p_email: emailNorm, p_ip: ip })
+      if (!admin) return { error: 'Nesprávný e-mail nebo heslo.' }
+      const { data: after } = await admin.rpc('record_failed_login', { p_email: emailNorm, p_ip: ip })
       if (after?.ip_blocked) return { error: IP_BLOCKED_MSG, locked: true }
       if (after?.email_locked) return { error: LOCKED_MSG, locked: true }
       const rem = remainingMsg(Number(after?.attempts_left ?? 0))
       return { error: 'Nesprávný e-mail nebo heslo.' + (rem ? ' ' + rem : '') }
     }
 
-    // 4. Success → reset counters.
+    // 4. Success → reset counters. Volá se PŘIHLÁŠENÝM klientem: funkce si bere
+    //    účet z `auth.uid()`, takže cizí počítadlo se tudy vynulovat nedá.
     await supabase.rpc('reset_login_attempts', { p_email: emailNorm, p_ip: ip })
     ok = true
   } catch {

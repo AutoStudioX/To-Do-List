@@ -1,7 +1,7 @@
 import LoginForm from './LoginForm'
 import { Zap } from 'lucide-react'
 import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, varujChybejiciKlic } from '@/lib/supabase/admin'
 
 const LOCKED_MSG = 'Příliš mnoho pokusů, zkuste to za 15 minut'
 const IP_BLOCKED_MSG = 'Přístup z této sítě byl zablokován. Kontaktujte správce.'
@@ -14,11 +14,16 @@ export default async function LoginPage() {
   let initialLocked = false
   let initialMessage = ''
   try {
-    const supabase = await createClient()
-    const { data } = await supabase.rpc('check_lock_state', { p_ip: ip })
-    if (data?.locked) {
-      initialLocked = true
-      initialMessage = data.ip_blocked ? IP_BLOCKED_MSG : LOCKED_MSG
+    // Service-role klient: od migrace 0025 tuhle RPC anon volat nesmí (audit, nález 1).
+    const admin = createAdminClient()
+    if (!admin) {
+      varujChybejiciKlic('LoginPage')
+    } else {
+      const { data } = await admin.rpc('check_lock_state', { p_ip: ip })
+      if (data?.locked) {
+        initialLocked = true
+        initialMessage = data.ip_blocked ? IP_BLOCKED_MSG : LOCKED_MSG
+      }
     }
   } catch {
     // If the RPC isn't available, fail open (form usable); the server action still enforces.
