@@ -14,6 +14,7 @@ export type ColdCall = {
   firma: string
   kontakt_jmeno: string | null
   telefon: string | null
+  email: string | null
   /** co o firmě vím před hovorem — obor, velikost, obrat, čím se živí */
   info: string | null
   vysledek: Vysledek
@@ -239,6 +240,21 @@ const TELEFON_ZNAKY = /^[+\d\s()./-]+$/
 
 export const MIN_CISLIC_TELEFON = 9
 
+/**
+ * Chyba k zobrazení, nebo `null` když je e-mail v pořádku.
+ *
+ * Prázdný e-mail chyba není — spousta leadů má jen telefon. Kontrola je
+ * schválně hrubá: zavináč, tečka za ním a žádné mezery. Přísnější vzorec by
+ * odmítal adresy, které doopravdy fungují, a doručitelnost stejně neověří.
+ */
+export function emailChyba(email: string): string | null {
+  const t = email.trim()
+  if (!t) return null
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)
+    ? null
+    : 'E-mail musí mít zavináč a tečku, třeba jan@firma.cz.'
+}
+
 /** Chyba k zobrazení, nebo `null` když je název v pořádku. */
 export function firmaChyba(firma: string): string | null {
   return firma.trim().length >= MIN_ZNAKU_FIRMA
@@ -315,7 +331,7 @@ export function fmtTelefon(tel: string | null | undefined): string {
 // ---- Export ----
 
 const EXPORT_SLOUPCE = [
-  'firma', 'kontakt', 'telefon', 'info', 'vysledek', 'kde_skoncil', 'volano', 'vytvoreno',
+  'firma', 'kontakt', 'telefon', 'email', 'info', 'vysledek', 'kde_skoncil', 'volano', 'vytvoreno',
   'co_jsem_rekl', 'co_odpovedel', 'co_spatne', 'co_priste_jinak',
 ] as const
 
@@ -329,7 +345,7 @@ export function doCsv(calls: ColdCall[]): string {
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const radek = (c: ColdCall) => [
-    c.firma, c.kontakt_jmeno ?? '', c.telefon ?? '', c.info ?? '', VYSLEDEK_STYL[c.vysledek].label,
+    c.firma, c.kontakt_jmeno ?? '', c.telefon ?? '', c.email ?? '', c.info ?? '', VYSLEDEK_STYL[c.vysledek].label,
     c.faze ? FAZE_LABEL[c.faze] : '',
     c.volano_at ? c.volano_at.slice(0, 16).replace('T', ' ') : '',
     c.created_at.slice(0, 16).replace('T', ' '),

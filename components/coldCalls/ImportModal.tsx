@@ -10,10 +10,11 @@ const STAV: Record<NahledRadek['stav'], { label: string; barva: string; Icon: ty
   'duplicita':    { label: 'Duplicita',      barva: 'var(--cc-ned-text)',  Icon: CircleX },
   'chybna-firma': { label: 'Chybná firma',   barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
   'chybne-cislo': { label: 'Chybný telefon', barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
+  'chybny-email': { label: 'Chybný e-mail',  barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
 }
 
 /** Řádky, které se do databáze nedostanou — vypsat proč, ne jen že. */
-const PRESKOCENO: NahledRadek['stav'][] = ['duplicita', 'chybna-firma', 'chybne-cislo']
+const PRESKOCENO: NahledRadek['stav'][] = ['duplicita', 'chybna-firma', 'chybne-cislo', 'chybny-email']
 
 /**
  * Import leadů: vyber soubor → NÁHLED → teprve pak uložení.
@@ -28,7 +29,8 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
   /** telefony už uložených záznamů — proti nim se hledají duplicity */
   existujiciTelefony: string[]
   onImport: (radky: {
-    firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+    firma: string; kontakt_jmeno: string | null; telefon: string | null
+    email: string | null; info: string | null
   }[]) => Promise<void>
 }) {
   const [nahled, setNahled] = useState<Nahled | null>(null)
@@ -62,7 +64,7 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
       {!nahled ? (
         <div>
           <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
-            CSV nebo Excel se sloupci firma, kontakt a telefon. Na názvech ani pořadí sloupců
+            CSV nebo Excel se sloupci firma, kontakt, telefon a e-mail. Na názvech ani pořadí sloupců
             nezáleží — poznají se samy. Před uložením uvidíš náhled: řádek s příliš krátkým
             názvem firmy nebo s nesmyslným telefonem se označí a nenaimportuje.
           </div>
@@ -92,7 +94,8 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
             {jmeno} · {nahled.hlavicka
               ? `sloupce podle hlavičky: ${[
                 nahled.hlavicka[nahled.sloupce.firma], nahled.hlavicka[nahled.sloupce.kontakt],
-                nahled.hlavicka[nahled.sloupce.telefon], nahled.hlavicka[nahled.sloupce.info]]
+                nahled.hlavicka[nahled.sloupce.telefon], nahled.hlavicka[nahled.sloupce.email],
+                nahled.hlavicka[nahled.sloupce.info]]
                 .filter(Boolean).join(', ')}`
               : 'soubor nemá hlavičku — sloupce jsou odhadnuté z obsahu'}
           </div>
@@ -121,6 +124,7 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                 {[
                   nahled.pocty.chybnaFirma && `${nahled.pocty.chybnaFirma}× firma kratší než 3 znaky`,
                   nahled.pocty.chybneCislo && `${nahled.pocty.chybneCislo}× telefon bez 9 číslic nebo s písmeny`,
+                  nahled.pocty.chybnyEmail && `${nahled.pocty.chybnyEmail}× e-mail bez zavináče nebo tečky`,
                 ].filter(Boolean).join(' · ')} — tyhle řádky se nenaimportují.
               </span>
             </div>
@@ -157,8 +161,9 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                       {/* U chybného řádku je důležitější důvod než kontakt —
                           u telefonu se ukáže i to, co v souboru doopravdy je. */}
                       {r.duvod
-                        ? (r.stav === 'chybne-cislo' ? `${r.duvod} — „${r.telefon}"` : r.duvod)
-                        : [r.kontakt, r.telefon, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
+                        ? (r.stav === 'chybne-cislo' ? `${r.duvod} — „${r.telefon}"`
+                          : r.stav === 'chybny-email' ? `${r.duvod} — „${r.email}"` : r.duvod)
+                        : [r.kontakt, r.telefon, r.email, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
                     </div>
                   </div>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: s.barva, flexShrink: 0 }}>

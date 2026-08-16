@@ -71,7 +71,8 @@ export default function ColdCallyPage() {
   const zavolane = videt.filter(c => c.vysledek !== 'ceka')
 
   async function importuj(radky: {
-    firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+    firma: string; kontakt_jmeno: string | null; telefon: string | null
+    email: string | null; info: string | null
   }[]) {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user

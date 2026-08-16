@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useConfirm } from '@/components/ConfirmDialog'
 import {
   VYSLEDKY_HOVORU, VYSLEDEK_STYL, FAZE, FAZE_LABEL, maFazi,
-  firmaChyba, telefonChyba, normalizujTelefon,
+  firmaChyba, telefonChyba, emailChyba, normalizujTelefon,
   naOdrazky, rozlozOdrazky, slozOdrazky, ocistiInfo,
   type ColdCall, type Faze, type Vysledek,
 } from '@/lib/coldCalls'
@@ -15,6 +15,7 @@ export type Draft = {
   firma: string
   kontakt_jmeno: string
   telefon: string
+  email: string
   info: string
   vysledek: Vysledek | ''
   faze: Faze | ''
@@ -25,7 +26,7 @@ export type Draft = {
 }
 
 const prazdny: Draft = {
-  firma: '', kontakt_jmeno: '', telefon: '', info: '', vysledek: '', faze: '',
+  firma: '', kontakt_jmeno: '', telefon: '', email: '', info: '', vysledek: '', faze: '',
   co_jsem_rekl: '', co_odpovedel: '', co_spatne: '', co_priste_jinak: '',
 }
 
@@ -33,6 +34,7 @@ export const draftZaznamu = (c: ColdCall): Draft => ({
   firma: c.firma,
   kontakt_jmeno: c.kontakt_jmeno ?? '',
   telefon: c.telefon ?? '',
+  email: c.email ?? '',
   info: c.info ?? '',
   // Lead ještě nemá výsledek hovoru — `ceka` není nic, co by se dalo vybrat.
   vysledek: c.vysledek === 'ceka' ? '' : c.vysledek,
@@ -63,7 +65,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   const [ukazChyby, setUkazChyby] = useState(false)
   // Chyba se ukáže až po opuštění pole nebo po pokusu uložit — ne u druhého
   // znaku názvu, kdy uživatel teprve píše.
-  const [dotknuto, setDotknuto] = useState<{ firma?: boolean; telefon?: boolean }>({})
+  const [dotknuto, setDotknuto] = useState<{ firma?: boolean; telefon?: boolean; email?: boolean }>({})
   const { confirm, dialog } = useConfirm()
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD(p => ({ ...p, [k]: v }))
@@ -99,6 +101,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   const zmeneno = JSON.stringify(d) !== JSON.stringify(zaznam ? draftZaznamu(zaznam) : prazdny)
   const chybaFirmy = firmaChyba(d.firma)
   const chybaTelefonu = telefonChyba(d.telefon)
+  const chybaEmailu = emailChyba(d.email)
   const chybiVysledek = !d.vysledek
   const chybiFirma = !!chybaFirmy
   // Tvar, ve kterém se číslo uloží — ukazuje se, jen když se liší od zápisu.
@@ -113,7 +116,8 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   async function uloz() {
     // Neuloží se nic, co neprojde kontrolou — a uživatel se dozví proč,
     // v hlášce i u pole samotného.
-    const prvniChyba = chybaFirmy || chybaTelefonu || (chybiVysledek ? 'Vyber výsledek hovoru' : null)
+    const prvniChyba = chybaFirmy || chybaTelefonu || chybaEmailu
+      || (chybiVysledek ? 'Vyber výsledek hovoru' : null)
     if (prvniChyba) {
       setUkazChyby(true)
       onError(prvniChyba)
@@ -130,6 +134,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
       kontakt_jmeno: d.kontakt_jmeno.trim() || null,
       // Jeden tvar pro celou appku: +420 777 123 456.
       telefon: normalizujTelefon(d.telefon),
+      email: d.email.trim() || null,
       info: ocistiInfo(d.info),
       vysledek: d.vysledek as Vysledek,
       // Fáze je nepovinná a u výsledku bez fáze se neukládá vůbec —
@@ -163,7 +168,10 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   }
   const pole: React.CSSProperties = {
     width: '100%', height: isMobile ? 46 : 44, padding: isMobile ? '0 14px' : '0 14px',
-    borderRadius: isMobile ? 11 : 10, border: '1px solid var(--border)',
+    borderRadius: isMobile ? 11 : 10,
+    // Longhand schválně: `chybne()` přepisuje jen barvu rámečku a míchat
+    // zkratku `border` s `borderColor` React při překreslení hlásí jako chybu.
+    borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)',
     background: 'var(--input-bg)', color: 'var(--text)', fontSize: isMobile ? 16 : 14.5,
     boxSizing: 'border-box', fontFamily: 'inherit',
   }
@@ -179,6 +187,7 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
   // Chyba se ukáže po opuštění pole nebo po pokusu uložit.
   const ukazFirmu = ukazChyby || !!dotknuto.firma
   const ukazTelefon = ukazChyby || !!dotknuto.telefon
+  const ukazEmail = ukazChyby || !!dotknuto.email
   const hlaska = (text: string, jeChyba = true) => (
     <div style={{
       marginTop: 6, fontSize: 12.5, lineHeight: 1.4,
@@ -303,9 +312,20 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
                 {podTelefonem()}
               </div>
             </div>
+            {/* E-mail patří k telefonu, na 390 px ale pod něj: tři pole vedle
+                sebe by měla po 120 px a adresa se do nich nevejde. */}
+            <div>
+              <label style={label} htmlFor="cc-email">E-mail</label>
+              <input id="cc-email" value={d.email} onChange={e => set('email', e.target.value)}
+                onBlur={() => setDotknuto(p => ({ ...p, email: true }))}
+                inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                placeholder="jan@firma.cz"
+                style={{ ...pole, ...chybne(!!chybaEmailu, ukazEmail) }} />
+              {ukazEmail && chybaEmailu && hlaska(chybaEmailu)}
+            </div>
           </>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr 1fr 1.15fr', gap: 14 }}>
             <div>
               <label style={label} htmlFor="cc-firma">Firma</label>
               <input id="cc-firma" value={d.firma} onChange={e => set('firma', e.target.value)}
@@ -324,6 +344,15 @@ export default function CallForm({ zaznam, isMobile, onSaved, onError }: {
                 inputMode="tel" placeholder="+420 777 123 456"
                 style={{ ...pole, ...chybne(!!chybaTelefonu, ukazTelefon) }} />
               {podTelefonem()}
+            </div>
+            <div>
+              <label style={label} htmlFor="cc-email">E-mail</label>
+              <input id="cc-email" value={d.email} onChange={e => set('email', e.target.value)}
+                onBlur={() => setDotknuto(p => ({ ...p, email: true }))}
+                inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                placeholder="jan@firma.cz"
+                style={{ ...pole, ...chybne(!!chybaEmailu, ukazEmail) }} />
+              {ukazEmail && chybaEmailu && hlaska(chybaEmailu)}
             </div>
           </div>
         )}

@@ -1020,3 +1020,18 @@ Funkce (`naOdrazky`, `maOdrazky`, `ODRAZKA`) se přestěhovaly z komponenty do `
 - **Motiv:** `color-scheme` je `light` ve světlém a `dark` v tmavém, `scrollbar-color` je `rgb(229,231,235)` / `rgb(42,42,42)` s průhlednou drážkou; přetékající textarea v tmavém motivu má tenký tmavý posuvník místo bílého pruhu.
 - **Jednotková tvrzení** (celkem 88): rozklad a složení odrážek, prázdná odrážka uprostřed při psaní zůstane, do uložení nejde, prázdné info je `null`, kolečko tam a zpět.
 - Poznámka k průběhu: změny v `globals.css` se nejdřív neprojevily — dev server servíroval starý CSS chunk (a `next build` do toho zapsal `.next` za jeho běhu). Správně je server zastavit, `.next` smazat a spustit znovu; po tom se `color-scheme` i posuvníky projevily.
+
+## Cold cally — e-mail
+Migrace **0024** přidává `email text` na `cold_calls`. Sloupec je nepovinný a **bez check constraintu schválně**: kontrolu dělá appka, ale omezení v databázi by při první divné adrese z importu shodilo celý insert, místo aby se řádek označil v náhledu.
+
+- **V záznamu hovoru vedle telefonu.** Na desktopu čtvrtý sloupec řádku Firma / Kontakt / Telefon / E-mail, na 390 px vlastní pole pod dvojicí kontakt–telefon: tři pole vedle sebe by měla po 120 px a adresa se do nich nevejde.
+- **V seznamu se nezobrazuje** — řádek nese firmu, telefon, čas, kontakt a začátek poznámky; e-mail je údaj do detailu, ne do přehledu.
+- **Kontrola jen když je vyplněný:** zavináč, tečka za ním, žádné mezery. Prázdný projde — spousta leadů má jen telefon. Vzorec je schválně hrubý, přísnější by odmítal adresy, které fungují, a doručitelnost stejně neověří.
+- **Import** hledá sloupec podle hlavičky (`email`, `e-mail`, `mail`, `e-mailová adresa`, `kontaktní email`) — `klic()` zahazuje všechno kromě písmen a číslic, takže na pomlčce nezáleží. Z obsahu se nehádá, stejně jako u info. Řádek s nesmyslnou adresou se v náhledu označí „Chybný e-mail", je vidět proč i s tím, co v souboru stojí, a nenaimportuje se — stejně jako chybný telefon.
+- **Export CSV** má sloupec `email` mezi `telefon` a `info`.
+
+### Ověřeno
+- **Migrace proti skutečnému Postgresu:** 0021–0024 puštěné dvakrát bez chyby, `email text` nullable, zápis s adresou i s `null` projde, RLS na tabulce zůstává zapnutá.
+- **Jednotková tvrzení** (celkem 100): prázdný e-mail projde, chybí zavináč / tečka / je tam mezera → chyba, `jan+leady@firma.co.uk` projde; import pozná sloupec podle hlavičky, řádek s vadnou adresou dostane stav `chybny-email` a `kImportu` veze e-mail dál; CSV má nový sloupec i hodnotu.
+- **Vykreslené na 1440 i 390:** pole je čtvrté vedle telefonu (x 1041 hned za telefonem na 1440), na mobilu celou šířkou pod ním; vadná adresa dá červený rámeček a důvod pod polem, uložení se odmítne a zůstane se na stránce, po opravě hláška zmizí. Import CSV s hlavičkou „E-mail" naimportoval 2 ze 3 řádků, prostřední označil „Chybný e-mail". Seznam hovorů e-mail nezobrazuje.
+- **Opraveno při ověřování:** React hlásil do konzole míchání zkratky `border` s `borderColor` (pole formuláře přebarvují rámeček při chybě) — styl polí je teď v longhandech `borderWidth` / `borderStyle` / `borderColor` a konzole je čistá.

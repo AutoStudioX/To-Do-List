@@ -4,11 +4,11 @@
 // i náhled jdou otestovat bez prohlížeče a bez databáze. Čtení souboru
 // (FileReader / XLSX) je až v UI vrstvě.
 
-import { telefonKlic, firmaChyba, telefonChyba, normalizujTelefon } from '@/lib/coldCalls'
+import { telefonKlic, firmaChyba, telefonChyba, emailChyba, normalizujTelefon } from '@/lib/coldCalls'
 
 export type Mrizka = string[][]
 
-export type Sloupce = { firma: number; kontakt: number; telefon: number; info: number }
+export type Sloupce = { firma: number; kontakt: number; telefon: number; email: number; info: number }
 
 export type NahledRadek = {
   /** číslo řádku v souboru, 1 = první datový řádek (kvůli hlášce uživateli) */
@@ -16,8 +16,9 @@ export type NahledRadek = {
   firma: string
   kontakt: string
   telefon: string
+  email: string
   info: string
-  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybna-firma' | 'chybne-cislo'
+  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybna-firma' | 'chybne-cislo' | 'chybny-email'
   /** proč je řádek chybný — text z kontroly, ať uživatel nehádá */
   duvod?: string
 }
@@ -29,7 +30,7 @@ export type Nahled = {
   radky: NahledRadek[]
   pocty: {
     celkem: number; kImportu: number; bezTelefonu: number; duplicit: number
-    chybnaFirma: number; chybneCislo: number; chybnych: number
+    chybnaFirma: number; chybneCislo: number; chybnyEmail: number; chybnych: number
   }
 }
 
@@ -92,6 +93,9 @@ const NAZVY = {
   telefon: ['telefon', 'tel', 'mobil', 'phone', 'mobile', 'cislo', 'telcislo', 'telefonnicislo', 'kontakttelefon', 'gsm'],
   kontakt: ['kontaktnijmeno', 'kontaktniosoba', 'kontaktjmeno', 'kontaktniosobajmeno', 'jmeno', 'kontakt', 'osoba', 'contact', 'contactname', 'person', 'jmenoaprijmeni'],
   firma: ['firma', 'spolecnost', 'company', 'nazevfirmy', 'nazev', 'obchodnijmeno', 'subjekt', 'klient', 'organizace', 'name'],
+  // Stejně jako info: jen podle hlavičky. „e-mail" i „mail" projdou, protože
+  // `klic()` zahazuje všechno kromě písmen a číslic.
+  email: ['email', 'mail', 'emailovaadresa', 'emailadresa', 'kontaktniemail', 'mailovaadresa'],
   // Co o firmě víme předem. Sloupec se hledá JEN podle hlavičky — hádat ho
   // z obsahu by znamenalo, že nejdelší text v souboru skončí jako info,
   // i když je to adresa nebo cokoli jiného.
@@ -127,6 +131,7 @@ export function detekujSloupce(mrizka: Mrizka): { sloupce: Sloupce; hlavicka: st
     telefon: najdi(NAZVY.telefon),
     kontakt: najdi(NAZVY.kontakt),
     firma: najdi(NAZVY.firma),
+    email: najdi(NAZVY.email),
     info: najdi(NAZVY.info),
   }
   // Aspoň dvě shody v POVINNÉ trojici = první řádek je opravdu hlavička.
@@ -137,7 +142,7 @@ export function detekujSloupce(mrizka: Mrizka): { sloupce: Sloupce; hlavicka: st
 
   // Bez použitelné hlavičky se hádá z obsahu: telefonní sloupec je ten, kde
   // většina buněk vypadá jako číslo; firma je nejdelší textový sloupec.
-  return { sloupce: dopln({ firma: -1, kontakt: -1, telefon: -1, info: -1 }, mrizka), hlavicka: null }
+  return { sloupce: dopln({ firma: -1, kontakt: -1, telefon: -1, email: -1, info: -1 }, mrizka), hlavicka: null }
 }
 
 /** Doplní chybějící sloupce odhadem z obsahu. */
@@ -202,24 +207,28 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
     const firma = bunka(sloupce.firma)
     const kontakt = bunka(sloupce.kontakt)
     const telefon = bunka(sloupce.telefon)
+    const email = bunka(sloupce.email)
     const info = bunka(sloupce.info)
     const k = telefonKlic(telefon)
     const chybaF = firmaChyba(firma)
     const chybaT = telefonChyba(telefon)
+    const chybaE = emailChyba(email)
     let stav: NahledRadek['stav']
     let duvod: string | undefined
     if (chybaF) { stav = 'chybna-firma'; duvod = chybaF }
     else if (chybaT) { stav = 'chybne-cislo'; duvod = chybaT }
+    else if (chybaE) { stav = 'chybny-email'; duvod = chybaE }
     else if (k && videne.has(k)) stav = 'duplicita'
     else if (!k) stav = 'bez-telefonu'
     else stav = 'ok'
     if (stav === 'ok') videne.add(k)
-    return { cislo: i + 1, firma, kontakt, telefon, info, stav, duvod }
+    return { cislo: i + 1, firma, kontakt, telefon, email, info, stav, duvod }
   })
 
   const spocti = (s: NahledRadek['stav']) => radky.filter(r => r.stav === s).length
   const chybnaFirma = spocti('chybna-firma')
   const chybneCislo = spocti('chybne-cislo')
+  const chybnyEmail = spocti('chybny-email')
   return {
     sloupce, hlavicka, radky,
     pocty: {
@@ -227,14 +236,15 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
       kImportu: spocti('ok') + spocti('bez-telefonu'),
       bezTelefonu: spocti('bez-telefonu'),
       duplicit: spocti('duplicita'),
-      chybnaFirma, chybneCislo, chybnych: chybnaFirma + chybneCislo,
+      chybnaFirma, chybneCislo, chybnyEmail, chybnych: chybnaFirma + chybneCislo + chybnyEmail,
     },
   }
 }
 
 /** Řádky, které se opravdu uloží — s telefonem sjednoceným do jednoho tvaru. */
 export function kImportu(nahled: Nahled): {
-  firma: string; kontakt_jmeno: string | null; telefon: string | null; info: string | null
+  firma: string; kontakt_jmeno: string | null; telefon: string | null
+  email: string | null; info: string | null
 }[] {
   return nahled.radky
     .filter(r => r.stav === 'ok' || r.stav === 'bez-telefonu')
@@ -242,6 +252,7 @@ export function kImportu(nahled: Nahled): {
       firma: r.firma.trim(),
       kontakt_jmeno: r.kontakt || null,
       telefon: normalizujTelefon(r.telefon),
+      email: r.email.trim() || null,
       info: r.info || null,
     }))
 }
