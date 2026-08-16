@@ -1129,3 +1129,16 @@ Během práce se tedy nestane nic; přenačte se jen záložka, která visela ot
 - **Middleware matcher (nález 22)** — cokoli začínající `icon`/`favicon`/`manifest` middlewarem neprojde. Neopraveno.
 - **Úklid projektů v Úkolech** — pojistka je v kódu a build prochází, ale odzkoušet ji od začátku do konce jde jen s přihlášením; **vykresleně ověřená není**.
 - Nálezy 7–9, 11, 13–24 z auditu leží dál (hlavičky, limit vstupu ve voice API, enumerace účtů, CSV formula injection, mrtvé soubory).
+
+## Upgrade Next.js 16.2.10 → 16.3.1
+Devět high advisories pryč, mezi nimi *Middleware / Proxy bypass in App Router applications using Turbopack* (GHSA-6gpp-xcg3-4w24) — middleware je v téhle appce jediná serverová brána, takže tohle bylo nejvážnější, co v repu leželo. Upgrade je nemajorový a spravil zároveň `sharp`, `postcss` i `nanoid`: **`npm audit` hlásí 0 zranitelností** (před upgradem 4 balíky, všechny high).
+
+Verze je v `package.json` zapsaná **přesně** (`16.3.1`), ne s caretem, jak to má repo u `react` a `react-dom` — `npm install next@16.3.1` tam caret dopsal sám.
+
+### Ověřeno
+- **Brána drží:** nepřihlášený dotaz na 13 chráněných rout (`/prehled`, `/ukoly`, `/finance`, `/habits`, `/cold-cally`, `/trenink`, `/focus`, `/goaly`, `/dluhy`, `/casovy-plan`, `/co-se-ucim`, `/admin`, `/cold-cally/novy`) vrací **307 → /login**, `/login` vrací 200. Po dočasném obejití brány (jen pro test vykreslení) a jejím vrácení znovu 307 — tedy ověřené v obou stavech, ne jen v tom příznivém.
+- **Vykreslení:** všech 15 stránek vrací HTTP 200 bez „Internal Server Error" ve výstupu; proklikání celé navigace v prohlížeči projde bez jediné chyby v konzoli a nadpisy sedí.
+- **Build, typy, testy:** `tsc --noEmit` čistý, produkční build projde, všech pět jednotkových sad (cold calls, Excel, časy návyků, posun dne, pořadí cviků) prošlo.
+
+### Co zůstalo
+Next 16 přejmenoval `middleware.ts` na `proxy.ts` (funkčnost stejná) a build to hlásí jako deprecation. **Nepřejmenovával jsem to** — je to jediná serverová brána appky a přejmenovávat ji v jednom kroku s upgradem frameworku znamená míchat dvě rizika dohromady. Zůstává jako samostatná úloha; do Next 17 to bude potřeba.
