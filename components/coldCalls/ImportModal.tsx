@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import Modal from '@/components/Modal'
-import { FileUp, Upload, AlertTriangle, CircleCheck, CircleX, PhoneOff } from 'lucide-react'
+import { FileUp, Upload, AlertTriangle, CircleCheck, CircleX, PhoneOff, MailX } from 'lucide-react'
 import { nactiSoubor, pripravNahled, kImportu, type Nahled, type NahledRadek } from '@/lib/coldCallsImport'
 
 const STAV: Record<NahledRadek['stav'], { label: string; barva: string; Icon: typeof CircleCheck }> = {
@@ -10,11 +10,13 @@ const STAV: Record<NahledRadek['stav'], { label: string; barva: string; Icon: ty
   'duplicita':    { label: 'Duplicita',      barva: 'var(--cc-ned-text)',  Icon: CircleX },
   'chybna-firma': { label: 'Chybná firma',   barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
   'chybne-cislo': { label: 'Chybný telefon', barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
-  'chybny-email': { label: 'Chybný e-mail',  barva: 'var(--cc-odm-text)',  Icon: AlertTriangle },
 }
 
 /** Řádky, které se do databáze nedostanou — vypsat proč, ne jen že. */
-const PRESKOCENO: NahledRadek['stav'][] = ['duplicita', 'chybna-firma', 'chybne-cislo', 'chybny-email']
+const PRESKOCENO: NahledRadek['stav'][] = ['duplicita', 'chybna-firma', 'chybne-cislo']
+
+/** Řádek se uloží, jen bez adresy — varování, ne chyba. */
+const BEZ_EMAILU = { label: 'Bez e-mailu', barva: 'var(--cc-zaj-text)', Icon: MailX }
 
 /**
  * Import leadů: vyber soubor → NÁHLED → teprve pak uložení.
@@ -124,8 +126,15 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                 {[
                   nahled.pocty.chybnaFirma && `${nahled.pocty.chybnaFirma}× firma kratší než 3 znaky`,
                   nahled.pocty.chybneCislo && `${nahled.pocty.chybneCislo}× telefon bez 9 číslic nebo s písmeny`,
-                  nahled.pocty.chybnyEmail && `${nahled.pocty.chybnyEmail}× e-mail bez zavináče nebo tečky`,
                 ].filter(Boolean).join(' · ')} — tyhle řádky se nenaimportují.
+              </span>
+            </div>
+          )}
+          {nahled.pocty.emailVynechan > 0 && (
+            <div style={{ fontSize: 13, color: 'var(--cc-zaj-text)', marginBottom: 12, display: 'flex', gap: 7, alignItems: 'flex-start' }}>
+              <MailX size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>
+                {nahled.pocty.emailVynechan}× e-mail bez zavináče nebo tečky — {nahled.pocty.emailVynechan === 1 ? 'ten lead se naimportuje' : 'ty leady se naimportují'} bez adresy.
               </span>
             </div>
           )}
@@ -141,7 +150,9 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
             border: '1px solid var(--border)', borderRadius: 12, marginBottom: 18,
           }}>
             {nahled.radky.map(r => {
-              const s = STAV[r.stav]
+              // U řádku, který projde, přebije zprávu o e-mailu jen chybějící
+              // telefon — to je závažnější než adresa, kterou stejně zahazujeme.
+              const s = r.emailVynechan && r.stav === 'ok' ? BEZ_EMAILU : STAV[r.stav]
               const preskoceno = PRESKOCENO.includes(r.stav)
               return (
                 <div key={r.cislo} style={{
@@ -161,9 +172,11 @@ export default function ImportModal({ isOpen, onClose, existujiciTelefony, onImp
                       {/* U chybného řádku je důležitější důvod než kontakt —
                           u telefonu se ukáže i to, co v souboru doopravdy je. */}
                       {r.duvod
-                        ? (r.stav === 'chybne-cislo' ? `${r.duvod} — „${r.telefon}"`
-                          : r.stav === 'chybny-email' ? `${r.duvod} — „${r.email}"` : r.duvod)
-                        : [r.kontakt, r.telefon, r.email, r.info].filter(Boolean).join(' · ') || 'bez kontaktu'}
+                        ? (r.stav === 'chybne-cislo' ? `${r.duvod} — „${r.telefon}"` : r.duvod)
+                        : [
+                          [r.kontakt, r.telefon, r.emailVynechan ? null : r.email, r.info].filter(Boolean).join(' · ') || 'bez kontaktu',
+                          r.emailVynechan ? `vadný e-mail „${r.email}" se vynechá` : null,
+                        ].filter(Boolean).join(' · ')}
                     </div>
                   </div>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: s.barva, flexShrink: 0 }}>

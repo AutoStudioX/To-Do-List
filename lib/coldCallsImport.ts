@@ -18,9 +18,14 @@ export type NahledRadek = {
   telefon: string
   email: string
   info: string
-  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybna-firma' | 'chybne-cislo' | 'chybny-email'
+  stav: 'ok' | 'bez-telefonu' | 'duplicita' | 'chybna-firma' | 'chybne-cislo'
   /** proč je řádek chybný — text z kontroly, ať uživatel nehádá */
   duvod?: string
+  /**
+   * E-mail neprošel kontrolou. Není to chyba řádku: lead se naimportuje,
+   * jen bez adresy. Bez firmy a bez čísla je lead k ničemu, bez e-mailu ne.
+   */
+  emailVynechan?: boolean
 }
 
 export type Nahled = {
@@ -30,7 +35,9 @@ export type Nahled = {
   radky: NahledRadek[]
   pocty: {
     celkem: number; kImportu: number; bezTelefonu: number; duplicit: number
-    chybnaFirma: number; chybneCislo: number; chybnyEmail: number; chybnych: number
+    chybnaFirma: number; chybneCislo: number; chybnych: number
+    /** naimportují se, jen bez e-mailu */
+    emailVynechan: number
   }
 }
 
@@ -189,8 +196,11 @@ function dopln(s: Sloupce, data: Mrizka): Sloupce {
  * záznamům, tak uvnitř souboru (stejná firma bývá v exportu dvakrát).
  *
  * Řádek, který neprojde kontrolou, se označí a NEnaimportuje — stejně jako
- * duplicita. Kontroluje se název firmy (aspoň tři znaky) a vyplněný telefon
- * (aspoň devět číslic, žádná písmena).
+ * duplicita. Tvrdá jsou dvě pole: název firmy (aspoň tři znaky) a vyplněný
+ * telefon (aspoň devět číslic, žádná písmena) — bez nich je lead k ničemu.
+ *
+ * Vadný e-mail řádek nezabíjí: naimportuje se bez adresy a v náhledu je to
+ * varování, ne chyba. Kvůli překlepu v mailu nemá smysl zahodit firmu i číslo.
  *
  * Řádek bez telefonu se naimportovat DÁ, jen je označený — číslo se dá
  * dohledat, ale ať uživatel ví, kolik jich bude. Prázdné pole není špatně
@@ -217,18 +227,17 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
     let duvod: string | undefined
     if (chybaF) { stav = 'chybna-firma'; duvod = chybaF }
     else if (chybaT) { stav = 'chybne-cislo'; duvod = chybaT }
-    else if (chybaE) { stav = 'chybny-email'; duvod = chybaE }
     else if (k && videne.has(k)) stav = 'duplicita'
     else if (!k) stav = 'bez-telefonu'
     else stav = 'ok'
     if (stav === 'ok') videne.add(k)
-    return { cislo: i + 1, firma, kontakt, telefon, email, info, stav, duvod }
+    return { cislo: i + 1, firma, kontakt, telefon, email, info, stav, duvod,
+      emailVynechan: !!chybaE || undefined }
   })
 
   const spocti = (s: NahledRadek['stav']) => radky.filter(r => r.stav === s).length
   const chybnaFirma = spocti('chybna-firma')
   const chybneCislo = spocti('chybne-cislo')
-  const chybnyEmail = spocti('chybny-email')
   return {
     sloupce, hlavicka, radky,
     pocty: {
@@ -236,7 +245,11 @@ export function pripravNahled(mrizka: Mrizka, existujiciTelefony: Iterable<strin
       kImportu: spocti('ok') + spocti('bez-telefonu'),
       bezTelefonu: spocti('bez-telefonu'),
       duplicit: spocti('duplicita'),
-      chybnaFirma, chybneCislo, chybnyEmail, chybnych: chybnaFirma + chybneCislo + chybnyEmail,
+      chybnaFirma, chybneCislo, chybnych: chybnaFirma + chybneCislo,
+      // Počítá se jen u řádků, které se opravdu uloží — u přeskočeného řádku
+      // by hláška „naimportuje se bez e-mailu" lhala.
+      emailVynechan: radky.filter(r => r.emailVynechan
+        && (r.stav === 'ok' || r.stav === 'bez-telefonu')).length,
     },
   }
 }
@@ -252,7 +265,8 @@ export function kImportu(nahled: Nahled): {
       firma: r.firma.trim(),
       kontakt_jmeno: r.kontakt || null,
       telefon: normalizujTelefon(r.telefon),
-      email: r.email.trim() || null,
+      // Vadná adresa se zahodí, řádek projde bez ní.
+      email: r.emailVynechan ? null : (r.email.trim() || null),
       info: r.info || null,
     }))
 }

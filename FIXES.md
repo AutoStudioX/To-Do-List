@@ -1035,3 +1035,17 @@ Migrace **0024** přidává `email text` na `cold_calls`. Sloupec je nepovinný 
 - **Jednotková tvrzení** (celkem 100): prázdný e-mail projde, chybí zavináč / tečka / je tam mezera → chyba, `jan+leady@firma.co.uk` projde; import pozná sloupec podle hlavičky, řádek s vadnou adresou dostane stav `chybny-email` a `kImportu` veze e-mail dál; CSV má nový sloupec i hodnotu.
 - **Vykreslené na 1440 i 390:** pole je čtvrté vedle telefonu (x 1041 hned za telefonem na 1440), na mobilu celou šířkou pod ním; vadná adresa dá červený rámeček a důvod pod polem, uložení se odmítne a zůstane se na stránce, po opravě hláška zmizí. Import CSV s hlavičkou „E-mail" naimportoval 2 ze 3 řádků, prostřední označil „Chybný e-mail". Seznam hovorů e-mail nezobrazuje.
 - **Opraveno při ověřování:** React hlásil do konzole míchání zkratky `border` s `borderColor` (pole formuláře přebarvují rámeček při chybě) — styl polí je teď v longhandech `borderWidth` / `borderStyle` / `borderColor` a konzole je čistá.
+
+## Cold cally — vadný e-mail už řádek nezabíjí
+Tvrdá zůstávají dvě pole: **firma** (aspoň tři znaky) a **telefon** (aspoň devět číslic, žádná písmena) — bez nich je lead k ničemu a řádek se přeskočí. **E-mail ne**: řádek s vadnou adresou se naimportuje **bez ní** a v náhledu je to **varování, ne chyba**. Kvůli překlepu v mailu nemá smysl zahodit firmu i číslo.
+
+- Stav `chybny-email` je zrušený; řádek má místo něj příznak `emailVynechan` a stav si drží podle firmy, telefonu a duplicity.
+- V náhledu má takový řádek žlutý štítek **„Bez e-mailu"** (ikona `MailX`), není přeškrtnutý, počítá se do „Naimportuje se" a na druhé řádce stojí, co se zahazuje: `vadný e-mail „dvorak-zavinac-firma.cz" se vynechá`.
+- Nad seznamem je vlastní žlutá věta „1× e-mail bez zavináče nebo tečky — ten lead se naimportuje bez adresy.", oddělená od červené věty o přeskočených řádcích. Do dlaždice „Chybných (přeskočí se)" se nepočítá.
+- Počítadlo `emailVynechan` bere jen řádky, které se opravdu uloží — u přeskočeného řádku by hláška „naimportuje se bez e-mailu" lhala.
+- `kImportu()` u takového řádku pošle `email: null`, ostatní pole beze změny.
+- **Ruční zápis zůstává přísný:** ve formuláři je vidět jedna adresa, dá se hned opravit a tiché zahození toho, co uživatel právě napsal, by bylo horší než hláška.
+
+### Ověřeno
+- **Jednotková tvrzení** (celkem 104): řádek s vadnou adresou má stav `ok` a příznak `emailVynechan`, do `chybnych` se nepočítá, `kImportu` vrátí `email: null` a firmu i telefon zachová; soubor se třemi řádky se naimportuje celý.
+- **Vykreslené na 1440 i 390:** soubor s pěti řádky (dobrý, vadný e-mail, bez e-mailu, krátká firma, chybný telefon) → „Naimportuje se 3", „Chybných 2", řádek s vadnou adresou má žlutý štítek „Bez e-mailu" a není přeškrtnutý, obě věty nad náhledem jsou oddělené a nic nepřetéká.
