@@ -1049,3 +1049,27 @@ Tvrdá zůstávají dvě pole: **firma** (aspoň tři znaky) a **telefon** (aspo
 ### Ověřeno
 - **Jednotková tvrzení** (celkem 104): řádek s vadnou adresou má stav `ok` a příznak `emailVynechan`, do `chybnych` se nepočítá, `kImportu` vrátí `email: null` a firmu i telefon zachová; soubor se třemi řádky se naimportuje celý.
 - **Vykreslené na 1440 i 390:** soubor s pěti řádky (dobrý, vadný e-mail, bez e-mailu, krátká firma, chybný telefon) → „Naimportuje se 3", „Chybných 2", řádek s vadnou adresou má žlutý štítek „Bez e-mailu" a není přeškrtnutý, obě věty nad náhledem jsou oddělené a nic nepřetéká.
+
+## Bezpečnostní audit — opravy 1–6
+Šest commitů na větvi `security-audit-fixes`, v pořadí, ve kterém byly nálezy vážné.
+
+**1 — přihlašovací RPC už nejsou veřejné (migrace 0025).** Funkce zámku měly `grant execute to anon` a anon klíč je v klientském bundlu. `reset_login_attempts` tak šel volat kýmkoli a kdykoli, takže se ochrana proti hrubé síle dala vynulovat mezi pokusy; `record_failed_login` bral IP jako parametr, takže pěti voláními šlo zamknout cizí účet a deseti natrvalo zablokovat libovolnou IP včetně majitelovy. Kontrolní i zápisové funkce teď smí jen `service_role` (volá je server přes `lib/supabase/admin.ts`), reset zůstal přihlášeným, ale účet si bere z `auth.uid()`. Postgres dává `EXECUTE` implicitně roli PUBLIC, takže revoke od `anon` samo o sobě nestačilo.
+
+**2 — načtení Úkolů už nesmaže všechny projekty.** Úklid „osiřelých" projektů běžel i tehdy, když dotaz na úkoly selhal; prázdná data znamenala „žádný projekt se nepoužívá" a smazalo se všechno. Úklid se teď spustí jen po úspěšných dotazech, každý zápis hlásí chybu a navíc se přeskočí, kdyby měl sebrat úplně všechno.
+
+**3 — 33 tichých zápisů.** Napříč osmi soubory se ignorovala chyba a uživatel viděl zelené „uloženo". Nejhorší byl řetěz ve Financích (NaN z částky → null → not-null → chyba zahozena) a potvrzení série v tréninku (série „potvrzená" jen v paměti). Optimistické překreslení se při chybě vrací zpátky.
+
+**4 — xlsx z CDN SheetJS (0.20.3).** Na npm je poslední 0.18.5 s prototype pollution a ReDoS a opravená verze tam není. Závislost teď míří na oficiální tarball, lockfile drží integrity hash. `npm audit` už xlsx nehlásí.
+
+**5 — planý poplach, přesto zapsáno explicitně (migrace 0026).** Audit tvrdil, že UPDATE bez `with check` pustí cvik do sdíleného katalogu. Postgres ale u UPDATE bez `with check` použije jako kontrolu výraz z `using`, takže to nikdy nešlo — ověřeno na původní politice. Explicitní zápis zůstává jako pojistka pro budoucí rozšíření `using`.
+
+**6 — RLS šesti tabulek konečně v repu (migrace 0027).** `ukoly, projekty, goaly, milniky, transakce, casovy_plan` vznikly ručně v dashboardu. Živě RLS drží, ale čisté nasazení by dostalo tabulky bez politik — a `useLiveData` je přihlašuje k Realtime. Migrace je idempotentní a nedestruktivní; definice sloupců je zrekonstruovaná z `lib/types.ts`, ne z běžící databáze.
+
+### Ověřeno
+- **Proti skutečnému Postgresu:** 0001+0003+0025 dvakrát bez chyby; `has_function_privilege` sedí (anon nikde, service_role u kontrolních, authenticated u resetu); pět neúspěchů zamkne účet, cizí přihlášený uživatel cizí zámek neodemkne, vlastník ano, anon dostane „permission denied". 0026 a 0027 taky dvakrát; po 0027 má všech šest tabulek `rls=true` a vlastnickou politiku, uživatel A vidí jen svoje řádky, anon nic a zápis pod cizím `user_id` skončí na RLS.
+- **Import Excelu s novou knihovnou:** vygenerovaný `.xlsx` projde stejně jako dřív (hlavička rozpoznaná, telefon zůstal textem, vadný e-mail varování, krátká firma přeskočená). Jednotkové testy nad importem a Excelem prošly.
+- **Statická kontrola:** v `app/`, `components/` a `lib/` nezůstal jediný zápis bez kontroly chyby.
+- **Přihlašovací stránka bez service-role klíče** se vykreslí normálně a do logu jde hláška, že zámek neběží — chybějící proměnná nesmí majitele zamknout venku.
+
+### Co ověřené NENÍ
+Cesta se skutečným service-role klíčem (nemám ho) a jakýkoli zápis pod přihlášeným uživatelem — na to bych se musel přihlásit heslem. Po nasazení projdi ručně: uložení úkolu, transakce a série v tréninku.

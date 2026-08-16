@@ -26,6 +26,8 @@ Copy `.env.local.example` to `.env.local` and fill in your Supabase credentials:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # server only, brute-force lockout
+ANTHROPIC_API_KEY=sk-ant-...                      # voice mode
 ```
 
 ## Pages
@@ -143,6 +145,12 @@ create table dluhy (
   created_at timestamptz default now()
 );
 
+-- NOTE: since migration 0027 these six tables (ukoly, projekty, goaly,
+-- milniky, transakce, casovy_plan) live in the repo — RLS and the owner-only
+-- policies are no longer dashboard-only knowledge. The block below is kept as
+-- documentation; `supabase/migrations/0027_core_tables_rls.sql` is the source
+-- of truth and is idempotent.
+
 -- Enable RLS
 -- NOTE: `transakce` is the real finance table (income, expenses, debts, fixed
 -- costs are all rows in it, discriminated by `typ`). The old split tables
@@ -212,7 +220,9 @@ Runs inside a **Next.js server action** (`app/login/actions.ts`), which reads th
 4. On error → `record_failed_login(email, ip)` → `{ email_locked, minutes_left, attempts_left, ip_blocked }`; show the matching message.
 5. On success → `reset_login_attempts(email, ip)`, then `redirect('/prehled')`.
 
-RPCs normalise the email, resolve it via `auth.users`, and are `SECURITY DEFINER` (bypass RLS), granted to `anon` (login is pre-auth) + `authenticated`.
+RPCs normalise the email, resolve it via `auth.users`, and are `SECURITY DEFINER` (bypass RLS). **Since migration 0025 they are NOT callable by `anon`** — the anon key ships in the client bundle, so anyone could call `reset_login_attempts` and clear the counter at will, or `record_failed_login` with someone else's IP to lock an account and block an address. `check_ip_block` / `check_login_lockout` / `record_failed_login` / `check_lock_state` are granted to `service_role` only and are called through `lib/supabase/admin.ts` (`SUPABASE_SERVICE_ROLE_KEY`, no `NEXT_PUBLIC_` prefix). `reset_login_attempts` stays open to `authenticated` but takes the account from `auth.uid()`, never from its argument, and runs right after a successful sign-in. Postgres grants `EXECUTE` to `PUBLIC` by default, so revoking from `anon` alone is not enough — revoke from `public` too.
+
+Without `SUPABASE_SERVICE_ROLE_KEY` the app still works, just without the lockout (a server-side `console.error` says so). A missing env var must never lock the owner out.
 
 ⚠️ **Known limit — be honest about it.** The server action still calls Supabase auth with the public anon flow; an attacker calling the GoTrue API directly **bypasses** these RPCs. Backstop = Supabase's built-in **per-IP** rate limit (`sign_in_sign_ups` = 30 / 5 min / IP; Dashboard → Authentication → Rate Limits). The unbypassable version needs the paid **Password Verification Attempt** hook (Team/Enterprise only). For this app the combination is adequate.
 
@@ -262,6 +272,8 @@ update public.login_lockout set failed_attempts = 0, locked_until = null
 - **Cold cally: the same check guards the form and the import.** `firmaChyba` / `telefonChyba` / `normalizujTelefon` in `lib/coldCalls.ts` are the only source — firma ≥ 3 characters, a filled-in phone ≥ 9 digits and no letters (separators and `+420` are counted out, not rejected). An empty phone is not an error: a lead can be imported without a number and get it later. Only firma and telefon are hard: a row that fails one of them is marked in the preview and skipped like a duplicate, while a malformed e-mail is a warning — the lead imports without the address (`emailVynechan`), because a typo in the mail is no reason to throw away the company and the number; the manual form refuses to save and says why, under the field and in the toast. Phones are stored in one shape, `+420 777 123 456` — nine bare digits get +420, a foreign prefix stays, spaces every three digits — and `telefonKlic` keeps deduplicating on the last 9 digits so the format can't split one company into two records.
 - **Native controls need `color-scheme`, not just CSS variables.** Scrollbars, the textarea resize grip and other browser-drawn chrome ignore the app's variables — in dark mode they render white inside a black card. The theme sets `color-scheme: light` / `dark` next to the variables, plus a thin scrollbar painted from `--border` / `--muted`; `.hide-scrollbar` still wins where a scrollbar shouldn't show at all.
 - **„Info o firmě" is a bullet list, not a text box.** Each bullet is its own input in a grid — two columns filled row-wise on desktop (1 left, 2 right, 3 under 1), one column at 390 px, and a lone bullet spans the full width. A `<textarea>` can't do columns and CSS `columns: 2` fills column-wise, which reverses the reading order. The column stays one text (`– a\n– b`); empty bullets survive while typing and are dropped by `ocistiInfo()` on save.
+- **A write whose error isn't checked is a lie to the user.** Every `insert` / `update` / `delete` / `upsert` checks `error`, reports it with a red toast including the reason, and shows the success toast only afterwards. Optimistic UI rolls back on failure. This is the rule the app broke in 33 places before the security audit — a failed insert with a green "saved" toast is worse than a crash, because the data is simply gone.
+- **Destructive cleanup only runs on data you know is complete.** The Tasks page prunes project rows that no task references; when the task query fails, "no task references anything" and the cleanup wipes every project. Any automatic delete must first verify that the queries it reasons from succeeded, and refuse to delete *everything* at once.
 - **Route names are Czech; keep redirects for any renamed/English path.** The goals page lives at `/goaly`; `/goals` (and `/goals/:path*`) permanently redirect to it via `next.config.ts` so bookmarked/external links don't 404. Add a similar redirect whenever a route is renamed.
 
 ## Dialogy a zpětná vazba (platí pro všechny projekty)
