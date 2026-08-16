@@ -31,6 +31,23 @@ function smaz(klic: string) {
   try { localStorage.removeItem(PREFIX + klic) } catch { console.warn('[draft] smazání se nepovedlo:', klic) }
 }
 
+/**
+ * Smaže VŠECHNY rozepsané záznamy. Volá se při odhlášení.
+ *
+ * Drafty nesou skutečné osobní údaje — rozepsaný hovor obsahuje jméno, telefon
+ * i e-mail leada. V `localStorage` přežijí odhlášení, takže bez tohohle by je
+ * na sdíleném zařízení našel další uživatel (a jakékoli XSS taky).
+ */
+export function smazVsechnyDrafty() {
+  try {
+    for (const klic of Object.keys(localStorage)) {
+      if (klic.startsWith(PREFIX)) localStorage.removeItem(klic)
+    }
+  } catch {
+    console.warn('[draft] úklid při odhlášení se nepovedl')
+  }
+}
+
 export function nactiDraft<T>(klic: string): T | null {
   try {
     const s = localStorage.getItem(PREFIX + klic)

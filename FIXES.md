@@ -1103,3 +1103,29 @@ Během práce se tedy nestane nic; přenačte se jen záložka, která visela ot
 ### Ověřeno vykreslené
 - **Čerstvá stránka (17 s) + tři návraty na záložku** → nepřenačetla se, rozepsaná reflexe zůstala.
 - **Stránka předstírající stáří 9 hodin + návrat na záložku** → přenačetla se (kontrolní značka v `window` zmizela, stáří dokumentu se vynulovalo) a rozepsaný text se hned vrátil z draftu. I ta jediná povolená obnova tedy nic nestojí.
+
+## Kontrola po opravách
+**Nový nález, který přebíjí všechno ostatní: `next@16.2.10` má devět high advisories** a mezi nimi *Middleware / Proxy bypass in App Router applications using Turbopack* (GHSA-6gpp-xcg3-4w24). Middleware je v téhle appce **jediná serverová brána** — obchází se jím přesměrování na `/login`. Data drží RLS (ověřeno), ale gate padá. Oprava je nemajorová: `next@16.3.1`, a spraví zároveň `sharp`, `postcss` i `nanoid`.
+
+**Vlastní regrese z opravy draftů:** rozepsaný záznam hovoru leží v `localStorage` v čitelné podobě i s osobními údaji (`{"firma":…,"kontakt_jmeno":"Veronika Šimková","telefon":"728 660 341","email":…}`) a **odhlášení ho nemazalo**. Opraveno: `smazVsechnyDrafty()` v `lib/useDraft.ts` se volá v odhlášení. Ověřeno vykreslené: před odhlášením `draft:hovor:novy`, po odhlášení prázdno.
+
+### Co po opravách drží (ověřeno, ne jen přečteno)
+| Oprava | Jak ověřeno | Stav |
+|---|---|---|
+| anon nesmí na lockout RPC | živý dotaz: `anon=401`, `service_role=200` | drží |
+| service-role klíč mimo klientský bundle | grep `.next/static` **s kontrolním vzorkem** — anon klíč nalezen (test není slepý), tajné klíče 0× | drží |
+| fail-closed zámek | rozbitý klíč → formulář zamčený s hláškou; správný klíč → normální stav | drží |
+| zápisy hlásí chybu | staticky 0 nekontrolovaných zápisů; vykresleně: uložení hovoru bez session → červený toast „Uložení selhalo: nejsi přihlášený", stránka zůstala | drží |
+| prázdné catch bloky | 0 v `app/`, `components/`, `lib/` | drží |
+| xlsx | nainstalovaná 0.20.3 z CDN, `npm audit` už ji nehlásí | drží |
+| appka se nepřenačítá sama | jediný `location.reload()` je StaleReloader (8 h + návrat) | drží |
+| RLS šesti tabulek | anon dotaz vrací prázdno u všech | drží |
+| zbytky po testech | `check_lock_state` pro veřejnou IP: `locked:false, ip_blocked:false` | čisto |
+
+### Co NEdrží nebo se vůbec neopravovalo
+- **`next@16.2.10`** — viz výš. Neopraveno, čeká na rozhodnutí (upgrade frameworku je větší zásah než tahle kontrola).
+- **IP hlavičky (nález 10)** — `x-forwarded-for` se pořád bere bez ověření proxy. **Nikdy se neopravovalo**, jen popsalo.
+- **Migrace 0026** — chování nemění (Postgres bere `using` jako implicitní `with check`); je to dokumentace záměru, ne oprava díry. Přiznáno už v jejím komentáři.
+- **Middleware matcher (nález 22)** — cokoli začínající `icon`/`favicon`/`manifest` middlewarem neprojde. Neopraveno.
+- **Úklid projektů v Úkolech** — pojistka je v kódu a build prochází, ale odzkoušet ji od začátku do konce jde jen s přihlášením; **vykresleně ověřená není**.
+- Nálezy 7–9, 11, 13–24 z auditu leží dál (hlavičky, limit vstupu ve voice API, enumerace účtů, CSV formula injection, mrtvé soubory).

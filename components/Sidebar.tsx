@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { LayoutDashboard, CheckSquare, TrendingUp, Target, LogOut, X, Zap, LockKeyhole, Dumbbell, Crosshair, Flame, Phone } from 'lucide-react'
 import AutoStudioLogo from './AutoStudioLogo'
 import { createClient } from '@/lib/supabase/client'
+import { smazVsechnyDrafty } from '@/lib/useDraft'
 
 const navItems = [
   { href: '/prehled', label: 'Přehled', icon: LayoutDashboard },
@@ -38,6 +39,9 @@ export default function Sidebar({ isOpen, onClose }: Props) {
   const items = isAdmin ? [...navItems, { href: '/admin', label: 'Admin', icon: LockKeyhole }] : navItems
 
   async function handleLogout() {
+    // Rozepsané záznamy nesou osobní údaje (jméno, telefon, e-mail leada)
+    // a v localStorage by odhlášení přežily.
+    smazVsechnyDrafty()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
