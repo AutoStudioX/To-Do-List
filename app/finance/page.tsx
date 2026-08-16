@@ -65,7 +65,8 @@ export default function FinancePage() {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) return
-      await seedRecurring(supabase, user.id)
+      const seedErr = await seedRecurring(supabase, user.id)
+      if (seedErr) showToast(`Opakované položky se nezaložily: ${seedErr}`, 'error')
       const { data } = await supabase.from('transakce').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       setTransactions(data || [])
     } catch { } finally { setLoading(false) }
@@ -147,15 +148,20 @@ export default function FinancePage() {
       klient: form.typ === 'prijem' ? (form.klient || null) : null,
       poznamka: form.poznamka || null,
     }
+    let error = null
     if (editTx) {
-      await supabase.from('transakce').update(payload).eq('id', editTx.id)
+      ;({ error } = await supabase.from('transakce').update(payload).eq('id', editTx.id))
     } else {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) { setSaving(false); return }
-      await supabase.from('transakce').insert({ ...payload, user_id: user.id })
+      ;({ error } = await supabase.from('transakce').insert({ ...payload, user_id: user.id }))
     }
-    setSaving(false); setModal(false); setEditTx(null); setFormErrors({}); load()
+    setSaving(false)
+    // Potvrzení až po zápisu — dřív se hlásilo „Záznam přidán" i tehdy, když
+    // insert spadl (třeba na částce, ze které vyšlo NaN).
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setModal(false); setEditTx(null); setFormErrors({}); load()
     showToast(editTx ? 'Záznam upraven' : 'Záznam přidán')
   }
 

@@ -64,34 +64,41 @@ export default function DluhyPage() {
     setSaving(true)
     const typ = editDebt ? editDebt.typ : 'dluh' as const
     const payload = { nazev: form.nazev, castka: Number(form.castka), datum: form.datum || null, typ, smer: form.smer || null, status: form.status, poznamka: form.poznamka || null }
+    let error = null
     if (editDebt) {
-      await supabase.from('transakce').update(payload).eq('id', editDebt.id)
+      ;({ error } = await supabase.from('transakce').update(payload).eq('id', editDebt.id))
     } else {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) { setSaving(false); return }
-      await supabase.from('transakce').insert({ ...payload, user_id: user.id })
+      ;({ error } = await supabase.from('transakce').insert({ ...payload, user_id: user.id }))
     }
-    setSaving(false); setModal(false); setEditDebt(null); setFormErrors({}); load()
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setModal(false); setEditDebt(null); setFormErrors({}); load()
     showToast(editDebt ? 'Dluh upraven' : 'Dluh přidán')
   }
 
   async function toggleStatus(d: Transaction) {
     const newStatus = d.status === 'splaceno' ? 'nesplaceno' : 'splaceno'
-    await createClient().from('transakce').update({ status: newStatus }).eq('id', d.id)
+    const { error } = await createClient().from('transakce').update({ status: newStatus }).eq('id', d.id)
+    if (error) { showToast(`Změna stavu selhala: ${error.message}`, 'error'); return }
     load()
+    showToast(newStatus === 'splaceno' ? 'Označeno jako splacené' : 'Označeno jako nesplacené')
   }
 
   async function deleteDebt(id: string) {
     if (!await confirm('Smazat dluh?')) return
     const supabase = createClient()
     const record = debts.find(d => d.id === id)
-    if (record?.typ === 'prijem') {
-      await supabase.from('transakce').update({ status: 'ceka' }).eq('id', id)
-    } else {
-      await supabase.from('transakce').delete().eq('id', id)
-    }
+    // Dluh vzniklý z příjmu se nemaže, jen se vrátí do stavu „čeká" —
+    // původní příjem musí zůstat ve financích.
+    const { error } = record?.typ === 'prijem'
+      ? await supabase.from('transakce').update({ status: 'ceka' }).eq('id', id)
+      : await supabase.from('transakce').delete().eq('id', id)
+    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
     load()
+    showToast('Dluh smazán')
   }
 
   const myDebts = debts.filter(d => d.smer === 'moje')

@@ -244,10 +244,14 @@ export default function ActiveWorkoutPage() {
     if (!it || !s) return
     const payload = { workout_id: id, exercise_id: it.exercise.id, order_index: ex, weight_kg: s.weight, reps: s.reps, is_warmup: s.is_warmup, to_failure: s.to_failure }
     if (s.confirmed && s.id) {
-      await supabase.from('workout_sets').update(payload).eq('id', s.id)
+      const { error } = await supabase.from('workout_sets').update(payload).eq('id', s.id)
+      if (error) { showToast(`Série se neuložila: ${error.message}`, 'error'); return }
       patchSet(ex, set, { prefilled: false })
     } else {
-      const { data } = await supabase.from('workout_sets').insert(payload).select().single()
+      const { data, error } = await supabase.from('workout_sets').insert(payload).select().single()
+      // Bez kontroly zůstala série „potvrzená" jen na obrazovce a po obnovení
+      // stránky zmizela — počítadlo i objem pak lhaly.
+      if (error) { showToast(`Série se neuložila: ${error.message}`, 'error'); return }
       patchSet(ex, set, { confirmed: true, prefilled: false, id: data?.id ?? null })
     }
     setSelectedKey(null)
@@ -302,7 +306,10 @@ export default function ActiveWorkoutPage() {
     if (!s) return
     const nv = !s.is_warmup
     patchSet(ex, set, { is_warmup: nv })
-    if (s.confirmed && s.id) await supabase.from('workout_sets').update({ is_warmup: nv }).eq('id', s.id)
+    if (s.confirmed && s.id) {
+      const { error } = await supabase.from('workout_sets').update({ is_warmup: nv }).eq('id', s.id)
+      if (error) { patchSet(ex, set, { is_warmup: !nv }); showToast(`Změna se neuložila: ${error.message}`, 'error') }
+    }
   }
 
   // „Do selhání" je zatím JEN ZÁZNAM — nesahá na objem, na statistiky ani na
@@ -312,7 +319,10 @@ export default function ActiveWorkoutPage() {
     if (!s) return
     const nv = !s.to_failure
     patchSet(ex, set, { to_failure: nv })
-    if (s.confirmed && s.id) await supabase.from('workout_sets').update({ to_failure: nv }).eq('id', s.id)
+    if (s.confirmed && s.id) {
+      const { error } = await supabase.from('workout_sets').update({ to_failure: nv }).eq('id', s.id)
+      if (error) { patchSet(ex, set, { to_failure: !nv }); showToast(`Změna se neuložila: ${error.message}`, 'error') }
+    }
   }
 
   async function addExercise(ex: Exercise) {
@@ -388,7 +398,8 @@ export default function ActiveWorkoutPage() {
   async function addCustomExercise(name: string) {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
-    const { data } = await supabase.from('exercises').insert({ user_id: session.user.id, name, is_custom: true }).select().single()
+    const { data, error } = await supabase.from('exercises').insert({ user_id: session.user.id, name, is_custom: true }).select().single()
+    if (error) { showToast(`Cvik se nepodařilo přidat: ${error.message}`, 'error'); return }
     if (data) { setCatalog(c => [...c, data as Exercise]); addExercise(data as Exercise) }
   }
 
@@ -435,7 +446,9 @@ export default function ActiveWorkoutPage() {
     const arr = [...items]; const [m] = arr.splice(ex, 1); arr.splice(to, 0, m)
     for (let i = 0; i < arr.length; i++) {
       const ids = arr[i].sets.filter(s => s.confirmed && s.id).map(s => s.id as string)
-      if (ids.length) await supabase.from('workout_sets').update({ order_index: i }).in('id', ids)
+      if (!ids.length) continue
+      const { error } = await supabase.from('workout_sets').update({ order_index: i }).in('id', ids)
+      if (error) { showToast(`Pořadí cviků se neuložilo: ${error.message}`, 'error'); break }
     }
     // Pořadí drží i plán — po obnovení se cviky mají seřadit stejně.
     await planExercises(arr.map(a => a.exercise.id))

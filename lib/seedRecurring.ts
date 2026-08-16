@@ -1,25 +1,34 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
-export async function seedRecurring(supabase: SupabaseClient, userId: string) {
+/**
+ * Založí letošní/tenhle měsíc chybějící opakované položky.
+ *
+ * Vrací chybu místo aby ji spolkl: zakládají se tu peníze a tiché selhání
+ * znamená, že v přehledu prostě chybí příjem, o kterém nikdo neví (audit,
+ * nález 3). Volající ji ukáže toastem.
+ */
+export async function seedRecurring(supabase: SupabaseClient, userId: string): Promise<string | null> {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const yearMonth = `${year}-${month}`
 
-  const { data: recurring } = await supabase
+  const { data: recurring, error: recErr } = await supabase
     .from('transakce')
     .select('*')
     .eq('user_id', userId)
     .in('opakovani', ['mesicni', 'rocni'])
     .in('typ', ['prijem', 'vydaj'])
 
-  if (!recurring?.length) return
+  if (recErr) return recErr.message
+  if (!recurring?.length) return null
 
-  const { data: existing } = await supabase
+  const { data: existing, error: exErr } = await supabase
     .from('transakce')
     .select('nazev, typ, datum')
     .eq('user_id', userId)
     .gte('datum', `${year}-01-01`)
+  if (exErr) return exErr.message
 
   const inserts: Record<string, unknown>[] = []
   const seen = new Set<string>()
@@ -69,6 +78,8 @@ export async function seedRecurring(supabase: SupabaseClient, userId: string) {
   }
 
   if (inserts.length) {
-    await supabase.from('transakce').insert(inserts)
+    const { error } = await supabase.from('transakce').insert(inserts)
+    if (error) return error.message
   }
+  return null
 }

@@ -160,26 +160,36 @@ export default function UkolyPage() {
     const user = session?.user
     if (!user) return
     const payload = { nazev: form.nazev, priorita: form.priorita, deadline: form.deadline || null, deadline_time: form.deadline_time || null, status: form.status, projekt: form.projekt || null }
-    if (editTask) {
-      await supabase.from('ukoly').update(payload).eq('id', editTask.id)
-    } else {
-      await supabase.from('ukoly').insert({ ...payload, user_id: user.id })
-    }
-    setSaving(false); setModalOpen(false); setFormError(''); load()
+    const { error } = editTask
+      ? await supabase.from('ukoly').update(payload).eq('id', editTask.id)
+      : await supabase.from('ukoly').insert({ ...payload, user_id: user.id })
+    setSaving(false)
+    // Potvrzení až po zápisu: dřív se hlásilo „Úkol přidán" i tehdy, když
+    // insert spadl, a úkol prostě nikde nebyl.
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setModalOpen(false); setFormError(''); load()
     showToast(editTask ? 'Úkol upraven' : 'Úkol přidán')
   }
 
   const deleteTask = useCallback(async (id: string) => {
     if (!await confirm('Smazat úkol?')) return
-    await createClient().from('ukoly').delete().eq('id', id)
+    const { error } = await createClient().from('ukoly').delete().eq('id', id)
+    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
     load()
     showToast('Úkol smazán')
   }, [confirm, load, showToast])
 
   const toggleTask = useCallback(async (task: Task) => {
     const newStatus = task.status === 'Done' ? 'Todo' : 'Done'
-    await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
+    // Optimistické překreslení: při chybě se vrátí zpátky, ať odškrtnutý úkol
+    // nezůstane odškrtnutý jen na obrazovce.
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+    const { error } = await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
+    if (error) {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+      showToast(`Změna stavu selhala: ${error.message}`, 'error')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const toggleExpand = useCallback((id: string) => {

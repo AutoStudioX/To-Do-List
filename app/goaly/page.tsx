@@ -128,12 +128,15 @@ export default function GoalyPage() {
     let error
     if (editGoal) {
       ;({ error } = await supabase.from('goaly').update(extendedPayload).eq('id', editGoal.id))
-      if (error?.code === '42703') await supabase.from('goaly').update(payload).eq('id', editGoal.id)
+      // 42703 = sloupec neexistuje (starší schéma) — zkusí se holý payload.
+      if (error?.code === '42703') ({ error } = await supabase.from('goaly').update(payload).eq('id', editGoal.id))
     } else {
       ;({ error } = await supabase.from('goaly').insert({ ...extendedPayload, user_id: user.id }))
-      if (error?.code === '42703') await supabase.from('goaly').insert({ ...payload, user_id: user.id })
+      if (error?.code === '42703') ({ error } = await supabase.from('goaly').insert({ ...payload, user_id: user.id }))
     }
-    setSaving(false); setGoalModal(false); setGoalError(''); load()
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setGoalModal(false); setGoalError(''); load()
     showToast(editGoal ? 'Goal upraven' : 'Goal přidán')
   }
 
@@ -144,25 +147,30 @@ export default function GoalyPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setSaving(false); return }
-    await supabase.from('milniky').insert({ nazev: msForm.nazev, deadline: msForm.deadline || null, goal_id: milestoneGoalId, user_id: user.id, done: false })
-    setSaving(false); setMilestoneModal(false); setMsError(''); load()
+    const { error } = await supabase.from('milniky').insert({ nazev: msForm.nazev, deadline: msForm.deadline || null, goal_id: milestoneGoalId, user_id: user.id, done: false })
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setMilestoneModal(false); setMsError(''); load()
     showToast('Krok přidán')
   }
 
   async function toggleMilestone(m: Milestone) {
-    await createClient().from('milniky').update({ done: !m.done }).eq('id', m.id)
+    const { error } = await createClient().from('milniky').update({ done: !m.done }).eq('id', m.id)
+    if (error) { showToast(`Změna kroku selhala: ${error.message}`, 'error'); return }
     load()
   }
 
   async function deleteGoal(id: string) {
     if (!await confirm('Smazat goal?')) return
-    await createClient().from('goaly').delete().eq('id', id)
+    const { error } = await createClient().from('goaly').delete().eq('id', id)
+    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
     load(); showToast('Goal smazán')
   }
 
   async function deleteMilestone(id: string) {
-    await createClient().from('milniky').delete().eq('id', id)
-    load()
+    const { error } = await createClient().from('milniky').delete().eq('id', id)
+    if (error) { showToast(`Smazání kroku selhalo: ${error.message}`, 'error'); return }
+    load(); showToast('Krok smazán')
   }
 
   if (loading) return <div style={{ color: 'var(--muted)', padding: 24 }}>Načítání...</div>

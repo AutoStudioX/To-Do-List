@@ -54,7 +54,8 @@ export default function PrehledPage() {
       const user = session?.user
       if (!user) return
       setUserEmail(user.email ?? null)
-      await seedRecurring(supabase, user.id)
+      const seedErr = await seedRecurring(supabase, user.id)
+      if (seedErr) showToast(`Opakované položky se nezaložily: ${seedErr}`, 'error')
       const [tr, gr, txr, pr] = await Promise.all([
         supabase.from('ukoly').select('*').eq('user_id', user.id),
         supabase.from('goaly').select('*').eq('user_id', user.id),
@@ -96,8 +97,14 @@ export default function PrehledPage() {
 
   async function checkTask(task: Task) {
     const newStatus = task.status === 'Done' ? 'Todo' : 'Done'
-    await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
+    // Optimistické překreslení; při chybě se vrátí zpátky, ať odškrtnutý úkol
+    // nezůstane odškrtnutý jen na obrazovce.
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+    const { error } = await createClient().from('ukoly').update({ status: newStatus }).eq('id', task.id)
+    if (error) {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+      showToast(`Změna stavu selhala: ${error.message}`, 'error')
+    }
   }
 
   async function saveTransaction() {
@@ -111,7 +118,7 @@ export default function PrehledPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setSaving(false); return }
-    const { data } = await supabase.from('transakce').insert({
+    const { data, error } = await supabase.from('transakce').insert({
       nazev: txForm.typ === 'prijem' ? txForm.klient : txForm.nazev,
       klient: txForm.typ === 'prijem' ? txForm.klient : null,
       castka: Number(txForm.castka),
@@ -123,8 +130,10 @@ export default function PrehledPage() {
       poznamka: txForm.poznamka || null,
       user_id: user.id,
     }).select().single()
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
     if (data) setTransactions(prev => [data, ...prev])
-    setSaving(false); setAddModal(null); setFormErrors({})
+    setAddModal(null); setFormErrors({})
     setTxForm({ nazev: '', klient: '', castka: '', datum: new Date().toISOString().split('T')[0], typ: 'prijem', status: 'ceka', kategorie: '', opakovani: 'jednorazovy', smer: 'moje', poznamka: '' })
     showToast('Transakce přidána')
   }
@@ -136,12 +145,14 @@ export default function PrehledPage() {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) { setSaving(false); return }
-    const { data } = await supabase.from('ukoly').insert({
+    const { data, error } = await supabase.from('ukoly').insert({
       nazev: taskForm.nazev, priorita: taskForm.priorita,
       deadline: taskForm.deadline || null, deadline_time: taskForm.deadline_time || null, status: taskForm.status, projekt: taskForm.projekt || null, user_id: user.id,
     }).select().single()
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
     if (data) setTasks(prev => [data, ...prev])
-    setSaving(false); setAddModal(null); setFormErrors({})
+    setAddModal(null); setFormErrors({})
     setTaskForm({ nazev: '', priorita: 'High', deadline: todayISO(), deadline_time: '', status: 'Todo', projekt: '' })
     showToast('Úkol přidán')
   }
@@ -157,7 +168,7 @@ export default function PrehledPage() {
       : goalForm.typ === 'number' && goalForm.target_value ? Math.min(100, Math.round(Number(goalForm.current_value) / Number(goalForm.target_value) * 100))
       : goalForm.typ === 'income' && goalForm.target_value ? Math.min(100, Math.round(monthIncome / Number(goalForm.target_value) * 100))
       : 0
-    const { data } = await supabase.from('goaly').insert({
+    const { data, error } = await supabase.from('goaly').insert({
       nazev: goalForm.nazev, deadline: goalForm.deadline || null,
       popis: goalForm.popis || null, progress,
       status: goalForm.status, user_id: user.id,
@@ -165,8 +176,10 @@ export default function PrehledPage() {
       target_value: goalForm.target_value ? Number(goalForm.target_value) : null,
       current_value: goalForm.current_value ? Number(goalForm.current_value) : null,
     }).select().single()
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
     if (data) setGoals(prev => [...prev, data])
-    setSaving(false); setAddModal(null); setFormErrors({})
+    setAddModal(null); setFormErrors({})
     setGoalForm({ nazev: '', deadline: todayISO(), popis: '', typ: 'manual', progress: 0, current_value: '', target_value: '', status: 'active' })
     showToast('Goal přidán')
   }
@@ -222,10 +235,12 @@ export default function PrehledPage() {
     } else if (typ === 'income') {
       return // income is auto, nothing to do
     }
-    await supabase.from('goaly').update(updates).eq('id', goal.id)
+    const { error } = await supabase.from('goaly').update(updates).eq('id', goal.id)
+    if (error) { showToast(`Uložení pokroku selhalo: ${error.message}`, 'error'); return }
     setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, ...updates } as Goal : g))
     setQuickGoalId(null)
     setQuickValue('')
+    showToast('Pokrok uložen')
   }
 
   // Goal ring: single goal → show its progress; multiple → show % completed

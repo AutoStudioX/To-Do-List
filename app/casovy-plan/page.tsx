@@ -77,18 +77,20 @@ export default function CasovyPlanPage() {
     const user = session?.user
     if (!user) return
     const payload = { nazev: form.nazev, den: form.den, od: form.od, do: form.do, barva: form.barva, kategorie: form.kategorie }
-    if (editBlock) {
-      await supabase.from('casovy_plan').update(payload).eq('id', editBlock.id)
-    } else {
-      await supabase.from('casovy_plan').insert({ ...payload, user_id: user.id })
-    }
-    setSaving(false); setModal(false); setFormError(''); load()
+    const { error } = editBlock
+      ? await supabase.from('casovy_plan').update(payload).eq('id', editBlock.id)
+      : await supabase.from('casovy_plan').insert({ ...payload, user_id: user.id })
+    setSaving(false)
+    if (error) { showToast(`Uložení selhalo: ${error.message}`, 'error'); return }
+    setModal(false); setFormError(''); load()
     showToast(editBlock ? 'Blok upraven' : 'Blok přidán')
   }
 
   async function deleteBlock(id: string) {
     if (!await confirm('Smazat blok?')) return
-    await createClient().from('casovy_plan').delete().eq('id', id); load()
+    const { error } = await createClient().from('casovy_plan').delete().eq('id', id)
+    if (error) { showToast(`Smazání selhalo: ${error.message}`, 'error'); return }
+    load()
     showToast('Blok smazán')
   }
 
