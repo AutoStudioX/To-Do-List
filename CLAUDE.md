@@ -276,10 +276,49 @@ update public.login_lockout set failed_attempts = 0, locked_until = null
 
 ## Pravidla z bezpečnostního auditu (platí pro všechny projekty)
 
-Pět pravidel, každé vzniklo na konkrétním bugu v týhle appce. Nejsou akademická
-— u každého je napsané, co se rozbilo, když se nedodrželo.
+Šest pravidel, každé vzniklo na konkrétním bugu. Nejsou akademická — u každého
+je napsané, co se rozbilo, když se nedodrželo. První je z nich nejdůležitější:
+kdyby se dodrželo, o zbylých pěti by se vědělo dřív, než na nich stála reálná
+data.
 
-### 1. Každý zápis do databáze kontroluje `error`, potvrzení až po něm
+### 1. Před nasazením s reálnými daty vždycky KOMPLETNÍ bezpečnostní audit
+
+Ne až potom, ne namátkově, ne „projdi místa, kde čekáš problém". Kompletní
+znamená **soubor po souboru celý repozitář**, včetně souborů, které git
+ignoruje, a včetně historie commitů.
+
+**Reálná data** = skutečná jména, telefony a e-maily (i cizí, třeba nahrané
+leady), čísla dokladů a smluv, firemní finance, zdravotní údaje, cokoli, co by
+se nesmělo objevit ve veřejném odkazu. Testovací data jsou „Alfa s.r.o." a
+„777 123 456". Jakmile do appky půjde první skutečný záznam, je pozdě.
+
+Audit musí projít aspoň tohle:
+
+1. **Klíče, hesla a tokeny** natvrdo v kódu i v souborech na disku (i těch
+   gitignorovaných) a v celé historii gitu.
+2. **RLS**: kde chybí filtr na uživatele, kde je `using (true)`, kde se něco
+   volá service-role klíčem a obchází tím práva. Ověř to i zvenku — dotazem
+   veřejným klíčem, ne jen čtením migrací.
+3. **API routy bez ověření přihlášení** a bez limitu na vstup.
+4. **Data, která se posílají klientovi** a neměla by (osobní údaje, interní
+   pole, cizí řádky).
+5. **Validace vstupů** — kde jde poslat cokoli.
+6. **Spolykané chyby**, které skryjí selhání zápisu (pravidla 2 a 3 níž).
+7. **Mrtvé soubory, skripty a migrace**, které už nikdo nepoužívá, ale pořád
+   něco drží (grant, politiku, závislost).
+
+Skill `/security-review` tohle NENAHRAZUJE — ten čte rozdíl na větvi, tohle je
+sken celého repa. Používej oba: `/security-review` průběžně, celý audit před
+prvním ostrým nasazením a po každé změně přístupového modelu (nová tabulka,
+nová RPC, nový klíč, nová role).
+
+**Vzniklo na:** property, To-Do i Jarvis běžely měsíce s reálnými daty a audit
+až zpětně našel, že přihlašovací zámek failoval otevřeně, že se dá injektovat
+vstup a že do klienta tekly osobní údaje. Nic z toho nebyla exotika — všechno
+by se našlo jedním systematickým průchodem, kdyby proběhl dřív, než v databázi
+byla cizí jména a čísla.
+
+### 2. Každý zápis do databáze kontroluje `error`, potvrzení až po něm
 
 `insert` / `update` / `delete` / `upsert` / `rpc`, které něco mění: vždycky
 `if (error) { showToast('… selhalo: ' + error.message, 'error'); return }` a
@@ -293,7 +332,7 @@ chyběly a nikdo nevěděl proč. Stejná díra byla u potvrzení série v trén
 série zůstala „potvrzená" jen v paměti, po obnovení stránky zmizela a
 počítadlo i objem lhaly. Celkem **33 míst v 8 souborech** (audit, nález 3).
 
-### 2. Žádné prázdné `catch` bloky
+### 3. Žádné prázdné `catch` bloky
 
 `catch { }` je zákaz. Buď se chyba ukáže uživateli (toast), nebo aspoň
 `console.warn` s kontextem — a v komentáři musí být napsané proč to stačí.
@@ -304,7 +343,7 @@ stránka vypadala jako „zatím tu nic není" a uživatel klidně zadal záznam
 který už existoval. V Úkolech to bylo horší — prázdný `catch` schoval chybu
 v okamžiku, kdy už úklid stihl mazat řádky (audit, nálezy 3 a 12).
 
-### 3. Bezpečnostní kontroly failují CLOSED
+### 4. Bezpečnostní kontroly failují CLOSED
 
 Když se nepovede PŘEČÍST stav zámku, práv nebo bloku, ber to jako zamčeno /
 bez práv. Nikdy ne obráceně. „Nešlo se zeptat, tak to pustíme" je přesně ta
@@ -322,7 +361,7 @@ zámku a do logu jde hlasitá hláška, protože zamknout majitele venku kvůli
 nenastavené proměnné je horší než běžet bez zámku. Výjimka musí být vidět
 v kódu i v logu, jinak je to jen fail open pod jiným jménem.
 
-### 4. Mazání dat se nikdy nespouští automaticky při načtení stránky
+### 5. Mazání dat se nikdy nespouští automaticky při načtení stránky
 
 Úklid, deduplikace, „prořezání osiřelých řádků" — nic z toho nesmí běžet jako
 vedlejší efekt `load()`. Když už takový úklid musí být, spouští ho uživatel,
@@ -335,7 +374,7 @@ všechno najednou.
 smazal **všechny projekty uživatele** — bez potvrzení, bez hlášky. Jeden
 výpadek sítě = tichá ztráta dat (audit, nález 2).
 
-### 5. `grant execute … to anon` jen jako vědomé rozhodnutí
+### 6. `grant execute … to anon` jen jako vědomé rozhodnutí
 
 Anon klíč je v klientském bundlu, takže „anon" znamená „kdokoli na internetu".
 Funkce, která něco MĚNÍ, tam nemá co dělat. Uživatele si funkce bere
